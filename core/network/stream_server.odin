@@ -34,12 +34,7 @@ server_stream_receive :: proc(s: ^Server_Stream, g: ^game.Game, slot: game.Soldi
 	kind: Msg_Kind
 	m: Msg_Client_State
 	msg_kind(&b, &kind)
-	net_u16(&b, &m.round)
-	net_u32(&b, &m.seq)
-	net_u32(&b, &m.base)
-	net_u32(&b, &m.ack)
-	net_u32(&b, &m.event_ack)
-	net_u8(&b, &m.life)
+	msg_client_state_header(&b, &m.header)
 	if !buffer_ok(&b) || m.round != s.round || m.seq <= s.newest {
 		s.dropped += 1
 		return false
@@ -53,9 +48,7 @@ server_stream_receive :: proc(s: ^Server_Stream, g: ^game.Game, slot: game.Soldi
 		base = &s.ring[m.base % STREAM_RING]
 	}
 	if base != nil do m.owned = base^
-	fields_serialize(&b, SOLDIER_OWNED_FIELDS, &m.owned, base)
-	fields_serialize(&b, SOLDIER_LOADOUT_FIELDS, &m.owned, base)
-	net_bool(&b, &m.typing)
+	msg_client_state_body(&b, &m, base)
 	if !buffer_ok(&b) || game.soldier_out_of_bounds(g.world.polymap, m.owned.body.pos) {
 		s.dropped += 1
 		return false
@@ -106,7 +99,8 @@ snapshot_bytes :: proc(m: ^Msg_Snapshot, base: ^Snap_Base, words: ^Wire_Queue, e
 	b := buffer_writer(buf)
 	kind := Msg_Kind.Snapshot
 	msg_kind(&b, &kind)
-	msg_snapshot(&b, m, base)
+	msg_snapshot_header(&b, &m.header)
+	msg_snapshot_body(&b, m, base)
 	wire_write(&b, words, event_ack, slot, event_max)
 	return buffer_written(&b) if buffer_ok(&b) else nil, b.bad
 }

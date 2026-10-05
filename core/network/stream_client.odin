@@ -30,13 +30,11 @@ STREAM_VIEW_SLACK :: 2           // frames in hand beyond interp, at the leanest
 STREAM_STEPS_MAX :: 16           // a word is stepped on this far at most: past it, it stands
 THING_TOLERANCE :: f32(10)       // a thing's points are taken only when they disagree by more than this
 
+// A snapshot as the client keeps it, for the tick that shows it.
 Snap_Frame :: struct {
-	soldiers:   [game.MAX_PLAYERS]game.Soldier,
-	word:       [game.MAX_PLAYERS]Snap_Word,
-	things:     [game.MAX_THINGS]game.Thing,
-	thing_word: [game.MAX_THINGS]Snap_Word,
-	match:      game.Round,
-	tick:       u32,
+	using state: Snap_State,
+	match:       game.Round,
+	tick:        u32,
 }
 
 Client_Stream :: struct {
@@ -120,11 +118,7 @@ client_stream_hear :: proc(c: ^Client_Stream, g: ^game.Game, me: game.Soldier_Id
 	kind: Msg_Kind
 	m := new(Msg_Snapshot, context.temp_allocator)
 	msg_kind(&b, &kind)
-	net_u16(&b, &m.round)
-	net_u32(&b, &m.tick)
-	net_u32(&b, &m.base)
-	net_u32(&b, &m.client_ack)
-	net_u32(&b, &m.client_event_ack)
+	msg_snapshot_header(&b, &m.header)
 	if buffer_ok(&b) && m.round != c.round { // another round's: the Map that begins it hasn't come, or it is over
 		c.stale += 1
 		return false
@@ -152,10 +146,7 @@ client_stream_hear :: proc(c: ^Client_Stream, g: ^game.Game, me: game.Soldier_Id
 			if frame.thing_word[i] == .State do m.things[i] = frame.things[i]
 		}
 	}
-	// read again from the top: the routine reads the header again, into the same values
-	b = buffer_reader(data)
-	msg_kind(&b, &kind)
-	msg_snapshot(&b, m, against)
+	msg_snapshot_body(&b, m, against)
 	if !buffer_ok(&b) {
 		c.dropped += 1
 		return false
@@ -199,12 +190,7 @@ client_stream_hear :: proc(c: ^Client_Stream, g: ^game.Game, me: game.Soldier_Id
 	}
 
 	frame := &c.snaps[m.tick % STREAM_RING]
-	frame.soldiers = m.soldiers
-	frame.word = m.word
-	frame.things = m.things
-	frame.thing_word = m.thing_word
-	frame.match = m.match
-	frame.tick = m.tick
+	frame^ = {state = m.state, match = m.match, tick = m.tick}
 	c.newest = m.tick
 	c.server_ack = max(c.server_ack, m.client_ack)
 	return true
@@ -412,7 +398,8 @@ client_stream_state :: proc(c: ^Client_Stream, me: ^game.Soldier, buf: []u8) -> 
 	kind := Msg_Kind.Client_State
 	m := Msg_Client_State{round = c.round, seq = seq, base = base_seq, ack = c.newest, event_ack = c.event_last, life = me.vitals.life, owned = me^, typing = me.player.typing}
 	msg_kind(&b, &kind)
-	msg_client_state(&b, &m, base)
+	msg_client_state_header(&b, &m.header)
+	msg_client_state_body(&b, &m, base)
 	wire_write(&b, &c.out, c.event_ack, nil, WIRE_PER_PACKET)
 	if !buffer_ok(&b) do return nil
 

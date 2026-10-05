@@ -245,28 +245,14 @@ msg_map_reply :: proc(b: ^Buffer, m: ^Msg_Map_Reply) {
 }
 
 // The weapons' numbers the server's game plays by, every weapon's, in a message of its
-// own (17 weapons of 14 numbers fit a datagram). A client plays by them.
+// own (17 weapons of 14 numbers fit a datagram). A client plays by them. Sent by its
+// fields (fields.odin), so a number added to res.Weapon_Stats goes with the rest.
 Msg_Weapons :: struct {
 	weapons: res.Weapon_Table,
 }
 
 msg_weapons :: proc(b: ^Buffer, m: ^Msg_Weapons) {
-	for &s in m.weapons {
-		net_f32(b, &s.damage)
-		net_signed(b, &s.fire_interval, 32)
-		net_signed(b, &s.ammo, 32)
-		net_signed(b, &s.reload_time, 32)
-		net_f32(b, &s.speed)
-		net_signed(b, &s.start_up_time, 32)
-		net_signed(b, &s.bink, 32)
-		net_f32(b, &s.movement_accuracy)
-		net_f32(b, &s.bullet_spread)
-		net_f32(b, &s.push)
-		net_f32(b, &s.inherited_velocity)
-		net_f32(b, &s.head_modifier)
-		net_f32(b, &s.chest_modifier)
-		net_f32(b, &s.leg_modifier)
-	}
+	fields_serialize(b, WEAPONS_FIELDS, m, nil)
 }
 
 // ---------------------------------------------------------------------------------

@@ -33,28 +33,39 @@ STREAM_RELEASE_TICKS :: 30 // no word for this long: the keys are let go
 // ---------------------------------------------------------------------------------
 // The messages
 
+// Each stream's message is a header and a body. The header says what the body is a delta
+// against, so a reader reads the header, finds that base, and reads the body against it.
+
+// The client state's header.
+Client_State_Header :: struct {
+	round:     u16, // the round it is of (Msg_Map); another round's is dropped
+	seq:       u32, // this state's number, the client's count from 1
+	base:      u32, // the state it is a delta against, 0 for whole
+	ack:       u32, // the newest snapshot (its tick) the client has, 0 for none
+	event_ack: u32, // the newest of the server's words the client has heard
+	life:      u8,  // the life the soldier is on here: the word of an older life is not taken
+}
+
 Msg_Client_State :: struct {
-	round:     u16,          // the round it is of (Msg_Map); another round's is dropped
-	seq:       u32,          // this state's number, the client's count from 1
-	base:      u32,          // the state it is a delta against, 0 for whole
-	ack:       u32,          // the newest snapshot (its tick) the client has, 0 for none
-	event_ack: u32,          // the newest of the server's words the client has heard
-	life:      u8,           // the life the soldier is on here: the word of an older life is not taken
-	owned:     game.Soldier, // the owned half, and the loadout, ride in a Soldier
-	typing:    bool,         // the player is at the chat prompt: the dots over its head
+	using header: Client_State_Header,
+	owned:        game.Soldier, // the owned half, and the loadout, ride in a Soldier
+	typing:       bool,         // the player is at the chat prompt: the dots over its head
 	// then the client's own decisions since the server's acknowledgement (wire_write)
 }
 
-// The header and the half; `base` is the soldier the delta is against, nil for whole;
-// in reading, the fields it holds that didn't change are taken from it. The words
-// follow, written and read with wire_write and wire_read.
-msg_client_state :: proc(b: ^Buffer, m: ^Msg_Client_State, base: ^game.Soldier) {
-	net_u16(b, &m.round)
-	net_u32(b, &m.seq)
-	net_u32(b, &m.base)
-	net_u32(b, &m.ack)
-	net_u32(b, &m.event_ack)
-	net_u8(b, &m.life)
+msg_client_state_header :: proc(b: ^Buffer, h: ^Client_State_Header) {
+	net_u16(b, &h.round)
+	net_u32(b, &h.seq)
+	net_u32(b, &h.base)
+	net_u32(b, &h.ack)
+	net_u32(b, &h.event_ack)
+	net_u8(b, &h.life)
+}
+
+// The half; `base` is the soldier the delta is against, nil for whole; in reading, the
+// fields it holds that didn't change are taken from it. The words follow, written and
+// read with wire_write and wire_read.
+msg_client_state_body :: proc(b: ^Buffer, m: ^Msg_Client_State, base: ^game.Soldier) {
 	fields_serialize(b, SOLDIER_OWNED_FIELDS, &m.owned, base)
 	fields_serialize(b, SOLDIER_LOADOUT_FIELDS, &m.owned, base)
 	net_bool(b, &m.typing)
@@ -66,24 +77,37 @@ Snap_Word :: enum u8 {
 	Same,  // nothing this time: keep stepping it
 }
 
-Msg_Snapshot :: struct {
+// What a snapshot says of the soldiers and the things: a word for each slot, and its
+// state where the word is State.
+Snap_State :: struct {
+	word:       [game.MAX_PLAYERS]Snap_Word,
+	soldiers:   [game.MAX_PLAYERS]game.Soldier,
+	thing_word: [game.MAX_THINGS]Snap_Word,
+	things:     [game.MAX_THINGS]game.Thing,
+}
+
+// The snapshot's header.
+Snapshot_Header :: struct {
 	round:            u16, // the round it is of (Msg_Map); another round's is dropped
 	tick:             u32, // the snapshot's number
 	base:             u32, // the snapshot it is a delta against, 0 for whole
 	client_ack:       u32, // the newest client state (its seq) the server has from this client
 	client_event_ack: u32, // the newest of the client's words the server has heard
-	match:            game.Round,
-	word:             [game.MAX_PLAYERS]Snap_Word,
-	soldiers:         [game.MAX_PLAYERS]game.Soldier,
-	names:            [game.MAX_PLAYERS]Name, // sent with a soldier that goes whole
-	thing_word:       [game.MAX_THINGS]Snap_Word,
-	things:           [game.MAX_THINGS]game.Thing,
+}
+
+Msg_Snapshot :: struct {
+	using header: Snapshot_Header,
+	match:        game.Round,
+	using state:  Snap_State,
+	names:        [game.MAX_PLAYERS]Name, // sent with a soldier that goes whole
 	// then the server's words since the client's acknowledgement (wire_write)
 }
 
 // What a snapshot is a delta against: the soldiers and things of the acknowledged
-// snapshot and the words it carried; nil for whole. A slot the base did not carry (not
-// State) goes whole, and a soldier that goes whole brings its name.
+// snapshot and the words it carried, by reference, since the server keeps them apart
+// (the soldiers and things in the game's history, the words in what it sent); nil for
+// whole. A slot the base did not carry (not State) goes whole, and a soldier that goes
+// whole brings its name.
 Snap_Base :: struct {
 	soldiers:   ^[game.MAX_PLAYERS]game.Soldier,
 	word:       ^[game.MAX_PLAYERS]Snap_Word,
@@ -91,14 +115,17 @@ Snap_Base :: struct {
 	thing_word: ^[game.MAX_THINGS]Snap_Word,
 }
 
-// The header, the round, the soldiers with their names, the things. The words follow,
-// written and read with wire_write and wire_read_pending.
-msg_snapshot :: proc(b: ^Buffer, m: ^Msg_Snapshot, base: ^Snap_Base) {
-	net_u16(b, &m.round)
-	net_u32(b, &m.tick)
-	net_u32(b, &m.base)
-	net_u32(b, &m.client_ack)
-	net_u32(b, &m.client_event_ack)
+msg_snapshot_header :: proc(b: ^Buffer, h: ^Snapshot_Header) {
+	net_u16(b, &h.round)
+	net_u32(b, &h.tick)
+	net_u32(b, &h.base)
+	net_u32(b, &h.client_ack)
+	net_u32(b, &h.client_event_ack)
+}
+
+// The round, the soldiers with their names, the things. The words follow, written and
+// read with wire_write and wire_read_pending.
+msg_snapshot_body :: proc(b: ^Buffer, m: ^Msg_Snapshot, base: ^Snap_Base) {
 	net_round(b, &m.match)
 	for &word, i in m.word {
 		net_enum(b, &word)

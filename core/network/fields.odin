@@ -50,12 +50,14 @@ Field_Kind :: enum {
 
 Field_Table :: []Field
 
-// The soldier's halves (soldier.odin's tags), its loadout, a thing, and a look.
+// The soldier's halves (soldier.odin's tags), its loadout, a thing, a look, and the
+// weapons' numbers.
 SOLDIER_OWNED_FIELDS: Field_Table
 SOLDIER_SERVED_FIELDS: Field_Table
 SOLDIER_LOADOUT_FIELDS: Field_Table
 THING_FIELDS: Field_Table
 LOOK_FIELDS: Field_Table
+WEAPONS_FIELDS: Field_Table
 
 @(init, private = "file")
 tables_init :: proc "contextless" () {
@@ -65,6 +67,7 @@ tables_init :: proc "contextless" () {
 	SOLDIER_LOADOUT_FIELDS = fields_of(game.Soldier, "loadout")
 	THING_FIELDS = fields_of(game.Thing, "served")
 	LOOK_FIELDS = fields_of(game.Look, "")
+	WEAPONS_FIELDS = fields_of(Msg_Weapons, "")
 }
 
 // The fields of `id` in `group`, or all of them for "". Kept for the program's life.
@@ -126,6 +129,10 @@ add :: proc(fields: ^[dynamic]Field, info: ^runtime.Type_Info, want: string, off
 	case runtime.Type_Info_Struct:
 		collect(fields, info.id, want, offset, name, groups)
 	case runtime.Type_Info_Array:
+		for i in 0 ..< v.count {
+			add(fields, v.elem, want, offset + uintptr(i * v.elem_size), fmt.aprintf("%s[%d]", name, i), groups, bits)
+		}
+	case runtime.Type_Info_Enumerated_Array: // [Weapon]T, in the enum's order
 		for i in 0 ..< v.count {
 			add(fields, v.elem, want, offset + uintptr(i * v.elem_size), fmt.aprintf("%s[%d]", name, i), groups, bits)
 		}

@@ -76,6 +76,13 @@ union_serialize :: proc(b: ^Buffer, info: ^runtime.Type_Info, at: rawptr) {
 	}
 }
 
+// One word as the queue sends it: its number, the tick it happened, and the word.
+net_stamped :: proc(b: ^Buffer, seq: ^u32, item: ^Stamped) {
+	net_u32(b, seq)
+	net_u32(b, &item.tick)
+	net_word(b, &item.word)
+}
+
 // The tables of the words' payloads, made as first needed.
 @(private = "file")
 table_of :: proc(id: typeid) -> Field_Table {
@@ -160,9 +167,7 @@ wire_write :: proc(b: ^Buffer, q: ^Wire_Queue, ack: u32, receiver: Maybe(game.So
 		if heard_from(q, seq, receiver) do continue
 		item := q.items[seq % WIRE_QUEUE]
 		number := seq
-		net_u32(b, &number)
-		net_u32(b, &item.tick)
-		net_word(b, &item.word)
+		net_stamped(b, &number, &item)
 		written += 1
 	}
 }
@@ -186,16 +191,14 @@ wire_read :: proc(b: ^Buffer, world: ^game.World, last: ^u32, only_owner: game.S
 	net_range(b, &count, WIRE_PER_PACKET)
 	for _ in 0 ..< count {
 		if !buffer_ok(b) do return
-		seq, tick: u32
-		word: game.Word
-		net_u32(b, &seq)
-		net_u32(b, &tick)
-		net_word(b, &word)
+		seq: u32
+		item: Stamped
+		net_stamped(b, &seq, &item)
 		if !buffer_ok(b) || seq <= last^ do continue
 		last^ = seq
-		if wire_side(word) != .Owner || wire_owner(word) != only_owner do continue
-		game.world_hear(world, word, tick)
-		if shot, is_shot := word.(game.Shot); is_shot do wire_push(relay, shot, tick, only_owner)
+		if wire_side(item.word) != .Owner || wire_owner(item.word) != only_owner do continue
+		game.world_hear(world, item.word, item.tick)
+		if shot, is_shot := item.word.(game.Shot); is_shot do wire_push(relay, shot, item.tick, only_owner)
 	}
 }
 
@@ -223,9 +226,7 @@ wire_read_pending :: proc(b: ^Buffer, p: ^Wire_Pending) {
 		if !buffer_ok(b) do return
 		seq: u32
 		item: Stamped
-		net_u32(b, &seq)
-		net_u32(b, &item.tick)
-		net_word(b, &item.word)
+		net_stamped(b, &seq, &item)
 		if !buffer_ok(b) do continue
 		// the first heard begins the count: what came before a newcomer is nobody's news
 		if p.received == 0 && p.applied == 0 && seq > 0 do p.applied = seq - 1
