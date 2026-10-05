@@ -1,0 +1,265 @@
+package server
+
+import "core:fmt"
+import "core:log"
+import "core:strconv"
+import "core:time"
+
+import sa "core:container/small_array"
+
+import "../core/game"
+import net "../core/network"
+import "../core/utils"
+import "lists"
+
+// The admin commands, said in the chat by an admin (`from` its slot) or typed at the
+// server's console (`from` nil), and answered to whoever said it:
+//
+//   kick <player> [reason]           off the server
+//   ban <player> [minutes] [reason]  off it and barred by address and machine; no minutes, or 0, for ever
+//   banip <address> [minutes] [reason]
+//   banhw <hardware ID> [minutes] [reason]
+//   unban <address, hardware ID or the name banned>
+//   mute <player> / unmute <player, address, hardware ID or name>   their chat reaches nobody,
+//                                    rejoining or not, by address and machine
+//   map <name>                       the round ends, and that map follows
+//   bans / mutes / admins            the lists
+//
+// A player names a slot, or a name or as much of one as is typed. Anyone may say
+// /login <password>, which with the admin password set makes them an admin until they
+// leave. In the chat /mute and /unmute are a player's own, kept by their client (the
+// original's), so an admin's, for everyone, are /servermute and /serverunmute; the
+// console's are both.
+
+ADMIN_COMMANDS :: [?]string{"kick", "ban", "banip", "banhw", "unban", "mute", "unmute", "map", "bans", "mutes", "admins"}
+
+// An admin command, if `text` (without its '/') is one: done, or refused, and answered.
+// False if it isn't one; then it is a player's to try as anything else.
+admin_command :: proc(sv: ^Server, from: Maybe(game.Soldier_Id), text: string) -> bool {
+	word, rest := next_word(text)
+	switch word {
+	case "servermute":   word = "mute"
+	case "serverunmute": word = "unmute"
+	}
+	if word == "login" {
+		login(sv, from, rest)
+		return true
+	}
+	known: bool
+	for command in ADMIN_COMMANDS do known |= word == command
+	if !known do return false
+	if slot, is_player := from.?; is_player && !sv.players[slot].admin {
+		reply(sv, from, fmt.tprintf("/%s is for admins.", word))
+		return true
+	}
+	by := "the console"
+	if slot, is_player := from.?; is_player do by = utils.short_string_text(&sv.players[slot].name)
+
+	switch word {
+	case "kick":
+		arg, reason := next_word(rest)
+		slot, found := player_named(sv, arg)
+		switch {
+		case !found:
+			reply(sv, from, fmt.tprintf("No player %s.", arg))
+		case sv.players[slot].bot:
+			player_remove_bot(sv, slot)
+		case:
+			log.infof("%s kicked by %s", utils.short_string_text(&sv.players[slot].name), by)
+			sv.players[slot].kick_why = .Console
+			player_kick(sv, slot, reason if reason != "" else "Kicked by an admin")
+		}
+	case "ban", "banip", "banhw":
+		ban(sv, from, by, word, rest)
+	case "unban": // by address, hardware ID, or the name the ban was given
+		arg, _ := next_word(rest)
+		host, hwid, named := whom_named(arg, sa.slice(&sv.lists.bans))
+		if named && lists.lists_unban(&sv.lists, host, hwid) {
+			reply(sv, from, fmt.tprintf("%s unbanned.", arg))
+		} else {
+			reply(sv, from, fmt.tprintf("%s isn't banned.", arg))
+		}
+	case "mute":
+		arg, _ := next_word(rest)
+		slot, found := person_named(sv, from, arg)
+		if !found do return true
+		player := &sv.players[slot]
+		host, hwid := net.peer_address(player.peer), utils.short_string_text(&player.hwid)
+		lists.lists_mute(&sv.lists, host, hwid, utils.short_string_text(&player.name))
+		set_muted(sv, host, hwid, true)
+		tell(sv, slot, "You have been muted.")
+		reply(sv, from, fmt.tprintf("%s muted.", utils.short_string_text(&player.name)))
+		log.infof("%s muted %s", by, utils.short_string_text(&player.name))
+	case "unmute": // a player on, or by address, hardware ID or name
+		arg, _ := next_word(rest)
+		host: u32
+		hwid: string
+		slot, found := player_named(sv, arg)
+		named := found && sv.players[slot].peer != nil
+		if named {
+			host, hwid = net.peer_address(sv.players[slot].peer), utils.short_string_text(&sv.players[slot].hwid)
+		} else {
+			host, hwid, named = whom_named(arg, sa.slice(&sv.lists.mutes))
+		}
+		if named && lists.lists_unmute(&sv.lists, host, hwid) {
+			set_muted(sv, host, hwid, false)
+			if found && sv.players[slot].peer != nil do tell(sv, slot, "You have been unmuted.")
+			reply(sv, from, fmt.tprintf("%s unmuted.", arg))
+		} else {
+			reply(sv, from, fmt.tprintf("%s isn't muted.", arg))
+		}
+	case "map":
+		arg, _ := next_word(rest)
+		if !map_known(sv, arg) {
+			reply(sv, from, fmt.tprintf("No map %s.", arg))
+		} else {
+			utils.short_string_set(&sv.vote_map, arg) // the round takes it as a passed vote
+			log.infof("%s changed the map to %s", by, arg)
+		}
+	case "bans":
+		now := time.to_unix_seconds(time.now())
+		bans := sa.slice(&sv.lists.bans)
+		reply(sv, from, fmt.tprintf("%d bans", len(bans)))
+		for &b, i in bans {
+			if from != nil && i >= 10 do break
+			expires := b.expires if b.expires != 0 && b.expires > now else 0
+			reply(sv, from, fmt.tprintf("%s %s %s: %s", lists.whom_text(b.host, utils.short_string_text(&b.hwid)), utils.short_string_text(&b.name), ban_length(expires), utils.short_string_text(&b.reason)))
+		}
+	case "mutes", "admins":
+		entries := sa.slice(&sv.lists.mutes) if word == "mutes" else sa.slice(&sv.lists.admins)
+		reply(sv, from, fmt.tprintf("%d %s", len(entries), word))
+		for &entry, i in entries {
+			if from != nil && i >= 10 do break
+			whom := lists.whom_text(entry.host, utils.short_string_text(&entry.hwid)) if word == "mutes" else lists.address_text(entry.host)
+			reply(sv, from, fmt.tprintf("%s %s", whom, utils.short_string_text(&entry.name)))
+		}
+	}
+	return true
+}
+
+// /login <password>: said by a player, with the admin password set.
+@(private = "file")
+login :: proc(sv: ^Server, from: Maybe(game.Soldier_Id), password: string) {
+	slot, is_player := from.?
+	if !is_player do return
+	name := utils.short_string_text(&sv.players[slot].name)
+	wanted := sv.options.config.server.admin_password
+	if wanted == "" || password != wanted {
+		reply(sv, from, "Wrong password.")
+		log.infof("%s tried the admin password and missed", name)
+	} else {
+		sv.players[slot].admin = true
+		reply(sv, from, "You are an admin until you leave.")
+		log.infof("%s logged in as an admin", name)
+	}
+}
+
+// ban <player>, banip <address>, banhw <hardware ID>, then [minutes] [reason]: a player
+// by address and machine both; an address alone; a machine alone.
+@(private = "file")
+ban :: proc(sv: ^Server, from: Maybe(game.Soldier_Id), by, word, rest: string) {
+	arg, after := next_word(rest)
+	host: u32
+	hwid, name: string
+	switch word {
+	case "ban":
+		slot, found := person_named(sv, from, arg)
+		if !found do return
+		player := &sv.players[slot]
+		host, hwid, name = net.peer_address(player.peer), utils.short_string_text(&player.hwid), utils.short_string_text(&player.name)
+	case "banip":
+		ok: bool
+		if host, ok = lists.address_parse(arg); !ok {
+			reply(sv, from, fmt.tprintf("%s is not an address (1.2.3.4).", arg))
+			return
+		}
+	case "banhw":
+		parsed, ok := lists.hwid_parse(arg)
+		if !ok {
+			reply(sv, from, fmt.tprintf("%s is not a hardware ID (eleven hex digits).", arg))
+			return
+		}
+		hwid = utils.short_string_text(&parsed)
+	}
+	seconds, said := ban_seconds(after)
+	reason := said if said != "" else "Banned by an admin"
+	expires := time.to_unix_seconds(time.now()) + seconds if seconds > 0 else 0
+	lists.lists_ban(&sv.lists, host, hwid, expires, name, reason)
+	whom := lists.whom_text(host, hwid)
+	shown := name if name != "" else arg
+	reply(sv, from, fmt.tprintf("%s (%s) banned %s.", shown, whom, ban_length(expires)))
+	log.infof("%s banned %s (%s) %s: %s", by, shown, whom, ban_length(expires), reason)
+	// everyone on from that address or machine is cut off
+	for &player, i in sv.players {
+		if !is_whom(&player, host, hwid) do continue
+		player.kick_why = .Console
+		player_kick(sv, game.Soldier_Id(i), reason)
+	}
+}
+
+// An answer to whoever ran an admin command: the player, or the server's console.
+@(private = "file")
+reply :: proc(sv: ^Server, from: Maybe(game.Soldier_Id), text: string) {
+	if slot, is_player := from.?; is_player {
+		tell(sv, slot, text)
+	} else {
+		log.info(text)
+	}
+}
+
+// A ban's length, if the first word of `text` is a number of minutes: taken, in seconds
+// (0 for ever), and the rest. With none, for ever.
+@(private = "file")
+ban_seconds :: proc(text: string) -> (seconds: i64, rest: string) {
+	word, after := next_word(text)
+	minutes, is_number := strconv.parse_int(word)
+	if !is_number do return 0, text
+	return i64(max(minutes, 0)) * 60, after
+}
+
+@(private = "file")
+ban_length :: proc(expires: i64) -> string {
+	if expires == 0 do return "for ever"
+	return fmt.tprintf("for %d minutes", (expires - time.to_unix_seconds(time.now()) + 59) / 60)
+}
+
+// Whether the player is from `host` (0 for any) or this machine (`hwid`, empty for
+// any): either names them.
+@(private = "file")
+is_whom :: proc(player: ^Player, host: u32, hwid: string) -> bool {
+	if player.peer == nil do return false
+	if host != 0 && net.peer_address(player.peer) == host do return true
+	own := utils.short_string_text(&player.hwid)
+	return hwid != "" && own != "" && own == hwid
+}
+
+@(private = "file")
+set_muted :: proc(sv: ^Server, host: u32, hwid: string, muted: bool) {
+	for &player in sv.players {
+		if is_whom(&player, host, hwid) do player.muted = muted
+	}
+}
+
+// Whom a command's word names, for unban and unmute: an address, a hardware ID, or the
+// name an entry of `entries` was given.
+@(private = "file")
+whom_named :: proc(word: string, entries: []$E) -> (host: u32, hwid: string, ok: bool) {
+	if host, ok = lists.address_parse(word); ok do return
+	if parsed, is_hwid := lists.hwid_parse(word); is_hwid do return 0, utils.short_string_text(&parsed), true
+	for &entry in entries {
+		if utils.short_string_text(&entry.name) != word do continue
+		return entry.host, utils.short_string_text(&entry.hwid), true
+	}
+	return 0, "", false
+}
+
+// The player a command names, a person on the line and not a bot; said, otherwise.
+@(private = "file")
+person_named :: proc(sv: ^Server, from: Maybe(game.Soldier_Id), name: string) -> (game.Soldier_Id, bool) {
+	slot, found := player_named(sv, name)
+	if !found || sv.players[slot].peer == nil {
+		reply(sv, from, fmt.tprintf("No player %s.", name))
+		return 0, false
+	}
+	return slot, true
+}

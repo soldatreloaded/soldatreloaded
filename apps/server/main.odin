@@ -1,0 +1,190 @@
+package main
+
+// The server, headless: a console around a hosted game (server/), and a loop that pumps
+// it until it is told to stop. It reads its config, loads the map, listens on its port,
+// gives everyone who says Hello a soldier, plays the bots asked for, ticks the world
+// with authority, and stops on `quit` or Ctrl-C.
+//
+// It runs from the install's root (assets/ in this repository), as the client does, and
+// keeps its files there:
+//
+//   server.config.json   how it hosts, the rotation, the weapons, the admins, bans and
+//                        mutes (core/resources/serverconfig.odin),
+//                        written whole as it starts, so it shows every setting, and as
+//                        the bans and mutes change
+//   scripts/main.lua     the script, as the config names it (script.odin)
+//
+//   server [-map:<name>] [-port:<port>]
+//
+// What is typed at it, a line at a time, is a console command (console.odin).
+
+import "base:runtime"
+import "core:c/libc"
+import "core:flags"
+import "core:log"
+import "core:os"
+import "core:strings"
+import "core:sync"
+import "core:time"
+
+import "../../core/game"
+import net "../../core/network"
+import res "../../core/resources"
+import "../../server"
+import "../../server/lobby"
+import scripting "../../server/script"
+
+// The files, at the install's root, where the server runs: assets/ in this repository.
+SERVER_CONFIG :: "server.config.json"
+
+SLEEP :: time.Millisecond // between passes of the loop, so it never spins flat out
+
+Arguments :: struct {
+	map_name: string `args:"name=map" usage:"the first round's map; else the rotation's first"`,
+	port:     u16 `usage:"the UDP port to listen on, over server.config.json's"`,
+}
+
+App :: struct {
+	sv:      server.Server,
+	config:  ^res.Server_Config,
+	weapons: res.Weapon_Settings, // the weapons as they stand: the config's, and the `weapon` lines since
+	lobby:   lobby.Lobby,
+	script:  scripting.Script, // held by its address while open
+	quit:    bool,
+}
+
+@(private = "file")
+interrupted: bool // Ctrl-C, or a kill
+
+main :: proc() {
+	context.logger = log.create_console_logger(.Info, {.Level, .Time})
+	args: Arguments
+	flags.parse_or_exit(&args, os.args)
+
+	app := new(App)
+	defer free(app)
+	if !start(app, args) do os.exit(1)
+	libc.signal(libc.SIGINT, on_interrupt)
+	libc.signal(libc.SIGTERM, on_interrupt)
+	stdin_start()
+
+	// The line is heard before the ticks; each tick the players' soldiers step on their
+	// last keys and the bots on their own minds, and a snapshot goes to everyone; the
+	// line is flushed after (server_pump).
+	last := time.tick_now()
+	for !app.quit && !sync.atomic_load(&interrupted) {
+		dt := time.duration_seconds(time.tick_lap_time(&last))
+		for line in stdin_take() do console_execute(app, line)
+		if !server.server_pump(&app.sv, dt) do app.quit = true
+		app_pump(app)
+		lobby.lobby_pump(&app.lobby, lobby_settings(app), time.duration_seconds(time.tick_since({})))
+		free_all(context.temp_allocator)
+		time.sleep(SLEEP)
+	}
+
+	log.info("stopping")
+	stop(app)
+}
+
+@(private = "file")
+on_interrupt :: proc "c" (_: i32) {
+	sync.atomic_store(&interrupted, true)
+}
+
+// The config and the files beside it, the network, and the game hosted on them.
+// The config, the network, and the game hosted on them.
+@(private = "file")
+start :: proc(app: ^App, args: Arguments) -> bool {
+	app.config = res.server_config_load(SERVER_CONFIG)
+	// its file whole, as it stands; the command line is the server's (Options), not the file's
+	if !res.server_config_save(app.config, SERVER_CONFIG) do log.errorf("could not write %s", SERVER_CONFIG)
+	app.weapons = app.config.weapons
+
+	if !net.net_init() {
+		log.error("ENet wouldn't start")
+		return false
+	}
+	options := server.Options {
+		config      = app.config,
+		config_path = SERVER_CONFIG,
+		data_dir    = game.DATA_DIR,
+		first_map   = args.map_name,
+		port        = args.port,
+	}
+	if !server.server_init(&app.sv, options) {
+		net.net_shutdown()
+		return false
+	}
+	app_start(app)
+	lobby.lobby_init(&app.lobby)
+	return true
+}
+
+@(private = "file")
+stop :: proc(app: ^App) {
+	lobby.lobby_close(&app.lobby)
+	app_stop(app) // before the server it listens to
+	server.server_destroy(&app.sv)
+	net.net_shutdown()
+	res.server_config_destroy(app.config)
+}
+
+
+@(private = "file")
+lobby_settings :: proc(app: ^App) -> lobby.Settings {
+	l := &app.config.lobby
+	return {public = l.public, url = l.url if l.url != "" else lobby.DEFAULT_URL, address = l.ip, port = server.server_port(&app.sv)}
+}
+
+// ---------------------------------------------------------------------------------
+// The console's input: a thread blocks on the standard input line by line, and the loop
+// takes what has come. A thread rather than polling, because a console and a pipe are
+// polled differently on each platform and a blocking read is the same everywhere.
+
+STDIN_LINES :: 8
+
+@(private = "file")
+Stdin :: struct {
+	lock:  sync.Mutex,
+	lines: [dynamic]string, // read and not yet taken; a line that arrives while it is full is lost
+}
+
+@(private = "file")
+stdin: Stdin
+
+@(private = "file")
+stdin_start :: proc() {
+	stdin.lines = make([dynamic]string, runtime.default_allocator())
+	thread_start(proc() {
+		buf: [256]u8
+		line := strings.builder_make(runtime.default_allocator())
+		for {
+			n, err := os.read(os.stdin, buf[:])
+			if err != nil || n <= 0 do return
+			for c in buf[:n] {
+				switch c {
+				case '\r':
+				case '\n':
+					sync.guard(&stdin.lock)
+					if len(stdin.lines) < STDIN_LINES do append(&stdin.lines, strings.clone(strings.to_string(line), runtime.default_allocator()))
+					strings.builder_reset(&line)
+				case:
+					strings.write_byte(&line, c)
+				}
+			}
+		}
+	})
+}
+
+// The lines waiting, oldest first, in the temp allocator.
+@(private = "file")
+stdin_take :: proc() -> []string {
+	sync.guard(&stdin.lock)
+	taken := make([]string, len(stdin.lines), context.temp_allocator)
+	for line, i in stdin.lines {
+		taken[i] = strings.clone(line, context.temp_allocator)
+		delete(line, runtime.default_allocator())
+	}
+	clear(&stdin.lines)
+	return taken
+}
