@@ -16,14 +16,14 @@ The types:
 - `perf` — the same behaviour, faster or smaller on the wire.
 - `docs` — the readme, docs/, the comments that carry reasoning.
 - `test` — tests, and the tools that run them.
-- `build` — xmake.lua, the flags, the packaging, the workflows.
+- `build` — the flags, the packaging, the workflows and their actions (`.github/`).
 - `chore` — everything else: files in, files out, housekeeping.
 
 The scope is the part of the tree the change lands in, named as the tree names it: a
-package (`client`, `server`, `shared`, `launcher`), a part of one (`game`, `weapons`,
-`net`, `console`, `hud`, `anim`, `polymap`), or a part of the install (`config`, `data`,
-`mods`, `scripts`), and `readme`, `docs`, `tests`, `ci`. Leave it out when the change is
-the whole repo's.
+package (`client`, `server`, `game`, `net`, `bots`, `resources`, `utils`, `sandbox`,
+`launcher`), a part of one (`weapons`, `console`, `hud`, `anim`, `polymap`), or a part
+of the install (`config`, `data`, `mods`, `scripts`), and `readme`, `docs`, `tests`,
+`ci`. Leave it out when the change is the whole repo's.
 
 ### The body
 
@@ -69,54 +69,78 @@ The wire decides the rest. A Hello carries the layout of the state and a build t
 does not match is refused, so any release that changes the protocol will not talk to
 the one before it. Say so in the tag's message, every time.
 
-A tag is the version; what ships beside it is the game, the server and
-the contents of `assets/` (`data/`, `mods/default/` and `scripts/`), unpacked flat so
-that the art sits beside the executable: the packages `xmake dist` makes (see
-xmake.lua). The server's package ships `scripts/main.lua` too. No config ships: the
-game and the server each make theirs at the install's root with the defaults where it
-is missing (`client.config.json`, `server.config.json`), and a server's lists and
-weapons mod sit beside them, so unpacking a release over an install leaves them as they
-are. The tag alone is not a release until those exist.
+A tag with a suffix (`v0.2.0-rc.1`) is a pre-release: built and published like any
+other, for testing, but the updater does not move to it and Discord is not told.
 
-Players start the game (`Soldat Reloaded.exe`, `soldatreloaded` on Linux), at the
-top of the install, whose updater keeps their copy at the newest release as it starts
-(launcher/updater.h, launcher/update.h) and hosts Local Play itself; the server
-package's `server` sits at its top, the one executable there. On Linux the game's
-package keeps `soldatreloaded-launcher`, the launcher's name when it was apart from the
-game, as a script that starts the game: a launcher from then updates itself into it
-first, and players' shortcuts to it still play. Each
-release carries, for each platform, the game (`soldatreloaded-<version>-<platform>.zip`,
-what a player downloads) and a manifest naming every file of an install by its hash; the
-updater compares the install with it and brings what differs, those files alone, out
-of the game's zip where it lies, or the zip whole when most of it changed. So a release
-costs a player what it changed. The manifest lists every file the release ships; the
-updater treats each by where it lies, weighing the file on disk against the last
-release's manifest and the new one (launcher/update.h):
+### Making one
 
-- **The release's own**, kept as it has it: the top-level files (the game,
-  `version.txt`), `data/`, `mods/default/` and `scripts/examples/`. Missing or
-  otherwise, it is brought, damage repaired; dropped by a release, deleted.
-- **Everything else a release ships** (`scripts/main.lua`):
-  its start of a file that is then the player's. It is made where it never was, brought
-  anew only while it is still as the last release made it, left alone once the player
-  has changed it, stays out once they take it out, and
-  goes with a release that drops it only unchanged.
+```bash
+git tag -a v0.1.0
+```
 
-Any other mod in `mods/`, `demos/` and what a server writes beside its own install are the
-player's and the server owner's, in no manifest, and never touched. So:
+```bash
+git push origin v0.1.0
+```
 
-- A release that adds a cvar registers it in code with its default (`cvar_register`), and
-  its help, which the settings files show beside it: a file has its line commented out
-  while it holds the default, so a new or changed default reaches everyone who hasn't set it.
-- A new default bind goes in the code (input_default_binds, or the client's VIEW_BINDS) and
-  reaches every player who hasn't bound that key otherwise.
-- The newest *published* release is the one every launcher moves to, so a release that
-  shouldn't go out to players is made a pre-release or left a draft.
+The tag's message is the release's notes, so write it for players to read. Pushing the
+tag runs `.github/workflows/release.yml`, each step only if the one before succeeded:
 
-Pushing the tag makes them. The release workflow (.github/workflows/release.yml)
-builds the packages on Windows and Linux and runs the tests (ci.yml, which runs the same
-on every push to main and every pull request), attaches the archives to a GitHub release
-named after the tag, with the tag's message as its notes, and announces it on Discord
-(discord-notify.yml), each step only if the one before succeeded. So the
-version in xmake.lua's `set_version` is bumped in a commit before the tag, the tag's
-message is written for players to read, and a tag whose tests fail releases nothing.
+1. **test**: `ci.yml`, the same as on every push to `main` and every pull request: the
+   programs build and the tests pass, on Windows and Linux.
+2. **package**: `.github/actions/package`, for the client and the server on each
+   platform.
+3. **publish**: a GitHub release named after the tag, its notes the tag's message,
+   with every package and manifest attached.
+4. **discord**: `discord.yml` posts the release to the channel behind the
+   `DISCORD_WEBHOOK` secret (a webhook URL, set under the repository's Settings →
+   Secrets and variables → Actions). It can be run by hand from the Actions tab to
+   announce a release again.
+
+A tag whose tests fail releases nothing; delete it, fix, and tag again.
+
+### What a release ships
+
+Each package is a program and the part of `assets/` it reads, unpacked flat so that the
+install's root is the zip's:
+
+| Package | Holds |
+|---|---|
+| `soldatreloaded-<version>-<platform>.zip` | `soldatreloaded(.exe)`, `data/`, `mods/default/` |
+| `soldatreloaded-server-<version>-<platform>.zip` | `soldatreloaded-server(.exe)`, `data/`, `scripts/`, and `lua54.dll` on Windows |
+
+Both hold `license.md` and `version.txt`. The game has no use for the server's scripts
+and the server draws nothing, so neither carries the other's. The platforms are
+`windows` and `linux`. The server on Linux links the system's ENet, curl and mbedTLS,
+which a Linux server needs installed.
+
+No config ships. The game and the server each make theirs at the install's root, with
+the defaults, where it is missing (`client.config.json`, `server.config.json`); a
+server's bans, mutes and weapons live in its config. So unpacking a release over an
+install leaves them as they are.
+
+`.github/actions/package` is where a package is made: what goes in it, and the manifest.
+
+### The manifest
+
+Beside each zip is its manifest, `<package>.manifest.json`: every file of the install,
+by its path, size and SHA-256, sorted by path.
+
+```json
+{
+  "name": "soldatreloaded",
+  "version": "0.1.0",
+  "platform": "windows",
+  "archive": "soldatreloaded-0.1.0-windows.zip",
+  "files": [
+    {"path": "data/anims/barret.poa", "size": 36550, "sha256": "35b33f7b…"},
+    …
+  ]
+}
+```
+
+It is what the updater (`apps/updater`, to come) keeps an install by: it weighs each
+file on disk against the newest release's manifest and brings only what differs. What a
+manifest lists is the release's own, kept as the release has it: missing or changed, it
+is brought again; dropped by a release, it is deleted. What no manifest lists is the
+player's and never touched: the configs, any mod beside `mods/default/`, demos, and the
+scripts a server's owner writes beside the examples.
