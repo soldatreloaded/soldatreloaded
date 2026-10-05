@@ -15,30 +15,33 @@ what it is and which file does what.
 ## The layers
 
 ```
-apps/server    ─► core/network, core/bots
+apps/server    ─► core/network, core/bots, core/http
 apps/client    ─► core/bots                  (and core/network, once it plays online)
 apps/sandbox   ─► core/game
-apps/launcher     nothing yet
+apps/launcher  ─► core/http, core/resources
 
 core/network   ─► core/game
+core/http      ─► (curl)
 core/bots      ─► core/game
 core/game      ─► core/resources ─► core/utils
 ```
 
 A package imports only those beneath it. Nothing in `core/` opens a window, plays a
-sound or knows which program it is in; only `core/network` touches a socket.
+sound or knows which program it is in; only `core/network` and `core/http` reach the
+network.
 
 | Package | What it is |
 |---|---|
 | `core/utils` | Files, geometry, colours, fixed-size strings: what everything needs and nothing owns. |
-| `core/resources` | Everything read from disk, and nothing that plays: the configs, maps, animations, skeletons, weapons' numbers, bot profiles, mods, images and sounds. It knows no `game` type. |
+| `core/resources` | Everything read from disk, and nothing that plays: the configs, maps, animations, skeletons, weapons' numbers, bot profiles, mods, images, sounds and release manifests. It knows no `game` type. |
 | `core/game` | The simulation: one world, stepped a tick at a time, the same on every machine. |
 | `core/network` | The wire: messages, the two delta-compressed streams, the transport over ENet. |
 | `core/bots` | Soldiers the game plays itself, the original's AI ported as it stands. |
+| `core/http` | HTTPS through curl, started once and made to trust what it should, for the server's lobby and scripts and the launcher. |
 | `apps/server` | The hosted game and the dedicated server around it, one package, with the `lists` and `lobby` packages beneath it. |
 | `apps/client` | The game a player runs: a screen at a time, each screen and system a package of its own. |
 | `apps/sandbox` | Local play on one map against standing targets, drawn plainly, for looking at the simulation without the client. |
-| `apps/launcher` | Not yet written: it will keep an install at the newest release. |
+| `apps/launcher` | What a player starts: it brings the install up to the newest release, then starts the game. |
 
 ## The install
 
@@ -50,6 +53,7 @@ data/        what the game plays by: maps, animations, skeletons, objects, bots
 mods/        what it looks and sounds like: default/, and any others beside it
 scripts/     the server's Lua
 *.config.json   the configs, made with their defaults where they are missing
+manifest.json   the release the install was last brought up to, which the launcher keeps
 ```
 
 **`data/` is the same for everyone in a game.** The soldiers' movement is driven by the

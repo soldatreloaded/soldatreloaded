@@ -22,8 +22,8 @@ Now that the game is in a decent state, with most issues fixed, a refactor is du
 - **The client** has its main menu, and Local Play against bots with the HUD, sound and
   the full look of the game. Online play and demos are not there yet.
 - **Releases** are built and published by tagging (docs/git.md), each package with a
-  manifest of its files. **The updater**, which keeps an install at the newest release
-  by them, comes next.
+  manifest of its files. **The launcher** keeps a player's install at the newest
+  release by them, then starts the game.
 
 The game is capture the flag alone: deathmatch and the C game's other modes, the rope,
 the bonus kits, the flamer and the bows are left out.
@@ -96,7 +96,7 @@ core/bots        the bots
 apps/server      the hosted game and the dedicated server
 apps/client      the game a player runs
 apps/sandbox     a plain look at the simulation
-apps/launcher    keeps an install up to date (not yet written)
+apps/launcher    what a player starts: updates the install, then starts the game
 assets/          the install: data/, mods/ and scripts/
 tests/           a package of tests each
 ```

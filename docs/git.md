@@ -105,12 +105,13 @@ install's root is the zip's:
 
 | Package | Holds |
 |---|---|
-| `soldatreloaded-<version>-<platform>.zip` | `soldatreloaded(.exe)`, `data/`, `mods/default/` |
+| `soldatreloaded-<version>-<platform>.zip` | `soldatreloaded(.exe)`, `soldatreloaded-launcher(.exe)`, `data/`, `mods/default/` |
 | `soldatreloaded-server-<version>-<platform>.zip` | `soldatreloaded-server(.exe)`, `data/`, `scripts/`, and `lua54.dll` on Windows |
 
-Both hold `license.md` and `version.txt`. The game has no use for the server's scripts
-and the server draws nothing, so neither carries the other's. The platforms are
-`windows` and `linux`. The server on Linux links the system's ENet, curl and mbedTLS,
+Both hold `license.md`, `version.txt`, and their own manifest as `manifest.json`. Players
+start the launcher, which brings the install up to the newest release and starts the
+game. The game has no use for the server's scripts and the server draws nothing, so
+neither carries the other's. The platforms are `windows` and `linux`. The server on Linux links the system's ENet, curl and mbedTLS,
 which a Linux server needs installed.
 
 No config ships. The game and the server each make theirs at the install's root, with
@@ -122,8 +123,9 @@ install leaves them as they are.
 
 ### The manifest
 
-Beside each zip is its manifest, `<package>.manifest.json`: every file of the install,
-by its path, size and SHA-256, sorted by path.
+Beside each zip is its manifest, `<package>.manifest.json`: every file of the install
+but the manifest itself, by its path, size and SHA-256, sorted by path. The install
+keeps a copy as `manifest.json`.
 
 ```json
 {
@@ -138,9 +140,13 @@ by its path, size and SHA-256, sorted by path.
 }
 ```
 
-It is what the updater (`apps/updater`, to come) keeps an install by: it weighs each
-file on disk against the newest release's manifest and brings only what differs. What a
-manifest lists is the release's own, kept as the release has it: missing or changed, it
-is brought again; dropped by a release, it is deleted. What no manifest lists is the
-player's and never touched: the configs, any mod beside `mods/default/`, demos, and the
-scripts a server's owner writes beside the examples.
+It is what the launcher (`apps/launcher`) keeps an install by, from three things: the
+newest release's manifest, the files on disk, and the install's `manifest.json`. A file
+the newest release lists that is missing or differs on disk is brought out of that
+release's zip; a file the install's manifest lists that the newest doesn't was dropped,
+and is deleted. So an update brings what changed and repairs what is damaged. What no
+manifest lists is the player's and never touched: the configs, any mod beside
+`mods/default/`, demos, and the scripts a server's owner writes beside the examples.
+
+The launcher follows GitHub's latest release, the newest that is published and not a
+pre-release.
