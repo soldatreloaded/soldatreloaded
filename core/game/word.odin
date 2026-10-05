@@ -1,0 +1,65 @@
+package game
+
+import sa "core:container/small_array"
+
+// Word from another machine: what the wire brings between ticks, done in the step at
+// the turn the C game's pass would have taken it from its mail. A client hears the
+// server's rulings, the others' shots and where a shot ended; the server hears each
+// owner's decisions: its shots, its gun thrown, its flag thrown.
+
+Word :: union {
+	Shot,       // an owner's, fired where it says; run forward to the present when heard
+	Gun_Drop,   // an owner's gun thrown, for the referee to lay down
+	Flag_Throw, // an owner's flag thrown, for the referee to allow
+	Shot_End,   // the server's word of where a shot ended
+	Ruling,     // the server's decision
+}
+
+MAX_HEARD :: 256
+CATCH_UP_MAX :: 30 // ticks a heard shot is run forward at most: half a second
+
+Hearing :: struct {
+	word:     Word,
+	catch_up: u8, // a shot's: how far behind the present it was fired
+}
+
+// `word`, said at `tick` on the machine it came from, for the next step. Dropped if the
+// inbox is full, as the C game's mail would be.
+world_hear :: proc(world: ^World, word: Word, tick: u32) {
+	catch_up: u8
+	if _, is_shot := word.(Shot); is_shot {
+		behind := world.tick - tick if world.tick > tick else 0
+		catch_up = u8(min(behind, CATCH_UP_MAX))
+	}
+	sa.push_back(&world.heard, Hearing{word, catch_up})
+}
+
+// The turns of a step at which what was heard is done.
+Turn :: enum {
+	Soldiers, // before them: the owners' throws, asked of the things as a soldier's are
+	Bullets,  // at the start of theirs: shots, and shots' ends, as the C game's bullets pass reads them
+	Wounds,   // where the referee lands the hits: wounds, deaths, new lives
+	Things,   // before the things' requests: what was decided about them
+}
+
+// What was heard that `turn` does, in the order heard; the inbox is emptied at the last.
+heard_apply :: proc(world: ^World, resources: ^Resources, authority: ^Authority, out: ^Tick_Output, turn: Turn) {
+	for hearing in sa.slice(&world.heard) {
+		switch w in hearing.word {
+		case Gun_Drop:   if turn == .Soldiers do things_ask(world, w)
+		case Flag_Throw: if turn == .Soldiers do things_ask(world, w)
+		case Shot:       if turn == .Bullets do bullet_hear(world, resources, w, hearing.catch_up, authority, out)
+		case Shot_End:   if turn == .Bullets do bullet_shot_end(world, resources, w, out)
+		case Ruling:     if turn == ruling_turn(w) do apply_ruling(world, resources, w)
+		}
+	}
+	if turn == .Things do sa.clear(&world.heard)
+}
+
+@(private = "file")
+ruling_turn :: proc(ruling: Ruling) -> Turn {
+	#partial switch _ in ruling {
+	case Damage, Kill, Respawn: return .Wounds
+	}
+	return .Things
+}
