@@ -19,6 +19,8 @@ import "core:fmt"
 import "core:log"
 import "core:strings"
 
+import "../../../core/http"
+
 // The lobby a server talks to unless sv_lobby names another; network.LOBBY_URL
 // (core/network/query.odin), repeated here so the lobby needs none of the game.
 DEFAULT_URL :: "https://soldatreloaded-lobby.fly.dev"
@@ -136,7 +138,7 @@ lobby_init :: proc(l: ^Lobby) {
 		interval  = DEFAULT_INTERVAL,
 		allocator = context.allocator,
 	}
-	http_init()
+	http.start()
 }
 
 @(private = "file")

@@ -1,11 +1,12 @@
 #+build !windows
 #+build !darwin
-package server
+package http
 
 import "core:os"
 
 // The distribution's certificates for curl, which is built on mbedTLS here and knows
-// none of its own, as the lobby's requests find them (lobby/): nil if none is
+// none of its own: where the distributions keep theirs, Debian and Ubuntu, Fedora and
+// RHEL, openSUSE, Alpine and Arch (the first), and the older ones. nil if none is
 // found, and curl is left to its own.
 @(private)
 ca_bundle :: proc() -> cstring {

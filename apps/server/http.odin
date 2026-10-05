@@ -10,9 +10,12 @@ import "core:thread"
 import curl "vendor:curl"
 import lua "vendor:lua/5.4"
 
-// `http`: a request made by the script runs on a thread of its own, through libcurl, so
-// the game never waits on the web; its answer is handed to the script's callback from
-// script_pump, on the server's thread.
+import "../../core/http"
+
+// `http`: a request made by the script runs on a thread of its own, through libcurl
+// (started and made to trust what it should by core/http), so the game never waits on
+// the web; its answer is handed to the script's callback from script_pump, on the
+// server's thread.
 //
 //   http.request{url=, method=, body=, headers={}, timeout=}, callback(response)
 //
@@ -41,14 +44,11 @@ Http_Job :: struct {
 }
 
 @(private = "file")
-http_once: sync.Once
-
-@(private = "file")
 http_lua := [?]lua.L_Reg{{"request", l_http_request}, {nil, nil}}
 
 // The `http` global; http.get and http.post come with the prelude.
 http_open :: proc(L: ^lua.State) {
-	sync.once_do(&http_once, proc() {curl.global_init(curl.GLOBAL_DEFAULT)})
+	http.start()
 	lua.createtable(L, 0, len(http_lua) - 1)
 	lua.L_setfuncs(L, &http_lua[0], 0)
 	lua.setglobal(L, "http")
@@ -144,12 +144,7 @@ http_run :: proc(job: ^Http_Job) {
 		curl.easy_setopt(handle, .NOSIGNAL, c.long(1))
 		curl.easy_setopt(handle, .USERAGENT, cstring(HTTP_AGENT))
 		curl.easy_setopt(handle, .ERRORBUFFER, &job.error[0])
-		when ODIN_OS == .Windows {
-			// Schannel fails outright where a revocation list can't be reached (behind
-			// some proxies), as the lobby's requests find
-			curl.easy_setopt(handle, .SSL_OPTIONS, c.long(curl.SSLOPT_REVOKE_BEST_EFFORT))
-		}
-		if bundle := ca_bundle(); bundle != nil do curl.easy_setopt(handle, .CAINFO, bundle)
+		http.secure(handle)
 		code := curl.easy_perform(handle)
 		if code == .E_OK {
 			curl.easy_getinfo(handle, .RESPONSE_CODE, &status)

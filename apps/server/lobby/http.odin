@@ -1,10 +1,8 @@
 package lobby
 
-// HTTPS, through libcurl (vendor:curl), as the launcher's http.c has it, cut to what
-// the heartbeat needs: one request with a method and a JSON body, its answer's status
-// and body back. On Windows curl trusts what the system trusts (Schannel); on Linux it
-// is built on mbedTLS, which knows no certificates of its own, so the distribution's
-// bundle is found and given to it.
+// HTTPS, through libcurl (vendor:curl, started and made to trust what it should by
+// core/http), cut to what the heartbeat needs: one request with a method and a JSON
+// body, its answer's status and body back.
 //
 // A request either runs here, on the caller's thread (the goodbye a stopping server
 // waits for), or on a thread of its own (request_start), whose outcome the caller polls
@@ -17,6 +15,8 @@ import "core:sync"
 import "core:thread"
 
 import curl "vendor:curl"
+
+import "../../../core/http"
 
 ANSWER_MAX :: 1024 // bytes of an answer kept; the lobby's are a line
 AGENT :: "soldatreloaded-server" // what the requests say they are
@@ -37,25 +37,6 @@ answer_body :: proc(a: ^Answer) -> string {
 
 answer_error :: proc(a: ^Answer) -> string {
 	return string(cstring(&a.error[0]))
-}
-
-// --- curl ----------------------------------------------------------------------------
-
-@(private = "file")
-Http :: struct {
-	started:   bool,
-	ca_bundle: cstring, // the distribution's certificates (ca_bundle); nil for curl's own
-}
-
-@(private = "file")
-http: Http
-
-// Curl made ready, once; every request after this.
-http_init :: proc() {
-	if http.started do return
-	http.started = true
-	http.ca_bundle = ca_bundle()
-	curl.global_init(curl.GLOBAL_DEFAULT)
 }
 
 // Any answer's body, an error page's too, as far as ANSWER_MAX (cut, not failed,
@@ -95,12 +76,7 @@ http_request :: proc(method, url, body: string, ipv4: bool, timeout: int) -> (a:
 	curl.easy_setopt(handle, .TIMEOUT, c.long(timeout))
 	curl.easy_setopt(handle, .USERAGENT, cstring(AGENT))
 	curl.easy_setopt(handle, .ERRORBUFFER, &a.error[0])
-	when ODIN_OS == .Windows {
-		// Schannel fails outright where a revocation list can't be reached (behind some
-		// proxies); nothing of worth comes back from the lobby anyway.
-		curl.easy_setopt(handle, .SSL_OPTIONS, c.long(curl.SSLOPT_REVOKE_BEST_EFFORT))
-	}
-	if http.ca_bundle != nil do curl.easy_setopt(handle, .CAINFO, http.ca_bundle)
+	http.secure(handle)
 	curl.easy_setopt(handle, .CUSTOMREQUEST, method_c)
 	headers: ^curl.slist
 	if body != "" {

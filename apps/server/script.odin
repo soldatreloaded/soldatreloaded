@@ -35,7 +35,7 @@ package server
 //   http.odin         `http`: requests on threads of their own
 //   json.odin         `json`, in Lua
 //   lua_windows.odin  Lua itself, found as the script is opened (lua_other.odin: linked in)
-//   ca_bundle_*.odin  the certificates https is checked against, where curl has none
+//   (curl is started and made to trust what it should by core/http)
 
 import "base:runtime"
 import "core:c"
