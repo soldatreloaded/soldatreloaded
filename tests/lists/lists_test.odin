@@ -17,11 +17,13 @@ import res "../../core/resources"
 import "../../core/utils"
 import "../../apps/server/lists"
 
-// A fresh, empty directory for a test's files, under the OS's temp directory.
+// A fresh, empty directory for a test's files, in the OS's temp directory. One of its
+// own, beside the others rather than in a parent they share: the tests run at once,
+// and two making the same parent at once would have one of them fail.
 scratch :: proc(t: ^testing.T, name: string) -> string {
 	temp, err := os.temp_directory(context.temp_allocator)
 	testing.expectf(t, err == nil, "the temp directory: %v", err)
-	dir := utils.temp_path(temp, "soldatreloaded_lists_test", name)
+	dir := utils.temp_path(temp, strings.concatenate({"soldatreloaded_lists_test_", name}, context.temp_allocator))
 	os.remove_all(dir)
 	os.make_directory_all(dir)
 	return dir
