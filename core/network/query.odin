@@ -1,8 +1,5 @@
 package network
 
-import "core:strconv"
-import "core:strings"
-
 import "../utils"
 
 // The query: a server asked what it is playing, out of band, on its game port, by
@@ -141,51 +138,5 @@ query_read_reply :: proc(data: []u8, nonce: u32) -> (info: Server_Info, ok: bool
 	info.password = p[6] & QUERY_FLAG_PASSWORD != 0
 	p = p[7:]
 	ok = get_string(&p, &info.hostname) && get_string(&p, &info.map_name) && len(p) == 0
-	return
-}
-
-// A server on the lobby's list.
-Query_Address :: struct {
-	ip:   utils.Short_String(15), // dotted IPv4
-	port: u16,
-}
-
-// Four numbers to 255, dotted.
-is_ipv4 :: proc(text: string) -> bool {
-	rest := text
-	for part in 0 ..< 4 {
-		number := rest
-		if dot := strings.index_byte(rest, '.'); dot >= 0 {
-			number = rest[:dot]
-			rest = rest[dot + 1:]
-		} else {
-			rest = ""
-		}
-		if len(number) == 0 || len(number) > 3 do return false
-		v, is_number := strconv.parse_uint(number, 10)
-		if !is_number || v > 255 do return false
-		if part < 3 && rest == "" && dot_missing(text, part) do return false
-	}
-	return rest == ""
-
-	dot_missing :: proc(text: string, parts_seen: int) -> bool {
-		return strings.count(text, ".") <= parts_seen
-	}
-}
-
-// The lobby's list as its servers.txt gives it, "1.2.3.4:23073" a line, into `out`: how
-// many. A line that isn't an IPv4 address and a port is passed over.
-query_parse_list :: proc(text: string, out: []Query_Address) -> (n: int) {
-	rest := text
-	for line in strings.split_lines_iterator(&rest) {
-		if n == len(out) do break
-		colon := strings.last_index_byte(line, ':')
-		if colon < 0 || colon > 15 || !is_ipv4(line[:colon]) do continue
-		port, is_number := strconv.parse_uint(line[colon + 1:], 10)
-		if !is_number || port < 1 || port > 65535 do continue
-		utils.short_string_set(&out[n].ip, line[:colon])
-		out[n].port = u16(port)
-		n += 1
-	}
 	return
 }

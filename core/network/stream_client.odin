@@ -16,6 +16,10 @@ import "../utils"
 // comes after its tick has passed is a late one, and raises `interp` for a while; a
 // tick with no snapshot steps everyone on. The clock itself runs free and is nudged a
 // tick at a time when the frames in hand run consistently over or under.
+//
+// The game doesn't play online yet: until it does, the tests are this end's only
+// caller, and the procedures only a playing client calls (client_stream_smooth, for the
+// picture; client_stream_quiet, for a silent player) have none at all.
 
 STREAM_SNAP_DISTANCE :: f32(160) // a correction this far is a placing to the eye: shown at once, not smoothed
 STREAM_INTERP_MAX :: 8           // ticks the view keeps behind the newest snapshot, at most

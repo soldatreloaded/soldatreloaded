@@ -276,10 +276,3 @@ fields_equal :: proc(fields: Field_Table, a, b: rawptr) -> bool {
 	}
 	return true
 }
-
-// A whole struct of any type on the wire, every field of it: a message's payload.
-net_struct :: proc(b: ^Buffer, value: ^$T) {
-	@(static) table: Field_Table
-	if table == nil do table = fields_of(T, "", runtime.default_allocator()) // for the program's life
-	fields_serialize(b, table, value, nil)
-}
