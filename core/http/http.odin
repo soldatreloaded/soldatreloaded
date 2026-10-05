@@ -46,6 +46,10 @@ get :: proc(url: string, agent: cstring, allocator := context.allocator) -> (bod
 	curl.easy_setopt(handle, .FOLLOWLOCATION, c.long(1))
 	curl.easy_setopt(handle, .FAILONERROR, c.long(1))
 	curl.easy_setopt(handle, .CONNECTTIMEOUT, c.long(10))
+	// Given up when it stalls: under a byte a second for half a minute. A slow line
+	// still gets its whole download; one that has stopped doesn't hang the caller.
+	curl.easy_setopt(handle, .LOW_SPEED_LIMIT, c.long(1))
+	curl.easy_setopt(handle, .LOW_SPEED_TIME, c.long(30))
 	curl.easy_setopt(handle, .NOSIGNAL, c.long(1))
 	curl.easy_setopt(handle, .WRITEFUNCTION, curl.write_callback(receive))
 	curl.easy_setopt(handle, .WRITEDATA, &received)
