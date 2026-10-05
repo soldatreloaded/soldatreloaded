@@ -12,8 +12,9 @@ description: >
 #   soldatreloaded-<version>-<platform>.zip              what a player downloads
 #   soldatreloaded-<version>-<platform>.manifest.json    every file in it, by hash
 #
-# and soldatreloaded-server-… for the server. The install holds its own manifest too, as
-# manifest.json, so the launcher knows what release it was last brought up to.
+# and soldatreloaded-server-<version>-linux for the server, which is released for Linux
+# alone. The install holds its own manifest too, as manifest.json, so the launcher knows
+# what release it was last brought up to.
 
 inputs:
   app:
@@ -44,19 +45,38 @@ runs:
           server) name="soldatreloaded-server-$VERSION-$platform"; program="soldatreloaded-server$exe" ;;
           *) echo "::error::app is client or server, not $APP"; exit 1 ;;
         esac
+        if [ "$APP" = server ] && [ "$platform" != linux ]; then
+          echo "::error::the server is released for Linux alone"; exit 1
+        fi
         dist=build/dist
         stage="$dist/$name"
         mkdir -p "$stage"
 
-        # The program, built for speed. The game on Windows is a windowed program,
-        # without a console of its own; the server and the launcher are consoles.
-        flags=(-o:speed -vet)
+        # The program, built for speed, its libraries linked in (ODIN_FLAGS, from the
+        # setup action). The game on Windows is a windowed program, without a console of
+        # its own; the server and the launcher are consoles.
+        flags=(-o:speed -vet ${ODIN_FLAGS:-})
+        programs=("$program")
         if [ "$APP" = client ] && [ "$platform" = windows ]; then flags+=(-subsystem:windows); fi
         odin build "apps/$APP" "${flags[@]}" -out:"$stage/$program"
         if [ "$APP" = client ]; then
-          odin build apps/launcher -o:speed -vet -out:"$stage/soldatreloaded-launcher$exe"
+          odin build apps/launcher -o:speed -vet ${ODIN_FLAGS:-} -out:"$stage/soldatreloaded-launcher$exe"
+          programs+=("soldatreloaded-launcher$exe")
         fi
         rm -f "$stage"/*.pdb "$stage"/*.exp "$stage"/*.lib
+
+        # Nothing a player would have to install: the programs ask the system only for
+        # what every machine has. Their libraries are listed, and any of ours found
+        # outside them, or the Visual C++ runtime (apps/client/crt_windows.odin), fails
+        # the release.
+        for p in "${programs[@]}"; do
+          if [ "$platform" = linux ]; then deps=$(ldd "$stage/$p"); else deps=$(llvm-objdump -p "$stage/$p" | grep 'DLL Name'); fi
+          echo "$p:"; echo "$deps"
+          if grep -iE 'raylib|enet|curl|mbed|libz\.|lua|vcruntime|msvcp' <<< "$deps"; then
+            echo "::error::$p links a library a player would need installed"
+            exit 1
+          fi
+        done
 
         # What of assets/ it reads.
         cp -r assets/data "$stage/"
@@ -65,8 +85,6 @@ runs:
           cp -r assets/mods/default "$stage/mods/"
         else
           cp -r assets/scripts "$stage/"
-          # Lua is loaded late, from beside the server, on Windows; on Linux it is linked in.
-          if [ "$platform" = windows ]; then cp "$(odin root)/vendor/lua/5.4/windows/lua54.dll" "$stage/"; fi
         fi
         cp license.md "$stage/"
         printf '%s\n' "$VERSION" > "$stage/version.txt"

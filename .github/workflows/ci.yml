@@ -29,13 +29,13 @@ jobs:
           mkdir -p build/ci
           ext=""; if [ "$RUNNER_OS" = Windows ]; then ext=.exe; fi
           for app in client server launcher sandbox; do
-            odin build apps/$app -vet -out:build/ci/$app$ext
+            odin build apps/$app -vet $ODIN_FLAGS -out:build/ci/$app$ext
           done
 
       # tests/compare is left out: it needs the C game and a C toolchain (docs/porting.md).
       - name: test
         run: |
           for suite in bots launcher lists lobby network script; do
-            odin test tests/$suite
+            odin test tests/$suite $ODIN_FLAGS
           done
-          odin test tests/server -define:ODIN_TEST_THREADS=1 # real sockets, one at a time
+          odin test tests/server -define:ODIN_TEST_THREADS=1 $ODIN_FLAGS # real sockets, one at a time

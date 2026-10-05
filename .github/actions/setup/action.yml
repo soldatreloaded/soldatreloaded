@@ -1,5 +1,17 @@
 name: setup
-description: Odin, and on Linux the libraries the game and the server link against
+description: >
+  Odin, and on Linux the libraries the programs link, built to be linked in rather
+  than looked for on a player's machine
+
+# A release's programs carry their libraries inside them: a player installs nothing.
+# Odin's vendor collection has most of them as static libraries already: on Windows
+# everything the game and the launcher link (raylib, curl), on Linux raylib and Lua. What
+# Linux lacks is built here from pinned sources, checked against their published hashes,
+# and cached: ENet for the server, and curl on mbedTLS for the server and the launcher.
+#
+# The step exports ODIN_FLAGS, which every build and test passes to Odin: on Linux the
+# directory the static libraries are in, searched before the system's. What stays the
+# system's is what every machine has: the C library, and on Linux X11 and OpenGL.
 
 runs:
   using: composite
@@ -8,12 +20,77 @@ runs:
       uses: laytan/setup-odin@v2
       with:
         release: dev-2026-09
+        token: ${{ github.token }} # without one it can't download a release
 
-    # The game links X11 (raylib); the server ENet, and curl with what it was built
-    # against. Lua is linked in from Odin's vendor collection.
-    - name: libraries
+    - name: versions
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        {
+          echo "ENET_TAG=v1.3.17"
+          echo "ENET_COMMIT=e0e7045b7e056b454b5093cb34df49dc4cee0bee"
+          echo "MBEDTLS_VERSION=3.6.7"
+          echo "MBEDTLS_SHA256=a7e8bcbec0e6f761b4af24f25677626b35f762f68eef79c08677a363212d11f6"
+          echo "CURL_VERSION=8.22.0"
+          echo "CURL_SHA256=d54dd598bf05927a726deb38df31c6a255ba83ff1de57c5d1464dac3ed8f44a1"
+          echo "STATIC_LIBS=$HOME/static-libs"
+        } >> "$GITHUB_ENV"
+
+    - name: cache
+      id: cache
+      if: runner.os == 'Linux'
+      uses: actions/cache@v4
+      with:
+        path: ~/static-libs
+        key: static-libs-${{ runner.os }}-enet${{ env.ENET_TAG }}-mbedtls${{ env.MBEDTLS_VERSION }}-curl${{ env.CURL_VERSION }}
+
+    - name: packages
       if: runner.os == 'Linux'
       shell: bash
       run: |
         sudo apt-get update -q
-        sudo apt-get install -yq libx11-dev libgl-dev libenet-dev libcurl4-openssl-dev libmbedtls-dev zlib1g-dev
+        sudo apt-get install -yq libx11-dev libgl-dev zlib1g-dev
+
+    - name: build enet, mbedtls and curl
+      if: runner.os == 'Linux' && steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p "$STATIC_LIBS/lib" && cd "$RUNNER_TEMP"
+        static=(-DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_LIBDIR=lib)
+
+        git clone -q --depth 1 --branch "$ENET_TAG" https://github.com/lsalzman/enet.git
+        test "$(git -C enet rev-parse HEAD)" = "$ENET_COMMIT"
+        cmake -S enet -B enet-build "${static[@]}"
+        cmake --build enet-build -j
+        cp enet-build/libenet.a "$STATIC_LIBS/lib/"
+
+        curl -fsSL "https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-$MBEDTLS_VERSION/mbedtls-$MBEDTLS_VERSION.tar.bz2" -o mbedtls.tar.bz2
+        echo "$MBEDTLS_SHA256  mbedtls.tar.bz2" | sha256sum -c -
+        tar -xjf mbedtls.tar.bz2
+        cmake -S "mbedtls-$MBEDTLS_VERSION" -B mbedtls-build "${static[@]}" -DCMAKE_INSTALL_PREFIX="$STATIC_LIBS" \
+          -DENABLE_PROGRAMS=OFF -DENABLE_TESTING=OFF -DGEN_FILES=OFF
+        cmake --build mbedtls-build -j
+        cmake --install mbedtls-build
+
+        # curl for HTTPS alone, on mbedTLS, as Odin's bindings link it; nothing else.
+        curl -fsSL "https://github.com/curl/curl/releases/download/curl-${CURL_VERSION//./_}/curl-$CURL_VERSION.tar.gz" -o curl.tar.gz
+        echo "$CURL_SHA256  curl.tar.gz" | sha256sum -c -
+        tar -xzf curl.tar.gz
+        cmake -S "curl-$CURL_VERSION" -B curl-build "${static[@]}" -DCMAKE_INSTALL_PREFIX="$STATIC_LIBS" -DCMAKE_PREFIX_PATH="$STATIC_LIBS" \
+          -DBUILD_CURL_EXE=OFF -DBUILD_TESTING=OFF -DBUILD_LIBCURL_DOCS=OFF -DBUILD_MISC_DOCS=OFF -DENABLE_CURL_MANUAL=OFF \
+          -DHTTP_ONLY=ON -DCURL_USE_MBEDTLS=ON -DCURL_USE_OPENSSL=OFF -DCURL_ZLIB=ON \
+          -DUSE_NGHTTP2=OFF -DUSE_LIBIDN2=OFF -DCURL_USE_LIBPSL=OFF -DCURL_USE_LIBSSH2=OFF -DCURL_USE_GSSAPI=OFF \
+          -DCURL_ZSTD=OFF -DCURL_BROTLI=OFF -DENABLE_ARES=OFF -DCURL_DISABLE_LDAP=ON \
+          -DCURL_CA_BUNDLE=none -DCURL_CA_PATH=none
+        cmake --build curl-build -j
+        cmake --install curl-build
+
+        cp "$(gcc -print-file-name=libz.a)" "$STATIC_LIBS/lib/" # zlib, which curl uses
+
+    - name: link the static libraries
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        ls "$STATIC_LIBS/lib"/*.a
+        echo "ODIN_FLAGS=-extra-linker-flags:-L$STATIC_LIBS/lib" >> "$GITHUB_ENV"
