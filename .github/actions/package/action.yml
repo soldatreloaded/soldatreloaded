@@ -5,13 +5,15 @@ description: >
 
 # The game draws and plays mods/ and has no use for scripts/; the server plays by data/
 # and runs scripts/, and draws nothing. So each package holds only what its program
-# reads. Into build/dist/:
+# reads. The game's comes with the launcher, which players start and which keeps the
+# install at the newest release (apps/launcher). Into build/dist/:
 #
 #   soldatreloaded-<version>-<platform>/                 the install, unpacked
 #   soldatreloaded-<version>-<platform>.zip              what a player downloads
 #   soldatreloaded-<version>-<platform>.manifest.json    every file in it, by hash
 #
-# and soldatreloaded-server-… for the server.
+# and soldatreloaded-server-… for the server. The install holds its own manifest too, as
+# manifest.json, so the launcher knows what release it was last brought up to.
 
 inputs:
   app:
@@ -47,10 +49,13 @@ runs:
         mkdir -p "$stage"
 
         # The program, built for speed. The game on Windows is a windowed program,
-        # without a console of its own; the server is a console.
+        # without a console of its own; the server and the launcher are consoles.
         flags=(-o:speed -vet)
         if [ "$APP" = client ] && [ "$platform" = windows ]; then flags+=(-subsystem:windows); fi
         odin build "apps/$APP" "${flags[@]}" -out:"$stage/$program"
+        if [ "$APP" = client ]; then
+          odin build apps/launcher -o:speed -vet -out:"$stage/soldatreloaded-launcher$exe"
+        fi
         rm -f "$stage"/*.pdb "$stage"/*.exp "$stage"/*.lib
 
         # What of assets/ it reads.
@@ -92,6 +97,9 @@ runs:
         } > "$dist/$name.manifest.json"
         count=$(wc -l < "$dist/paths.list")
         rm -f "$dist"/*.list
+
+        # The install's own copy, which lists every file but itself.
+        cp "$dist/$name.manifest.json" "$stage/manifest.json"
 
         # The zip, its files at its root, as the install is laid out.
         (
