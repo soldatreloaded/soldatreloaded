@@ -39,7 +39,9 @@ Msg_Kind :: enum u8 {
 	Map_Part,     // server -> client: a part of it
 }
 
-RELIABLE :: bit_set[Msg_Kind]{.Hello, .Welcome, .Denied, .Chat, .Map, .Vote, .Map_Change, .Map_Query, .Map_Reply, .Weapons, .Map_Fetch, .Map_Part}
+// Every kind but the two streams, which are state sent anew every tick; so a kind added
+// goes reliably unless it is said otherwise here.
+RELIABLE :: ~bit_set[Msg_Kind]{.Invalid, .Client_State, .Snapshot}
 
 // The kind, first in every message; reading one past the table, or Invalid, is bad.
 msg_kind :: proc(b: ^Buffer, kind: ^Msg_Kind) {

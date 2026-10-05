@@ -220,39 +220,30 @@ intercept :: proc "c" (host: ^enet.Host, event: ^enet.Event) -> i32 {
 	return 1
 }
 
-// One datagram on a plain socket, outside ENet's peers: a query or its reply. ENet's
-// buffer is laid out as the platform's own (WSABUF on Windows, the length first; iovec
-// elsewhere, the data first), which vendor:ENet declares data first everywhere, so it
-// is laid out here.
-datagram_send :: proc(socket: enet.Socket, to: ^enet.Address, bytes: []u8) -> bool {
-	when ODIN_OS == .Windows {
-		Platform_Buffer :: struct {
-			length: uint,
-			data:   rawptr,
-		}
-	} else {
-		Platform_Buffer :: struct {
-			data:   rawptr,
-			length: uint,
-		}
+// ENet's buffer as the platform lays it out (WSABUF on Windows, the length first; iovec
+// elsewhere, the data first), which vendor:ENet declares data first everywhere.
+when ODIN_OS == .Windows {
+	@(private = "file")
+	Platform_Buffer :: struct {
+		length: uint,
+		data:   rawptr,
 	}
+} else {
+	@(private = "file")
+	Platform_Buffer :: struct {
+		data:   rawptr,
+		length: uint,
+	}
+}
+
+// One datagram on a plain socket, outside ENet's peers: a query or its reply.
+datagram_send :: proc(socket: enet.Socket, to: ^enet.Address, bytes: []u8) -> bool {
 	buffer := Platform_Buffer{data = raw_data(bytes), length = uint(len(bytes))}
 	return enet.socket_send(socket, to, (^enet.Buffer)(&buffer), 1) == i32(len(bytes))
 }
 
 // One datagram received on a plain socket, into `buf`: its bytes, or nothing.
 datagram_receive :: proc(socket: enet.Socket, from: ^enet.Address, buf: []u8) -> []u8 {
-	when ODIN_OS == .Windows {
-		Platform_Buffer :: struct {
-			length: uint,
-			data:   rawptr,
-		}
-	} else {
-		Platform_Buffer :: struct {
-			data:   rawptr,
-			length: uint,
-		}
-	}
 	buffer := Platform_Buffer{data = raw_data(buf), length = uint(len(buf))}
 	n := enet.socket_receive(socket, from, (^enet.Buffer)(&buffer), 1)
 	return buf[:n] if n > 0 else nil

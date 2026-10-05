@@ -17,8 +17,13 @@ Server_Stream :: struct {
 	sent_tick:       [STREAM_RING]u32,
 	event_ack:       u32,                       // the newest of the server's words the client has heard
 	event_last:      u32,                       // the newest of the client's words heard here
-	dropped:         u32,                       // client states that couldn't be read, or failed a check
-	unwritable:      u32,                       // snapshots not sent because a value would not fit its width: a bug, not a size
+	stats:           Server_Stream_Stats,
+}
+
+// What the server's end has seen of the line, counted: none of it steers the stream.
+Server_Stream_Stats :: struct {
+	dropped:    u32, // client states that couldn't be read, or failed a check
+	unwritable: u32, // snapshots not sent because a value would not fit its width: a bug, not a size
 }
 
 // Fresh for `round`: nothing received, nothing sent, so the first snapshot goes whole.
@@ -36,13 +41,13 @@ server_stream_receive :: proc(s: ^Server_Stream, g: ^game.Game, slot: game.Soldi
 	msg_kind(&b, &kind)
 	msg_client_state_header(&b, &m.header)
 	if !buffer_ok(&b) || m.round != s.round || m.seq <= s.newest {
-		s.dropped += 1
+		s.stats.dropped += 1
 		return false
 	}
 	base: ^game.Soldier
 	if m.base != 0 {
 		if s.ring_seq[m.base % STREAM_RING] != m.base { // a base we never had, or lost
-			s.dropped += 1
+			s.stats.dropped += 1
 			return false
 		}
 		base = &s.ring[m.base % STREAM_RING]
@@ -50,7 +55,7 @@ server_stream_receive :: proc(s: ^Server_Stream, g: ^game.Game, slot: game.Soldi
 	if base != nil do m.owned = base^
 	msg_client_state_body(&b, &m, base)
 	if !buffer_ok(&b) || game.soldier_out_of_bounds(g.world.polymap, m.owned.body.pos) {
-		s.dropped += 1
+		s.stats.dropped += 1
 		return false
 	}
 	// its decisions, each once, into the inbox: the step does them next tick. Those of a
@@ -58,7 +63,7 @@ server_stream_receive :: proc(s: ^Server_Stream, g: ^game.Game, slot: game.Soldi
 	event_last := s.event_last
 	wire_read(&b, &g.world, &event_last, slot, relay)
 	if !buffer_done(&b) {
-		s.dropped += 1
+		s.stats.dropped += 1
 		return false
 	}
 	s.event_last = event_last
@@ -150,7 +155,7 @@ server_stream_snapshot :: proc(s: ^Server_Stream, g: ^game.Game, slot: game.Sold
 			return bytes
 		}
 		if bad { // a width too small somewhere: nothing to hold back would mend it, and a guess would cull
-			s.unwritable += 1
+			s.stats.unwritable += 1
 			return nil
 		}
 		if event_max > 0 {

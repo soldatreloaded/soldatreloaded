@@ -47,15 +47,10 @@ Client_Stream :: struct {
 	newest:       u32,  // the newest snapshot received (its tick), 0 for none
 	applied:      u32,  // the newest snapshot applied to the world (its tick), 0 for none
 	interp:       int,  // ticks the view keeps behind the newest: the floor asked for, raised by late snapshots
-	late:         u32,  // snapshots that came after the view had passed their tick
-	late_tick:    u32,  // the newest's tick at the last of them, for settling back down
+	late_tick:    u32,  // the newest's tick at the last late snapshot, for settling back down
 	grew_tick:    u32,  // and at the last raise, so it is raised a tick a second at most
-	misses:       u32,  // ticks the view had no snapshot of, and stepped everyone on
 	level_min:    i32,  // the fewest frames in hand over the window being watched
 	window:       int,  // ticks of it left
-	skipped, held, resyncs: u32, // the view clock's nudges forward and back, and its jumps
-	applies:      u32,  // snapshots applied to the world
-	correction:   f32,  // how far, all told, the applied snapshots moved the others from where stepping had them
 	word_applied: [game.MAX_PLAYERS]u32, // the newest snapshot tick each soldier was taken from
 	pending:      Wire_Pending,          // the server's words heard, each done in the tick of its frame
 	last_word:    [game.MAX_PLAYERS]u32, // the snapshot tick each soldier was last heard of in
@@ -71,10 +66,22 @@ Client_Stream :: struct {
 	event_last:   u32,  // the newest of the server's words heard here
 	view_at:      u32,  // the tick the next begin_tick shows, its clock passed over, 0 for the clock's: a demo's, as recorded
 	round:        u16,  // the round I am in (Msg_Map); snapshots of another are dropped
-	dropped:      u32,  // snapshots that couldn't be read
-	stale:        u32,  // snapshots of another round
-	held_back:    u32,  // times a soldier I know was held back from a snapshot (Same)
-	largest:      int,  // the largest snapshot heard, in bytes
+	stats:        Client_Stream_Stats,
+}
+
+// What the client's end has seen of the line, counted: none of it steers the stream.
+Client_Stream_Stats :: struct {
+	dropped:    u32, // snapshots that couldn't be read
+	stale:      u32, // snapshots of another round
+	late:       u32, // snapshots that came after the view had passed their tick
+	misses:     u32, // ticks the view had no snapshot of, and stepped everyone on
+	skipped:    u32, // ticks the view clock was nudged forward
+	held:       u32, // and back
+	resyncs:    u32, // times it jumped
+	applies:    u32, // snapshots applied to the world
+	held_back:  u32, // times a soldier I know was held back from a snapshot (Same)
+	largest:    int, // the largest snapshot heard, in bytes
+	correction: f32, // how far, all told, the applied snapshots moved the others from where stepping had them
 }
 
 client_stream_init :: proc(c: ^Client_Stream) {
@@ -120,11 +127,11 @@ client_stream_hear :: proc(c: ^Client_Stream, g: ^game.Game, me: game.Soldier_Id
 	msg_kind(&b, &kind)
 	msg_snapshot_header(&b, &m.header)
 	if buffer_ok(&b) && m.round != c.round { // another round's: the Map that begins it hasn't come, or it is over
-		c.stale += 1
+		c.stats.stale += 1
 		return false
 	}
 	if !buffer_ok(&b) || m.tick <= c.newest {
-		c.dropped += 1
+		c.stats.dropped += 1
 		return false
 	}
 	base: Snap_Base
@@ -132,7 +139,7 @@ client_stream_hear :: proc(c: ^Client_Stream, g: ^game.Game, me: game.Soldier_Id
 	if m.base != 0 {
 		frame := &c.snaps[m.base % STREAM_RING]
 		if frame.tick != m.base {
-			c.dropped += 1
+			c.stats.dropped += 1
 			return false
 		}
 		base = {soldiers = &frame.soldiers, word = &frame.word, things = &frame.things, thing_word = &frame.thing_word}
@@ -148,14 +155,14 @@ client_stream_hear :: proc(c: ^Client_Stream, g: ^game.Game, me: game.Soldier_Id
 	}
 	msg_snapshot_body(&b, m, against)
 	if !buffer_ok(&b) {
-		c.dropped += 1
+		c.stats.dropped += 1
 		return false
 	}
 
 	// the server's words, each once, kept for the tick of their frame
 	wire_read_pending(&b, &c.pending)
 	if !buffer_done(&b) {
-		c.dropped += 1
+		c.stats.dropped += 1
 		return false
 	}
 	c.event_ack = max(c.event_ack, m.client_event_ack)
@@ -174,14 +181,14 @@ client_stream_hear :: proc(c: ^Client_Stream, g: ^game.Game, me: game.Soldier_Id
 			c.last_word[i] = m.tick
 			if m.names[i].length != 0 do c.names[i] = m.names[i]
 		} else if m.word[i] == .Same && g.world.soldiers[i].active {
-			c.held_back += 1
+			c.stats.held_back += 1
 		}
 	}
-	c.largest = max(c.largest, len(data))
+	c.stats.largest = max(c.stats.largest, len(data))
 	// one that comes after the view has passed its tick was too late to show: the view
 	// keeps further behind for a while, a tick more each second at most
 	if c.applied != 0 && m.tick < g.world.tick {
-		c.late += 1
+		c.stats.late += 1
 		c.late_tick = m.tick
 		if c.interp < STREAM_INTERP_MAX && (c.grew_tick == 0 || m.tick - c.grew_tick > game.TICK_RATE) {
 			c.interp += 1
@@ -257,7 +264,7 @@ soldier_apply :: proc(c: ^Client_Stream, g: ^game.Game, id: game.Soldier_Id, fra
 		c.blend[id] = {}
 		c.blend_vel[id] = {}
 	}
-	if !placed do c.correction += utils.length(jump)
+	if !placed do c.stats.correction += utils.length(jump)
 }
 
 // Every other soldier from its newest word no later than the tick on show, stepped on
@@ -288,69 +295,82 @@ soldiers_apply :: proc(c: ^Client_Stream, g: ^game.Game, me: game.Soldier_Id, v:
 // right; and the server's words due by the tick into the world's inbox.
 client_stream_begin_tick :: proc(c: ^Client_Stream, g: ^game.Game, me: game.Soldier_Id, interp: int) {
 	if c.newest == 0 do return // nothing heard yet: the world stands as the round left it
-	w := &g.world
+	interp_set(c, interp)
+	view_clock_step(c, &g.world)
+	v := g.world.tick
+	frame_on_show_apply(c, g, me, v)
+	soldiers_apply(c, g, me, v)
+	wire_pending_apply(&c.pending, &g.world, v)
+	c.event_last = c.pending.received // what is held here need not come again
+}
+
+// How far the view keeps behind the newest snapshot: `interp` at least, the player's
+// floor, and more for a while after late snapshots, settling a tick closer once they
+// have been on time long enough.
+@(private = "file")
+interp_set :: proc(c: ^Client_Stream, interp: int) {
 	floor := clamp(interp, 0, STREAM_INTERP_MAX)
 	c.interp = max(c.interp, floor)
 	if c.interp > floor && c.newest - c.late_tick > STREAM_INTERP_SETTLE { // quiet long enough: a tick closer
 		c.interp -= 1
 		c.late_tick = c.newest
 	}
+}
 
-	// The view clock. The frames in hand are the newest's tick less the view's; the view
-	// wants `interp` of them at the leanest moment of each window. Far off, it jumps;
-	// else at a window's end it is nudged a tick back when it ran short, or forward by
-	// what it never needed, with a frame or so of slack so that a line whose jitter is
-	// about a tick is not nudged to and fro. Each nudge is a frame shown twice or passed
-	// over, smoothed as a correction is. A demo playing passes the clock over: the tick
-	// shown is the one it showed.
-	level := i32(c.newest) - i32(w.tick)
+// The view clock: the tick the world shows. The frames in hand are the newest's tick less
+// the view's; the view wants `interp` of them at the leanest moment of each window. Far
+// off, it jumps; else at a window's end it is nudged a tick back when it ran short, or
+// forward by what it never needed, with a frame or so of slack so that a line whose
+// jitter is about a tick is not nudged to and fro. Each nudge is a frame shown twice or
+// passed over, smoothed as a correction is. A demo playing passes the clock over: the
+// tick shown is the one it showed.
+@(private = "file")
+view_clock_step :: proc(c: ^Client_Stream, w: ^game.World) {
 	if c.view_at != 0 {
 		w.tick = c.view_at
 		c.view_at = 0
-	} else {
-		if level > STREAM_VIEW_SNAP + i32(c.interp) || level < -STREAM_VIEW_SNAP {
-			w.tick = c.newest - u32(c.interp) if c.newest > u32(c.interp) else 0
-			level = i32(c.interp)
-			c.window = 0
-			c.resyncs += 1
-		}
-		if c.window <= 0 {
-			c.level_min = level
-			c.window = STREAM_VIEW_WINDOW
-		} else {
-			c.level_min = min(c.level_min, level)
-			c.window -= 1
-			if c.window == 0 {
-				if c.level_min < i32(c.interp) {
-					w.tick -= 1
-					c.held += 1
-				} else if c.level_min >= i32(c.interp) + STREAM_VIEW_SLACK {
-					ahead := u32(c.level_min - i32(c.interp))
-					w.tick += ahead
-					c.skipped += ahead
-				}
-			}
-		}
+		return
 	}
+	level := i32(c.newest) - i32(w.tick)
+	if level > STREAM_VIEW_SNAP + i32(c.interp) || level < -STREAM_VIEW_SNAP {
+		w.tick = c.newest - u32(c.interp) if c.newest > u32(c.interp) else 0
+		level = i32(c.interp)
+		c.window = 0
+		c.stats.resyncs += 1
+	}
+	if c.window <= 0 {
+		c.level_min = level
+		c.window = STREAM_VIEW_WINDOW
+		return
+	}
+	c.level_min = min(c.level_min, level)
+	c.window -= 1
+	if c.window != 0 do return
+	if c.level_min < i32(c.interp) {
+		w.tick -= 1
+		c.stats.held += 1
+	} else if c.level_min >= i32(c.interp) + STREAM_VIEW_SLACK {
+		ahead := u32(c.level_min - i32(c.interp))
+		w.tick += ahead
+		c.stats.skipped += ahead
+	}
+}
 
-	// The frame on show; with none for this tick (lost, late, or the view ahead of the
-	// line after the server stood still a while), the newest before it not yet applied,
-	// so the server's word of me, the round and the things (a placing, a death, a
-	// capture) waits on the line and not on the clock, as everyone else's word does.
-	// Then the others from their newest words, and the server's words due.
-	v := w.tick
-	if c.snaps[v % STREAM_RING].tick != v && v > c.applied do c.misses += 1
+// The frame of tick `v` onto the world; with none for it (lost, late, or the view ahead
+// of the line after the server stood still a while), the newest before it not yet
+// applied, so the server's word of me, the round and the things (a placing, a death, a
+// capture) waits on the line and not on the clock, as everyone else's word does.
+@(private = "file")
+frame_on_show_apply :: proc(c: ^Client_Stream, g: ^game.Game, me: game.Soldier_Id, v: u32) {
+	if c.snaps[v % STREAM_RING].tick != v && v > c.applied do c.stats.misses += 1
 	for t := min(v, c.newest); t > c.applied && c.newest - t < STREAM_RING; t -= 1 {
 		frame := &c.snaps[t % STREAM_RING]
 		if frame.tick != t do continue
 		frame_apply(c, g, me, frame)
-		c.applies += 1
+		c.stats.applies += 1
 		c.applied = t
-		break
+		return
 	}
-	soldiers_apply(c, g, me, v)
-	wire_pending_apply(&c.pending, w, v)
-	c.event_last = c.pending.received // what is held here need not come again
 }
 
 // After the client's tick: its own decisions among the tick's events, for the server.
