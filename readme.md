@@ -21,7 +21,9 @@ Now that the game is in a decent state, with most issues fixed, a refactor is du
   commands, bans and mutes, a listing in the server browser and Lua scripts.
 - **The client** has its main menu, and Local Play against bots with the HUD, sound and
   the full look of the game. Online play and demos are not there yet.
-- **The launcher** is not written yet.
+- **Releases** are built and published by tagging (docs/git.md), each package with a
+  manifest of its files. **The updater**, which keeps an install at the newest release
+  by them, comes next.
 
 The game is capture the flag alone: deathmatch and the C game's other modes, the rope,
 the bonus kits, the flamer and the bows are left out.
@@ -30,7 +32,9 @@ the bonus kits, the flamer and the bows are left out.
 
 You need a recent nightly of [Odin](https://odin-lang.org/). Everything else (raylib,
 ENet, Lua, curl, stb) comes with Odin's `vendor` collection. It is developed on
-Windows.
+Windows; on Linux, the game links X11 and the server the system's ENet, curl and
+mbedTLS (on Debian and Ubuntu: `libx11-dev libenet-dev libcurl4-openssl-dev
+libmbedtls-dev`).
 
 Every program runs from the install's root, which is `assets/` in this repository:
 
