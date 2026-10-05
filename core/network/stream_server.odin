@@ -1,0 +1,215 @@
+package network
+
+import "../game"
+import res "../resources"
+import "../utils"
+
+// The server's end of the two streams, one per player (stream.odin).
+
+Server_Stream :: struct {
+	round:           u16,                       // the round this stream is of
+	ring:            [STREAM_RING]game.Soldier, // the client states received, by seq, for the deltas
+	ring_seq:        [STREAM_RING]u32,
+	newest:          u32,                       // the newest client state received (its seq), 0 for none
+	newest_tick:     u32,                       // the server tick it came in
+	ack:             u32,                       // the newest snapshot the client has
+	sent_word:       [STREAM_RING][game.MAX_PLAYERS]Snap_Word, // what each snapshot sent carried, by tick
+	sent_thing_word: [STREAM_RING][game.MAX_THINGS]Snap_Word,
+	sent_tick:       [STREAM_RING]u32,
+	event_ack:       u32,                       // the newest of the server's words the client has heard
+	event_last:      u32,                       // the newest of the client's words heard here
+	dropped:         u32,                       // client states that couldn't be read, or failed a check
+	unwritable:      u32,                       // snapshots not sent because a value would not fit its width: a bug, not a size
+}
+
+// Fresh for `round`: nothing received, nothing sent, so the first snapshot goes whole.
+server_stream_init :: proc(s: ^Server_Stream, round: u16) {
+	s^ = {round = round}
+}
+
+// A client state for the soldier in `slot`: read against its base, checked, and taken
+// as written, its words into the world's inbox and its shots into `relay` for the
+// others. False if dropped: old, unreadable, or off the map.
+server_stream_receive :: proc(s: ^Server_Stream, g: ^game.Game, slot: game.Soldier_Id, data: []u8, relay: ^Wire_Queue) -> bool {
+	b := buffer_reader(data)
+	kind: Msg_Kind
+	m: Msg_Client_State
+	msg_kind(&b, &kind)
+	net_u16(&b, &m.round)
+	net_u32(&b, &m.seq)
+	net_u32(&b, &m.base)
+	net_u32(&b, &m.ack)
+	net_u32(&b, &m.event_ack)
+	net_u8(&b, &m.life)
+	if !buffer_ok(&b) || m.round != s.round || m.seq <= s.newest {
+		s.dropped += 1
+		return false
+	}
+	base: ^game.Soldier
+	if m.base != 0 {
+		if s.ring_seq[m.base % STREAM_RING] != m.base { // a base we never had, or lost
+			s.dropped += 1
+			return false
+		}
+		base = &s.ring[m.base % STREAM_RING]
+	}
+	if base != nil do m.owned = base^
+	fields_serialize(&b, SOLDIER_OWNED_FIELDS, &m.owned, base)
+	fields_serialize(&b, SOLDIER_LOADOUT_FIELDS, &m.owned, base)
+	net_bool(&b, &m.typing)
+	if !buffer_ok(&b) || game.soldier_out_of_bounds(g.world.polymap, m.owned.body.pos) {
+		s.dropped += 1
+		return false
+	}
+	// its decisions, each once, into the inbox: the step does them next tick. Those of a
+	// soldier not alive here are heard and dropped by the step's own rules.
+	event_last := s.event_last
+	wire_read(&b, &g.world, &event_last, slot, relay)
+	if !buffer_done(&b) {
+		s.dropped += 1
+		return false
+	}
+	s.event_last = event_last
+
+	s.ring[m.seq % STREAM_RING] = m.owned
+	s.ring_seq[m.seq % STREAM_RING] = m.seq
+	s.newest = m.seq
+	s.newest_tick = g.world.tick
+	s.ack = max(s.ack, m.ack)
+	s.event_ack = max(s.event_ack, m.event_ack)
+
+	// the owner's word, unless the soldier is dead here, or placed anew since the state
+	// was sent, and the client hasn't heard: an older life's word would drag it back; or
+	// the game is paused: it stands as it stood when the pause began, held keys and all,
+	// whatever its owner says, and every client is given it so (the original drops a
+	// paused player's bullets the same); its loadout always, a weapon that isn't a
+	// primary or a secondary put right
+	soldier := &g.world.soldiers[slot]
+	_, paused := g.round.phase.(game.Paused)
+	if soldier.active && !soldier.vitals.dead && m.life == soldier.vitals.life && !paused {
+		soldier_take_owned(g.resources.animations, soldier, &m.owned)
+	}
+	soldier.player.typing = m.typing
+	soldier.loadout = loadout_allowed(m.owned.loadout)
+	return true
+}
+
+// A loadout as the server allows it: the original's first loadout for a choice that
+// isn't one.
+loadout_allowed :: proc(chosen: game.Loadout) -> game.Loadout {
+	return {
+		primary   = chosen.primary if game.weapon_is_primary(chosen.primary) else .Desert_Eagles,
+		secondary = chosen.secondary if game.weapon_is_secondary(chosen.secondary) else .Knife,
+	}
+}
+
+// Nothing heard for STREAM_RELEASE_TICKS.
+server_stream_quiet :: proc(s: ^Server_Stream, tick: u32) -> bool {
+	return s.newest == 0 || tick - s.newest_tick > STREAM_RELEASE_TICKS
+}
+
+// The snapshot as `m` says, against its base, with up to `event_max` of the words
+// pending for `slot`; the bytes, or nothing with the buffer overflowed, `bad` set
+// instead if a value would not fit its width (which no holding back can mend).
+@(private = "file")
+snapshot_bytes :: proc(m: ^Msg_Snapshot, base: ^Snap_Base, words: ^Wire_Queue, event_ack: u32, slot: game.Soldier_Id, event_max: int, buf: []u8) -> (bytes: []u8, bad: bool) {
+	b := buffer_writer(buf)
+	kind := Msg_Kind.Snapshot
+	msg_kind(&b, &kind)
+	msg_snapshot(&b, m, base)
+	wire_write(&b, words, event_ack, slot, event_max)
+	return buffer_written(&b) if buffer_ok(&b) else nil, b.bad
+}
+
+// The snapshot for the player in `slot`, into `buf`, with the words of `words` it has
+// not acknowledged and the players' `names`: the bytes, or nothing if nothing could fit.
+// Soldiers and things are held back farthest first until it fits. The deltas are
+// against the authority's history; without it every snapshot is whole.
+server_stream_snapshot :: proc(s: ^Server_Stream, g: ^game.Game, slot: game.Soldier_Id, words: ^Wire_Queue, names: ^[game.MAX_PLAYERS]Name, buf: []u8) -> []u8 {
+	w := &g.world
+	m := new(Msg_Snapshot, context.temp_allocator) // large
+	m^ = {round = s.round, tick = w.tick, client_ack = s.newest, client_event_ack = s.event_last, match = g.round}
+
+	// the base: the snapshot the client has, if young enough and still in the history
+	base: Snap_Base
+	against: ^Snap_Base
+	if s.ack != 0 && w.tick - s.ack <= STREAM_WHOLE_AFTER && s.sent_tick[s.ack % STREAM_RING] == s.ack && g.authority != nil {
+		soldiers, things, kept := game.history_at(&g.authority.history, s.ack)
+		if kept {
+			base = {soldiers = soldiers, things = things, word = &s.sent_word[s.ack % STREAM_RING], thing_word = &s.sent_thing_word[s.ack % STREAM_RING]}
+			against = &base
+			m.base = s.ack
+		}
+	}
+
+	for &soldier, i in w.soldiers {
+		m.word[i] = .State if soldier.active else .Gone
+		m.soldiers[i] = soldier
+		m.names[i] = names[i]
+	}
+	for &thing, i in w.things {
+		m.thing_word[i] = .State if thing.kind != .None else .Gone
+		m.things[i] = thing
+	}
+
+	// until it fits: fewer words first (they go next time regardless), then the farthest
+	// soldier or thing held back, never the receiver's own soldier; what is held back goes
+	// next time, whole if need be
+	here := w.soldiers[slot].body.pos
+	event_max := WIRE_PER_PACKET
+	for {
+		bytes, bad := snapshot_bytes(m, against, words, s.event_ack, slot, event_max, buf)
+		if bytes != nil {
+			s.sent_word[w.tick % STREAM_RING] = m.word
+			s.sent_thing_word[w.tick % STREAM_RING] = m.thing_word
+			s.sent_tick[w.tick % STREAM_RING] = w.tick
+			return bytes
+		}
+		if bad { // a width too small somewhere: nothing to hold back would mend it, and a guess would cull
+			s.unwritable += 1
+			return nil
+		}
+		if event_max > 0 {
+			event_max /= 2
+			continue
+		}
+		soldier, thing: int = -1, -1
+		far := f32(-1)
+		for i in 0 ..< game.MAX_PLAYERS {
+			if game.Soldier_Id(i) == slot || m.word[i] != .State do continue
+			if d := utils.length(w.soldiers[i].body.pos - here); d > far {
+				far, soldier, thing = d, i, -1
+			}
+		}
+		for i in 0 ..< game.MAX_THINGS {
+			if m.thing_word[i] != .State do continue
+			if d := utils.length(w.things[i].points[0] - here); d > far {
+				far, thing, soldier = d, i, -1
+			}
+		}
+		switch {
+		case thing >= 0:   m.thing_word[thing] = .Same
+		case soldier >= 0: m.word[soldier] = .Same
+		case:              return nil // not even alone
+		}
+	}
+}
+
+// A soldier as the server places it: dressed as its player said, on `team`, with its
+// loadout as allowed; or a spectator, present and dead, never respawned, which the
+// simulation passes by. Its life counts up, so word from before isn't taken for after.
+soldier_place :: proc(g: ^game.Game, slot: game.Soldier_Id, team: res.Team, remote: bool) {
+	soldier := &g.world.soldiers[slot]
+	loadout := loadout_allowed(soldier.loadout)
+	respawn := game.Respawn {
+		target    = slot,
+		life      = soldier.vitals.life + 1,
+		team      = team,
+		primary   = loadout.primary,
+		secondary = loadout.secondary,
+	}
+	if team != .Spectator do respawn.pos = game.spawn_point(g.world.polymap, team, &g.world.rng)
+	soldier.remote = remote
+	game.apply_ruling(&g.world, &g.resources, respawn)
+	if team == .Spectator do soldier.vitals.dead = true
+}
