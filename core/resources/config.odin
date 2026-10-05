@@ -55,6 +55,15 @@ config_read :: proc(path: string, config: ^$T, allocator: mem.Allocator) -> Conf
 	return .Broken
 }
 
+// JSON that isn't a config's (a manifest, a web service's answer) into `value`, its
+// strings and lists made with `allocator`. It is checked to be JSON first, as a config
+// is: with the marshalers below registered, the unmarshaling doesn't check it. False if
+// it isn't JSON, or isn't a `T`.
+read_json :: proc(text: []byte, value: ^$T, allocator := context.allocator) -> bool {
+	if err, _ := not_json(text); err != nil do return false
+	return json.unmarshal(text, value, .JSON, allocator) == nil
+}
+
 // Where `text` stops being JSON, if it does.
 @(private = "file")
 not_json :: proc(text: []byte) -> (err: json.Error, at: json.Pos) {
