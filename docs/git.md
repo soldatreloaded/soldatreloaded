@@ -94,7 +94,8 @@ tag runs `.github/workflows/release.yml`, each step only if the one before succe
 4. **discord**: `discord.yml` posts the release to the channel behind the
    `DISCORD_WEBHOOK` secret (a webhook URL, set under the repository's Settings →
    Secrets and variables → Actions). It can be run by hand from the Actions tab to
-   announce a release again.
+   announce a release again. **Off for now** (`if: false` in release.yml), until the
+   secret is set.
 
 A tag whose tests fail releases nothing; delete it, fix, and tag again.
 

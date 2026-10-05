@@ -70,9 +70,11 @@ jobs:
           gh release create "$TAG" dist/* -R "$GITHUB_REPOSITORY" \
             --title "$TAG" --notes-from-tag --verify-tag $prerelease
 
+  # Off until the DISCORD_WEBHOOK secret is set: to turn it on, put back
+  # if: ${{ !contains(github.ref_name, '-') }}
   discord:
     needs: publish
-    if: ${{ !contains(github.ref_name, '-') }}
+    if: false
     uses: ./.github/workflows/discord.yml
     with:
       tag: ${{ github.ref_name }}
