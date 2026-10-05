@@ -242,7 +242,7 @@ hello :: proc(sv: ^Server, peer: net.Peer, e: ^net.Event) {
 // A player's soldier on `team`: alive on its spawn, or a spectator, present on the
 // roster and nowhere else. What it held goes back at the things' next turn.
 player_place :: proc(sv: ^Server, slot: game.Soldier_Id, team: res.Team) {
-	net.soldier_place(sv.game, slot, team, remote = !sv.players[slot].bot) // a player's keys move it and it tells what it fires; a bot is played here
+	game.soldier_place(sv.game, slot, team, remote = !sv.players[slot].bot) // a player's keys move it and it tells what it fires; a bot is played here
 }
 
 // The team a player is placed on: what it chose, and a spectator until it has.

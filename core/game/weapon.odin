@@ -102,6 +102,15 @@ weapon_is_secondary :: proc(weapon: res.Weapon) -> bool {
 	return weapon >= .USSOCOM && weapon <= .LAW
 }
 
+// A loadout as a host allows it: the original's first loadout for a choice that isn't
+// one.
+loadout_allowed :: proc(chosen: Loadout) -> Loadout {
+	return {
+		primary   = chosen.primary if weapon_is_primary(chosen.primary) else .Desert_Eagles,
+		secondary = chosen.secondary if weapon_is_secondary(chosen.secondary) else .Knife,
+	}
+}
+
 // Whether it can be let go of, to lie on the ground as a thing.
 weapon_droppable :: proc(weapon: res.Weapon) -> bool {
 	return weapon_is_primary(weapon) || weapon_is_secondary(weapon)

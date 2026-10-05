@@ -24,3 +24,23 @@ spawn_point :: proc(polymap: ^res.Poly_Map, team: res.Team, rng: ^Rng) -> utils.
 	}
 	return {}
 }
+
+// A soldier as a host places it: dressed as its player said, on `team`, with its loadout
+// as allowed; or a spectator, present and dead, never respawned, which the simulation
+// passes by. Its life counts up, so word from before isn't taken for after. A `remote`
+// one is played elsewhere: its keys move it here, but fire nothing.
+soldier_place :: proc(g: ^Game, slot: Soldier_Id, team: res.Team, remote: bool) {
+	soldier := &g.world.soldiers[slot]
+	loadout := loadout_allowed(soldier.loadout)
+	respawn := Respawn {
+		target    = slot,
+		life      = soldier.vitals.life + 1,
+		team      = team,
+		primary   = loadout.primary,
+		secondary = loadout.secondary,
+	}
+	if team != .Spectator do respawn.pos = spawn_point(g.world.polymap, team, &g.world.rng)
+	soldier.remote = remote
+	apply_ruling(&g.world, &g.resources, respawn)
+	if team == .Spectator do soldier.vitals.dead = true
+}

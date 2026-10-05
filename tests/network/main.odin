@@ -249,8 +249,8 @@ streams :: proc(t: ^testing.T) {
 		free(server)
 		free(client)
 	}
-	net.soldier_place(server, 0, .Alpha, remote = true)
-	net.soldier_place(server, 1, .Bravo, remote = false)
+	game.soldier_place(server, 0, .Alpha, remote = true)
+	game.soldier_place(server, 1, .Bravo, remote = false)
 	run(server, 120, {.Right, .Jet}) // past the spawn protection
 
 	words: net.Wire_Queue

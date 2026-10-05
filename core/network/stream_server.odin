@@ -1,7 +1,6 @@
 package network
 
 import "../game"
-import res "../resources"
 import "../utils"
 
 // The server's end of the two streams, one per player (stream.odin).
@@ -90,17 +89,8 @@ server_stream_receive :: proc(s: ^Server_Stream, g: ^game.Game, slot: game.Soldi
 		soldier_take_owned(g.resources.animations, soldier, &m.owned)
 	}
 	soldier.player.typing = m.typing
-	soldier.loadout = loadout_allowed(m.owned.loadout)
+	soldier.loadout = game.loadout_allowed(m.owned.loadout)
 	return true
-}
-
-// A loadout as the server allows it: the original's first loadout for a choice that
-// isn't one.
-loadout_allowed :: proc(chosen: game.Loadout) -> game.Loadout {
-	return {
-		primary   = chosen.primary if game.weapon_is_primary(chosen.primary) else .Desert_Eagles,
-		secondary = chosen.secondary if game.weapon_is_secondary(chosen.secondary) else .Knife,
-	}
 }
 
 // Nothing heard for STREAM_RELEASE_TICKS.
@@ -193,23 +183,4 @@ server_stream_snapshot :: proc(s: ^Server_Stream, g: ^game.Game, slot: game.Sold
 		case:              return nil // not even alone
 		}
 	}
-}
-
-// A soldier as the server places it: dressed as its player said, on `team`, with its
-// loadout as allowed; or a spectator, present and dead, never respawned, which the
-// simulation passes by. Its life counts up, so word from before isn't taken for after.
-soldier_place :: proc(g: ^game.Game, slot: game.Soldier_Id, team: res.Team, remote: bool) {
-	soldier := &g.world.soldiers[slot]
-	loadout := loadout_allowed(soldier.loadout)
-	respawn := game.Respawn {
-		target    = slot,
-		life      = soldier.vitals.life + 1,
-		team      = team,
-		primary   = loadout.primary,
-		secondary = loadout.secondary,
-	}
-	if team != .Spectator do respawn.pos = game.spawn_point(g.world.polymap, team, &g.world.rng)
-	soldier.remote = remote
-	game.apply_ruling(&g.world, &g.resources, respawn)
-	if team == .Spectator do soldier.vitals.dead = true
 }

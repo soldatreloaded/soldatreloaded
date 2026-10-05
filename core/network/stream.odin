@@ -155,9 +155,3 @@ soldier_take_owned :: proc(animations: ^res.Animations, dst, src: ^game.Soldier)
 soldier_take_served :: proc(dst, src: ^game.Soldier) {
 	fields_copy(SOLDIER_SERVED_FIELDS, dst, src)
 }
-
-// Whether the round stands still: paused, or over.
-round_standing :: proc(round: ^game.Round) -> bool {
-	_, playing := round.phase.(game.Playing)
-	return !playing
-}

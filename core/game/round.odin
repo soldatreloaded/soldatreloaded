@@ -82,6 +82,12 @@ round_over :: proc(round: ^Round) -> bool {
 	return is_ended && ended.countdown == 0
 }
 
+// Whether the round stands still: paused, or over.
+round_standing :: proc(round: ^Round) -> bool {
+	_, playing := round.phase.(Playing)
+	return !playing
+}
+
 // Freezes or resumes the round; an ended one is left alone. True if it changed.
 round_pause :: proc(round: ^Round, paused: bool) -> bool {
 	#partial switch _ in round.phase {

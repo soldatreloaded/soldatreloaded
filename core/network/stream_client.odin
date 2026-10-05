@@ -256,7 +256,7 @@ soldier_apply :: proc(c: ^Client_Stream, g: ^game.Game, id: game.Soldier_Id, fra
 	soldier_take_owned(g.resources.animations, s, heard)
 	s.remote = true
 	steps_left := min(steps, STREAM_STEPS_MAX)
-	if round_standing(&g.round) do steps_left = 0 // the world stands, paused or between rounds: so does the word
+	if game.round_standing(&g.round) do steps_left = 0 // the world stands, paused or between rounds: so does the word
 	for _ in 0 ..< steps_left {
 		game.clear_output(scratch) // what the steps would say is said by nobody
 		game.soldier_update(w, &g.resources, id, game.soldier_last_command(s, false), nil, scratch)
