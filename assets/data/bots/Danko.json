@@ -1,0 +1,23 @@
+{
+  "name": "Danko",
+  "primary_weapon": "ak74",
+  "secondary_weapon": "ussocom",
+  "shirt": "987D7C",
+  "pants": "416172",
+  "skin": "E6B478",
+  "hair": "714835",
+  "hair_style": "army",
+  "head_style": "helmet",
+  "chain_style": "none",
+  "friend": "",
+  "accuracy": 19,
+  "shoot_dead": true,
+  "grenade_frequency": 145,
+  "camping": 128,
+  "chat_frequency": 12,
+  "chat_kill": "I kill!",
+  "chat_dead": "Sorry, guys",
+  "chat_low_health": "No...",
+  "chat_see_enemy": "See enemy now",
+  "chat_winning": "OK"
+}

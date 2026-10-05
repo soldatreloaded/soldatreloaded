@@ -1,0 +1,23 @@
+{
+  "name": "Roach",
+  "primary_weapon": "m79",
+  "secondary_weapon": "ussocom",
+  "shirt": "215302",
+  "pants": "7B2C11",
+  "skin": "6D4A1A",
+  "hair": "714835",
+  "hair_style": "army",
+  "head_style": "helmet",
+  "chain_style": "dog_tags",
+  "friend": "",
+  "accuracy": 30,
+  "shoot_dead": false,
+  "grenade_frequency": 400,
+  "camping": 255,
+  "chat_frequency": 2000,
+  "chat_kill": "",
+  "chat_dead": "",
+  "chat_low_health": "",
+  "chat_see_enemy": "",
+  "chat_winning": ""
+}

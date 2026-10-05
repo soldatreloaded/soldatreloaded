@@ -1,0 +1,23 @@
+{
+  "name": "Kruger",
+  "primary_weapon": "ruger77",
+  "secondary_weapon": "ussocom",
+  "shirt": "125CD8",
+  "pants": "9DC697",
+  "skin": "E6B478",
+  "hair": "795C51",
+  "hair_style": "normal",
+  "head_style": "helmet",
+  "chain_style": "none",
+  "friend": "",
+  "accuracy": 8,
+  "shoot_dead": false,
+  "grenade_frequency": 500,
+  "camping": 255,
+  "chat_frequency": 6,
+  "chat_kill": "You've just been erased",
+  "chat_dead": "",
+  "chat_low_health": "",
+  "chat_see_enemy": "Drop your gun",
+  "chat_winning": ""
+}

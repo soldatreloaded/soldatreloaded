@@ -1,0 +1,23 @@
+{
+  "name": "Terminator",
+  "primary_weapon": "barrett",
+  "secondary_weapon": "ussocom",
+  "shirt": "464646",
+  "pants": "32354B",
+  "skin": "A8CAA8",
+  "hair": "010101",
+  "hair_style": "normal",
+  "head_style": "helmet",
+  "chain_style": "none",
+  "friend": "Sarah O'Connor",
+  "accuracy": 0,
+  "shoot_dead": false,
+  "grenade_frequency": 10000,
+  "camping": 255,
+  "chat_frequency": 8,
+  "chat_kill": "You have been terminated",
+  "chat_dead": "I'll be back",
+  "chat_low_health": "I'm an obsolete design",
+  "chat_see_enemy": "It is time",
+  "chat_winning": "I'm back"
+}

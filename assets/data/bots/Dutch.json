@@ -1,0 +1,23 @@
+{
+  "name": "Dutch",
+  "primary_weapon": "minimi",
+  "secondary_weapon": "ussocom",
+  "shirt": "C29541",
+  "pants": "3D7A2E",
+  "skin": "E6B478",
+  "hair": "714835",
+  "hair_style": "normal",
+  "head_style": "helmet",
+  "chain_style": "none",
+  "friend": "",
+  "accuracy": 13,
+  "shoot_dead": false,
+  "grenade_frequency": 160,
+  "camping": 255,
+  "chat_frequency": 7,
+  "chat_kill": "Stick around!",
+  "chat_dead": "Son of a *****!",
+  "chat_low_health": "Do it! Do it now!!!! I'm here! Kill Me!",
+  "chat_see_enemy": "You're one UGLY mother ****er!",
+  "chat_winning": "If it bleeds, we can kill it"
+}

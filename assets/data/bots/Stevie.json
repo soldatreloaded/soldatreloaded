@@ -1,0 +1,23 @@
+{
+  "name": "Stevie",
+  "primary_weapon": "steyr_aug",
+  "secondary_weapon": "ussocom",
+  "shirt": "EDA45A",
+  "pants": "775042",
+  "skin": "E6B478",
+  "hair": "9A8929",
+  "hair_style": "army",
+  "head_style": "helmet",
+  "chain_style": "none",
+  "friend": "",
+  "accuracy": 55,
+  "shoot_dead": true,
+  "grenade_frequency": 200,
+  "camping": 255,
+  "chat_frequency": 8,
+  "chat_kill": "Take that",
+  "chat_dead": "I can't take it!",
+  "chat_low_health": "Medic!",
+  "chat_see_enemy": "Charlie!",
+  "chat_winning": ""
+}

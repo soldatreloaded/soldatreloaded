@@ -12,8 +12,8 @@ package bots
 // team's once it carries the flag; a flag, a kit it needs or a knife it sees
 // draws it off the path (GoToThing); a grenade near it is run from; stuck, it jumps,
 // and after too long on one waypoint it forgets the path and finds another. It is
-// pissed off at who last hit it and looks for them first. A bot is told by a .bot file
-// (data/bots, the original's format): its name, look, favourite weapon, accuracy,
+// pissed off at who last hit it and looks for them first. A bot is told by its file
+// (data/bots/<name>.json): its name, look, favourite weapon, accuracy,
 // how often it throws grenades, whether it camps, and what it says.
 //
 // The bots are a source of commands, as the players' clients are: before the tick
@@ -23,13 +23,14 @@ package bots
 // it does with a player's. What a bot says goes to a callback (the server relays it as
 // chat).
 //
-// By file: profile.odin reads the .bot files; control.odin is one tick of a bot's
+// By file: profile.odin reads the bots' files; control.odin is one tick of a bot's
 // thinking (ControlBot), which fights through decision.odin (SimpleDecision), walks
 // through waypoints.odin, and is drawn off the path by things.odin.
 
 import sa "core:container/small_array"
 
 import "../game"
+import res "../resources"
 import "../utils"
 
 // The original's bots_difficulty: scales the accuracy's spread (100 as the file says,
@@ -54,7 +55,7 @@ Bots :: struct {
 // The original's TBotData, per soldier.
 Brain :: struct {
 	active:                   bool,
-	profile:                  Profile,
+	profile:                  res.Bot_Profile,
 	accuracy:                 i32, // the profile's, scaled by the difficulty
 	chat_freq:                i32, // the profile's, as the original stretches it
 	rng:                      game.Rng,
@@ -81,7 +82,7 @@ bots_init :: proc(b: ^Bots, settings: Settings, say: Say, say_user: rawptr) {
 }
 
 // The soldier in `slot` is a bot with this profile from now; `seed` its own randomness.
-bots_attach :: proc(b: ^Bots, slot: game.Soldier_Id, profile: ^Profile, seed: u64) {
+bots_attach :: proc(b: ^Bots, slot: game.Soldier_Id, profile: ^res.Bot_Profile, seed: u64) {
 	b.brains[slot] = {
 		active                   = true,
 		profile                  = profile^,

@@ -1,0 +1,23 @@
+{
+  "name": "Sniper",
+  "primary_weapon": "barrett",
+  "secondary_weapon": "ussocom",
+  "shirt": "7C782E",
+  "pants": "4F5C3A",
+  "skin": "E6B478",
+  "hair": "714835",
+  "hair_style": "army",
+  "head_style": "helmet",
+  "chain_style": "none",
+  "friend": "",
+  "accuracy": 10,
+  "shoot_dead": false,
+  "grenade_frequency": 1000,
+  "camping": 255,
+  "chat_frequency": 5,
+  "chat_kill": "One down",
+  "chat_dead": "Alpha is down",
+  "chat_low_health": "I'm hit!",
+  "chat_see_enemy": "Open fire!",
+  "chat_winning": "Objective complete"
+}

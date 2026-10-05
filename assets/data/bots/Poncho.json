@@ -1,0 +1,23 @@
+{
+  "name": "Poncho",
+  "primary_weapon": "mp5",
+  "secondary_weapon": "ussocom",
+  "shirt": "CB9634",
+  "pants": "4E5238",
+  "skin": "E6B478",
+  "hair": "714835",
+  "hair_style": "army",
+  "head_style": "hat",
+  "chain_style": "dog_tags",
+  "friend": "",
+  "accuracy": 28,
+  "shoot_dead": false,
+  "grenade_frequency": 133,
+  "camping": 0,
+  "chat_frequency": 10,
+  "chat_kill": "Take a look at that!",
+  "chat_dead": "Bullcrap!",
+  "chat_low_health": "I'm bleeding, man!",
+  "chat_see_enemy": "You got time to duck?",
+  "chat_winning": ""
+}

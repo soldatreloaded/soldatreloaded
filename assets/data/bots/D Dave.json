@@ -1,0 +1,23 @@
+{
+  "name": "Dangerous Dave",
+  "primary_weapon": "ak74",
+  "secondary_weapon": "chainsaw",
+  "shirt": "B6AF30",
+  "pants": "141615",
+  "skin": "C78F10",
+  "hair": "6D4225",
+  "hair_style": "punk",
+  "head_style": "none",
+  "chain_style": "gold_chain",
+  "friend": "",
+  "accuracy": 35,
+  "shoot_dead": false,
+  "grenade_frequency": 180,
+  "camping": 128,
+  "chat_frequency": 14,
+  "chat_kill": "Wicked!",
+  "chat_dead": "Life is the most precious gift that Jah has given us...",
+  "chat_low_health": "Now da' is wicked!",
+  "chat_see_enemy": "Que pasa!?",
+  "chat_winning": "I am D' Best"
+}

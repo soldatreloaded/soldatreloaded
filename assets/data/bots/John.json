@@ -1,0 +1,23 @@
+{
+  "name": "John",
+  "primary_weapon": "desert_eagles",
+  "secondary_weapon": "knife",
+  "shirt": "9187AA",
+  "pants": "134212",
+  "skin": "A86A46",
+  "hair": "714835",
+  "hair_style": "dreadlocks",
+  "head_style": "hat",
+  "chain_style": "gold_chain",
+  "friend": "",
+  "accuracy": 16,
+  "shoot_dead": true,
+  "grenade_frequency": 125,
+  "camping": 0,
+  "chat_frequency": 5,
+  "chat_kill": "Who's the man!",
+  "chat_dead": "Crap, man!",
+  "chat_low_health": "You suck, man!",
+  "chat_see_enemy": "I'm your daddy!",
+  "chat_winning": "Yeah, yo momma!"
+}

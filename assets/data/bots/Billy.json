@@ -1,0 +1,23 @@
+{
+  "name": "Billy",
+  "primary_weapon": "spas12",
+  "secondary_weapon": "knife",
+  "shirt": "9D4F51",
+  "pants": "4B488E",
+  "skin": "98754E",
+  "hair": "2C1714",
+  "hair_style": "normal",
+  "head_style": "hat",
+  "chain_style": "dog_tags",
+  "friend": "",
+  "accuracy": 24,
+  "shoot_dead": false,
+  "grenade_frequency": 122,
+  "camping": 0,
+  "chat_frequency": 13,
+  "chat_kill": "I ain't afraid of no man",
+  "chat_dead": "We're all gonna die.",
+  "chat_low_health": "aaaaaAAAAAAAAA!!!!!",
+  "chat_see_enemy": "There's something!",
+  "chat_winning": ""
+}

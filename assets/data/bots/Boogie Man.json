@@ -1,0 +1,23 @@
+{
+  "name": "Boogie Man",
+  "primary_weapon": "chainsaw",
+  "secondary_weapon": "ussocom",
+  "shirt": "333666",
+  "pants": "333666",
+  "skin": "ABB45B",
+  "hair": "010101",
+  "hair_style": "army",
+  "head_style": "none",
+  "chain_style": "none",
+  "friend": "",
+  "accuracy": 0,
+  "shoot_dead": false,
+  "grenade_frequency": 10000,
+  "camping": 255,
+  "chat_frequency": 222,
+  "chat_kill": "",
+  "chat_dead": "",
+  "chat_low_health": "",
+  "chat_see_enemy": "",
+  "chat_winning": ""
+}

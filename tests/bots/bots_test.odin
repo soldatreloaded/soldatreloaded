@@ -1,6 +1,6 @@
 package bots_test
 
-// The bots: the .bot files read as the original reads them; a bot that sees an enemy
+// The bots: their files under data/bots read as written; a bot that sees an enemy
 // fights it; one with nobody in sight walks the map's waypoints.
 //
 //   odin test tests/bots        from the repo root, which assets/data is read from
@@ -74,7 +74,7 @@ count_said :: proc(user: rawptr, slot: game.Soldier_Id, text: string) {
 }
 
 @(private = "file")
-find_profile :: proc(profiles: []bots.Profile, name: string) -> ^bots.Profile {
+find_profile :: proc(profiles: []res.Bot_Profile, name: string) -> ^res.Bot_Profile {
 	for &profile in profiles {
 		if utils.short_string_text(&profile.name) == name do return &profile
 	}
@@ -82,9 +82,8 @@ find_profile :: proc(profiles: []bots.Profile, name: string) -> ^bots.Profile {
 }
 
 @(test)
-profiles_read_as_the_original_reads_them :: proc(t: ^testing.T) {
-	weapons := game.weapons_default()
-	profiles := bots.profiles_load(game.DATA_DIR, &weapons)
+profiles_read_as_written :: proc(t: ^testing.T) {
+	profiles := res.bot_profiles_load(game.DATA_DIR)
 	defer delete(profiles)
 	testing.expectf(t, len(profiles) >= 10, "the bot files under data/bots are read (%d)", len(profiles))
 
@@ -92,9 +91,9 @@ profiles_read_as_the_original_reads_them :: proc(t: ^testing.T) {
 	if !testing.expect(t, admiral != nil, "Admiral among them") do return
 	testing.expectf(t, admiral.favourite == .Minimi && admiral.secondary == .USSOCOM, "with his FN Minimi and USSOCOM (%v, %v)", admiral.favourite, admiral.secondary)
 	testing.expect(t, admiral.accuracy == 70 && admiral.grenade_frequency == 160 && admiral.camping == 0 && admiral.chat_frequency == 7, "his numbers as the file has them")
-	testing.expectf(t, admiral.look.shirt.rgb == {0xEE, 0x53, 0xE2}, "his shirt's colour turned round from the file's $00BBGGRR (%v)", admiral.look.shirt)
-	testing.expectf(t, admiral.look.skin.rgb == {0x6D, 0x4A, 0x1A}, "and his skin's as written (%v)", admiral.look.skin)
-	testing.expect(t, admiral.look.hair_style == .Punk && admiral.look.head_style == .Helmet && admiral.look.chain_style == .Gold_Chain, "his punk hair, helmet and chain")
+	testing.expectf(t, admiral.shirt.rgb == {0xEE, 0x53, 0xE2}, "his shirt's colour as the file has it (%v)", admiral.shirt)
+	testing.expectf(t, admiral.skin.rgb == {0x6D, 0x4A, 0x1A}, "and his skin's (%v)", admiral.skin)
+	testing.expect(t, admiral.hair_style == .Punk && admiral.head_style == .Helmet && admiral.chain_style == .Gold_Chain, "his punk hair, helmet and chain")
 	testing.expectf(t, utils.short_string_text(&admiral.chat_kill) == "Ha ha", "and what he says (%s)", utils.short_string_text(&admiral.chat_kill))
 
 	rng := game.Rng{3}
@@ -117,7 +116,7 @@ a_bot_that_sees_an_enemy_fights_it :: proc(t: ^testing.T) {
 	}
 	if !testing.expect(t, scene(g, 100.0), "the scene loads") do return
 	weapons := game.weapons_default()
-	profiles := bots.profiles_load(game.DATA_DIR, &weapons)
+	profiles := res.bot_profiles_load(game.DATA_DIR)
 	defer delete(profiles)
 	admiral := find_profile(profiles, "Admiral")
 	if !testing.expect(t, admiral != nil, "Admiral among the profiles") do return
@@ -158,7 +157,7 @@ a_bot_with_nobody_in_sight_walks_the_waypoints :: proc(t: ^testing.T) {
 	}
 	if !testing.expect(t, scene(g, 100.0), "the scene loads") do return
 	weapons := game.weapons_default()
-	profiles := bots.profiles_load(game.DATA_DIR, &weapons)
+	profiles := res.bot_profiles_load(game.DATA_DIR)
 	defer delete(profiles)
 	admiral := find_profile(profiles, "Admiral")
 	if !testing.expect(t, admiral != nil, "Admiral among the profiles") do return

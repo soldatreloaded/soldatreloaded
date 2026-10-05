@@ -44,7 +44,7 @@ MAX_PLAYERS :: game.MAX_PLAYERS
 Game :: game.Game
 Rng :: game.Rng
 Bots :: bots.Bots
-Profile :: bots.Profile
+Profile :: res.Bot_Profile
 
 TICK_SECONDS :: 1.0 / f64(game.TICK_RATE)
 MAX_STALL :: 0.25 // seconds: a stall never turns into a burst of ticks
@@ -154,7 +154,7 @@ server_init :: proc(sv: ^Server, options: Options) -> bool {
 	lists.lists_load(&sv.lists, config, options.config_path)
 
 	bots.bots_init(&sv.bots, {difficulty = config.bots.difficulty, chat = config.bots.chat}, bot_say, sv)
-	sv.profiles = bots.profiles_load(options.data_dir, &sv.game.resources.weapons)
+	sv.profiles = res.bot_profiles_load(options.data_dir)
 	add_bots(sv)
 
 	log.infof("hosting %s on %s%sport %d, %d ticks a second", first, config.server.ip, " " if config.server.ip != "" else "", port, game.TICK_RATE)
@@ -261,7 +261,7 @@ server_weapons_changed :: proc(sv: ^Server, weapons: res.Weapon_Table) {
 // A bot on `team` (none for the emptier side), named, or one at random: its slot, or
 // nothing when the server is full, no profile is known by that name, or there is none.
 server_add_bot :: proc(sv: ^Server, team: res.Team, name: string = "") -> (slot: game.Soldier_Id, ok: bool) {
-	profile: ^bots.Profile
+	profile: ^res.Bot_Profile
 	if name != "" {
 		for &p in sv.profiles {
 			if utils.short_string_text(&p.name) == name do profile = &p

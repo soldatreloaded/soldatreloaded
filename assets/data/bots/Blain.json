@@ -1,0 +1,23 @@
+{
+  "name": "Blain",
+  "primary_weapon": "minigun",
+  "secondary_weapon": "ussocom",
+  "shirt": "C26541",
+  "pants": "2B6A2E",
+  "skin": "E6B478",
+  "hair": "784B2E",
+  "hair_style": "normal",
+  "head_style": "hat",
+  "chain_style": "dog_tags",
+  "friend": "",
+  "accuracy": 21,
+  "shoot_dead": false,
+  "grenade_frequency": 550,
+  "camping": 0,
+  "chat_frequency": 7,
+  "chat_kill": "",
+  "chat_dead": "",
+  "chat_low_health": "I ain't got time to bleed!",
+  "chat_see_enemy": "Payback time!",
+  "chat_winning": "Bunch of slack-jawed ******* around here"
+}

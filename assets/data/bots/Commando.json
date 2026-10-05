@@ -1,0 +1,23 @@
+{
+  "name": "Commando",
+  "primary_weapon": "steyr_aug",
+  "secondary_weapon": "knife",
+  "shirt": "CD1B1B",
+  "pants": "355479",
+  "skin": "E6B478",
+  "hair": "714835",
+  "hair_style": "army",
+  "head_style": "helmet",
+  "chain_style": "dog_tags",
+  "friend": "",
+  "accuracy": 23,
+  "shoot_dead": false,
+  "grenade_frequency": 152,
+  "camping": 255,
+  "chat_frequency": 9,
+  "chat_kill": "I eat Green Berets for breakfast",
+  "chat_dead": "**** you",
+  "chat_low_health": "Like heck!",
+  "chat_see_enemy": "You're a funny guy, I like you",
+  "chat_winning": "Affirmative"
+}

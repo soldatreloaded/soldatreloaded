@@ -52,7 +52,7 @@ Match :: struct {
 	limbo:      Limbo,
 	team_asked: Maybe(res.Team), // chosen in the team menu, for the next tick to place me on
 	bots:       ai.Bots,
-	profiles:   []ai.Profile, // data/bots, the bots are dressed from
+	profiles:   []res.Bot_Profile, // data/bots, the bots are dressed from
 }
 
 // What the match asks of the client.
@@ -262,7 +262,7 @@ round_start :: proc(match: ^Match, config: ^res.Client_Config) -> bool {
 			ai.bots_attach(&match.bots, slot, profile, game.world.rng.state + u64(id))
 		}
 		profile := &match.bots.brains[id].profile
-		game.world.soldiers[id].player = {look = profile.look, bot = true}
+		game.world.soldiers[id].player = {look = ai.profile_look(profile), bot = true}
 		team: res.Team = .Alpha if id <= alpha else .Bravo
 		spawn(game, slot, team, {profile.favourite, profile.secondary})
 	}
@@ -293,7 +293,7 @@ spawn :: proc(game: ^sim.Game, id: sim.Soldier_Id, team: res.Team, loadout: sim.
 @(private = "file")
 bots_join :: proc(match: ^Match, settings: res.Bot_Settings) {
 	ai.bots_init(&match.bots, {difficulty = settings.difficulty, chat = settings.chat}, nil, nil)
-	match.profiles = ai.profiles_load(sim.DATA_DIR, &match.game.resources.weapons)
+	match.profiles = res.bot_profiles_load(sim.DATA_DIR)
 }
 
 @(private = "file")

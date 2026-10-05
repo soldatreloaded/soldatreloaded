@@ -311,7 +311,7 @@ player_ban :: proc(sv: ^Server, slot: game.Soldier_Id, seconds: i64, reason: str
 // A bot into a free slot, placed on `team` (the emptier side when it isn't alpha or
 // bravo) and announced: its slot, or nothing when full.
 // The soldier is the server's to play: not remote, marked a bot.
-player_add_bot :: proc(sv: ^Server, profile: ^bots.Profile, team: res.Team) -> (slot: game.Soldier_Id, ok: bool) {
+player_add_bot :: proc(sv: ^Server, profile: ^res.Bot_Profile, team: res.Team) -> (slot: game.Soldier_Id, ok: bool) {
 	slot = free_slot(sv) or_return
 	team := team
 	if team != .Alpha && team != .Bravo do team = team_for(sv)
@@ -320,7 +320,7 @@ player_add_bot :: proc(sv: ^Server, profile: ^bots.Profile, team: res.Team) -> (
 	player^ = {bot = true, chose_team = true, team = team, name = profile.name}
 	if player.name.length == 0 do player.name = utils.short_string(24, "Bot")
 	soldier := &sv.game.world.soldiers[slot]
-	soldier.player.look = profile.look
+	soldier.player.look = bots.profile_look(profile)
 	soldier.player.bot = true
 	soldier.loadout = {primary = profile.favourite, secondary = profile.secondary}
 	soldier.tally = {}

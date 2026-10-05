@@ -1,0 +1,23 @@
+{
+  "name": "Admiral",
+  "primary_weapon": "minimi",
+  "secondary_weapon": "ussocom",
+  "shirt": "EE53E2",
+  "pants": "484F39",
+  "skin": "6D4A1A",
+  "hair": "F53653",
+  "hair_style": "punk",
+  "head_style": "helmet",
+  "chain_style": "gold_chain",
+  "friend": "",
+  "accuracy": 70,
+  "shoot_dead": false,
+  "grenade_frequency": 160,
+  "camping": 0,
+  "chat_frequency": 7,
+  "chat_kill": "Ha ha",
+  "chat_dead": "You like that, don't you?",
+  "chat_low_health": "",
+  "chat_see_enemy": "Punk",
+  "chat_winning": "That's the way you do it"
+}

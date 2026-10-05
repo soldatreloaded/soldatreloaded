@@ -1,0 +1,23 @@
+{
+  "name": "Sgt. Mac",
+  "primary_weapon": "spas12",
+  "secondary_weapon": "ussocom",
+  "shirt": "9F645B",
+  "pants": "538B43",
+  "skin": "6D4A1A",
+  "hair": "714835",
+  "hair_style": "army",
+  "head_style": "helmet",
+  "chain_style": "dog_tags",
+  "friend": "",
+  "accuracy": 32,
+  "shoot_dead": false,
+  "grenade_frequency": 144,
+  "camping": 0,
+  "chat_frequency": 12,
+  "chat_kill": "Got that?",
+  "chat_dead": "Uuu",
+  "chat_low_health": "Mother ****aaa!",
+  "chat_see_enemy": "I'll bleed ya, real quiet",
+  "chat_winning": "I'm gonna have me some fun!"
+}
