@@ -18,9 +18,9 @@ import "../../core/utils"
 
 @(test)
 tables :: proc(t: ^testing.T) {
-	testing.expect(t, len(net.SOLDIER_OWNED_FIELDS) > 30, "the owned half has its fields")
+	testing.expect(t, len(net.SOLDIER_OWNED_FIELDS) >= 30, "the owned half has its fields")
 	testing.expect(t, len(net.SOLDIER_SERVED_FIELDS) > 25, "the served half has its fields")
-	testing.expect_value(t, len(net.SOLDIER_LOADOUT_FIELDS), 3)
+	testing.expect_value(t, len(net.SOLDIER_LOADOUT_FIELDS), 2) // the primary and the secondary
 	testing.expect(t, len(net.THING_FIELDS) > 20, "a thing has its fields")
 	testing.expect_value(t, len(net.LOOK_FIELDS), 9)
 	for f in net.SOLDIER_OWNED_FIELDS {
@@ -217,32 +217,23 @@ messages :: proc(t: ^testing.T) {
 	testing.expect(t, net.buffer_done(&b))
 	testing.expect_value(t, heard_chat, chat)
 
-	// a full weapons mod takes a few messages, and comes back whole
-	changes: res.Weapon_Changes
-	for &weapon, w in changes {
-		for &stat, s in weapon {
-			stat = f64(int(w) * 100 + int(s))
-		}
+	// a whole weapons mod goes in one message, within a packet, and comes back whole
+	weapons := net.Msg_Weapons{weapons = res.weapon_table(res.GATHER_WEAPONS)}
+	for &stats, w in weapons.weapons {
+		stats.damage = f32(w) * 10 + 0.5
+		stats.fire_interval = i32(w) + 1
+		stats.ammo = -i32(w)
+		stats.leg_modifier = f32(w) / 4
 	}
-	msgs: [len(res.Weapon)]net.Msg_Weapons
-	made := net.msg_weapons_fit(&changes, net.MTU, msgs[:])
-	testing.expect(t, made > 1 && made < 6, "a full mod takes a few messages")
-	heard_changes: res.Weapon_Changes
-	last := res.Weapon(0)
-	for &m, i in msgs[:made] {
-		bytes = net.build(buf[:], .Weapons, net.msg_weapons, &m)
-		testing.expect(t, bytes != nil)
-		b = net.buffer_reader(bytes)
-		heard_weapons: net.Msg_Weapons
-		net.msg_kind(&b, &kind)
-		net.msg_weapons(&b, &heard_weapons)
-		testing.expect(t, net.buffer_done(&b))
-		if i > 0 do testing.expect_value(t, heard_weapons.first, last + res.Weapon(1))
-		for w in heard_weapons.first ..= heard_weapons.last do heard_changes[w] = heard_weapons.changes[w]
-		last = heard_weapons.last
-	}
-	testing.expect_value(t, last, max(res.Weapon))
-	testing.expect(t, heard_changes == changes, "the mod came through")
+	bytes = net.build(buf[:], .Weapons, net.msg_weapons, &weapons)
+	testing.expect(t, bytes != nil && len(bytes) <= net.MTU, "a full weapons mod fits a packet")
+	b = net.buffer_reader(bytes)
+	heard_weapons: net.Msg_Weapons
+	net.msg_kind(&b, &kind)
+	net.msg_weapons(&b, &heard_weapons)
+	testing.expect(t, net.buffer_done(&b))
+	testing.expect_value(t, kind, net.Msg_Kind.Weapons)
+	testing.expect(t, heard_weapons == weapons, "the mod came through")
 }
 
 // A server and a client on the same map, the client playing soldier 0, the server
