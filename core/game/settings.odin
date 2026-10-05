@@ -12,7 +12,6 @@ Game_Settings :: struct {
 	respawn_time:     i32,  // ticks
 	max_grenades:     i32,
 	medikit_cooldown: i32,  // seconds before a second medikit
-	friendly_fire:    bool,
 	kits_collide:     bool, // bullets and blasts knock kits about
 	guns_collide:     bool, // and dropped guns
 	gravity:          f32,  // pulling everything down, each tick

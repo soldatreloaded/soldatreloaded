@@ -140,11 +140,12 @@ suicide_hit :: proc(world: ^World, id: Soldier_Id) -> Hit {
 	return {shooter = id, target = id, weapon = .Punch, amount = 4.0 * DEFAULT_HEALTH, pos = world.soldiers[id].body.pos}
 }
 
-// Whether a hit wounds at all: friendly fire stops the wound, not the shove.
+// Whether a hit wounds at all: a teammate's doesn't, though it still shoves. There is no
+// friendly fire.
 wounds :: proc(world: ^World, hit: Hit) -> bool {
 	target := &world.soldiers[hit.target]
 	attacker := &world.soldiers[hit.shooter]
-	if !world.rules.friendly_fire && target.team != .None && target.team == attacker.team && hit.target != hit.shooter do return false
+	if target.team != .None && target.team == attacker.team && hit.target != hit.shooter do return false
 	return true
 }
 

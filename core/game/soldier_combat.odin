@@ -570,12 +570,12 @@ SPRAY_MATCH_TICKS :: 10
 // A hit disturbs the target's aim by the bink of the gun it holds (the original's
 // HitSpray). Of the two words of one hit, whichever comes first gives the spray and the
 // other is taken as it, if it comes within SPRAY_MATCH_TICKS. None for the dead, nor
-// from a teammate without friendly fire.
+// from a teammate.
 soldier_hit_spray :: proc(world: ^World, resources: ^Resources, target, attacker: Soldier_Id, word: Spray_Word) {
 	victim := &world.soldiers[target]
 	from := &world.soldiers[attacker]
 	if victim.vitals.dead do return // it goes with the life
-	if target != attacker && !world.rules.friendly_fire && victim.team != .None && victim.team == from.team do return
+	if target != attacker && victim.team != .None && victim.team == from.team do return
 
 	// the other word of a hit already sprayed: taken as it. One that waited too long for
 	// its match is forgotten, the hit it stood for missed by the other side

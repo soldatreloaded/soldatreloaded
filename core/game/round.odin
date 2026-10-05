@@ -116,7 +116,6 @@ round_rules :: proc(round: ^Round, settings: ^Game_Settings) -> Rules {
 	_, playing := round.phase.(Playing)
 	return {
 		frozen           = !playing,
-		friendly_fire    = settings.friendly_fire,
 		kits_collide     = settings.kits_collide,
 		guns_collide     = settings.guns_collide,
 		respawn_time     = settings.respawn_time,

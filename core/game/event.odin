@@ -134,7 +134,7 @@ Blood :: struct {
 	target:    Soldier_Id,
 	pos:       utils.Vec2,
 	velocity:  utils.Vec2,
-	bloodless: bool, // the hit's sound alone: a thrown knife in a teammate, friendly fire off
+	bloodless: bool, // the hit's sound alone: a thrown knife in a teammate
 }
 
 Explosion :: struct {

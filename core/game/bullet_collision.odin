@@ -448,9 +448,9 @@ body_collide :: proc(
 			wound(resources, bullet, target_id, utils.length(bullet.velocity) * bullet.damage, &joints, part, point, push, false, out)
 			return
 		case .Thrown_Knife:
-			// The hit's sound on whoever it meets, and its blood unless a teammate's with friendly
-			// fire off. Through a corpse it hits it once (last_hit), so it is heard once.
-			friendly := !world.rules.friendly_fire && owner.team != .None && owner.team == live.team && target_id != bullet.owner
+			// The hit's sound on whoever it meets, and its blood unless a teammate's. Through a
+			// corpse it hits it once (last_hit), so it is heard once.
+			friendly := owner.team != .None && owner.team == live.team && target_id != bullet.owner
 			emit(out, Blood{target = target_id, pos = point, velocity = bullet.velocity, bloodless = friendly})
 			wound(resources, bullet, target_id, utils.length(bullet.velocity) * bullet.damage * 0.01, &joints, part, point, push, false, out)
 			if corpse { // it goes through a corpse rather than sticking in it

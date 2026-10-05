@@ -60,7 +60,6 @@ Resources :: struct {
 // What the round decides that the world plays by.
 Rules :: struct {
 	frozen:           bool, // between rounds and while paused nothing moves
-	friendly_fire:    bool,
 	kits_collide:     bool, // bullets and blasts knock kits about; flags always
 	guns_collide:     bool, // and dropped guns
 	respawn_time:     i32,  // ticks

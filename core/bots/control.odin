@@ -36,7 +36,6 @@ brain_think :: proc(b: ^Bots, br: ^Brain, g: ^game.Game, names: ^[game.MAX_PLAYE
 	polymap := world.polymap
 	s := &world.soldiers[me]
 	c := &br.keys
-	friendly_fire := g.settings.friendly_fire
 	difficulty := b.settings.difficulty
 
 	// FreeControls: all but a grenade being wound up
@@ -68,11 +67,10 @@ brain_think :: proc(b: ^Bots, br: ^Brain, g: ^game.Game, names: ^[game.MAX_PLAYE
 		}
 	}
 
+	// a grudge is never against itself, nor a teammate, whose hits don't wound
 	if who, has := br.pissed_off.?; has {
-		if who == me do br.pissed_off = nil
-		if !friendly_fire && world.soldiers[who].team == s.team do br.pissed_off = nil
+		if who == me || world.soldiers[who].team == s.team do br.pissed_off = nil
 	}
-	if friendly_fire && world.soldiers[br.target].team != s.team do br.pissed_off = nil
 	if who, has := br.pissed_off.?; has { // whoever hit me, if I can see them
 		o := &world.soldiers[who]
 		_, blocked := res.ray_cast(polymap, look, head_of(g, o), SEE_DISTANCE)
