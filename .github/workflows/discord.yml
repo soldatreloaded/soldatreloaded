@@ -1,0 +1,40 @@
+name: discord
+
+# Tells the Discord channel behind the DISCORD_WEBHOOK secret of a release: its name,
+# its notes and a link. Called by release.yml once the release is up, or run by hand
+# from the Actions tab to announce one again.
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: the release to announce, as its tag (v0.1.0)
+        required: true
+
+jobs:
+  announce:
+    runs-on: ubuntu-latest
+    steps:
+      - name: announce
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          if [ -z "$WEBHOOK" ]; then
+            echo "::error::no DISCORD_WEBHOOK secret: set one in the repository's settings"
+            exit 1
+          fi
+          gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json name,url,body |
+            jq '{embeds: [{
+              title: ("Soldat Reloaded " + .name + " is out"),
+              url: .url,
+              description: (.body[0:3800] + "\n\n[Download](" + .url + ")"),
+              color: 15105570
+            }]}' > message.json
+          curl -fsS -H "Content-Type: application/json" -d @message.json "$WEBHOOK"

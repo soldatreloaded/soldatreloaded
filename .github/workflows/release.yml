@@ -1,0 +1,77 @@
+name: release
+
+# Pushing a tag v<major>.<minor>.<patch> releases it (docs/git.md): the tests, then the
+# packages for each platform, then a GitHub release with them, then Discord is told.
+# Each step only if the one before succeeded. A tag with a suffix (v0.2.0-rc.1) makes
+# a pre-release, which the updater does not move to and Discord is not told of.
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+*"]
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  package:
+    name: package (${{ matrix.app }}, ${{ matrix.os }})
+    needs: test
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+        app: [client, server]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+
+      - uses: ./.github/actions/package
+        with:
+          app: ${{ matrix.app }}
+          version: ${{ github.ref_name }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app }}-${{ matrix.os }}
+          path: |
+            build/dist/*.zip
+            build/dist/*.manifest.json
+          if-no-files-found: error
+
+  publish:
+    needs: package
+    runs-on: ubuntu-latest
+    steps:
+      # The tag itself, annotation and all, which a checkout leaves out.
+      - uses: actions/checkout@v5
+      - run: git fetch --force origin "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      # The notes are the tag's message, written for players to read.
+      - name: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          prerelease=""
+          if [[ "$TAG" == *-* ]]; then prerelease="--prerelease"; fi
+          gh release create "$TAG" dist/* -R "$GITHUB_REPOSITORY" \
+            --title "$TAG" --notes-from-tag --verify-tag $prerelease
+
+  discord:
+    needs: publish
+    if: ${{ !contains(github.ref_name, '-') }}
+    uses: ./.github/workflows/discord.yml
+    with:
+      tag: ${{ github.ref_name }}
+    secrets: inherit
