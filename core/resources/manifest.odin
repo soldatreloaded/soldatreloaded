@@ -4,19 +4,17 @@ import "core:log"
 
 import "../utils"
 
-// A release's list of its files (docs/git.md, "The manifest"): every file of an install,
-// by its path from the install's root, its size and its SHA-256 in hex. One is published
-// beside each package of a release, and the package carries its own as manifest.json at
-// the install's root, which the launcher replaces as it updates the install.
+// A release's list of the game's files on one platform (docs/git.md, "The manifest"):
+// every file of an install, by its path from the install's root, its size and its
+// SHA-256 in hex. A release publishes one for each platform, manifest.<platform>.json,
+// and an install carries its own as manifest.json at its root, which the launcher
+// replaces as it updates the install.
 
 MANIFEST_FILE :: "manifest.json"
 
 Manifest :: struct {
-	name:     string, // the package: "soldatreloaded", "soldatreloaded-server"
-	version:  string, // "0.1.0"
-	platform: string, // "windows", "linux"
-	archive:  string, // the release's zip the files are in
-	files:    []Manifest_File,
+	version: string, // "0.1.0"
+	files:   []Manifest_File,
 }
 
 Manifest_File :: struct {

@@ -84,8 +84,7 @@ plan_from_two_manifests_and_the_disk :: proc(t: ^testing.T) {
 
 @(test)
 manifest_parses :: proc(t: ^testing.T) {
-	text := `{"name": "soldatreloaded", "version": "0.1.0", "platform": "windows", "archive": "soldatreloaded-0.1.0-windows.zip",
-		"files": [{"path": "data/maps/ctf_Ash.pms", "size": 12, "sha256": "ab"}]}`
+	text := `{"version": "0.1.0", "files": [{"path": "data/maps/ctf_Ash.pms", "size": 12, "sha256": "ab"}]}`
 	manifest, ok := res.manifest_parse(transmute([]byte)text, context.temp_allocator)
 	testing.expect(t, ok && manifest.version == "0.1.0" && len(manifest.files) == 1, "a manifest reads")
 	testing.expect(t, ok && manifest.files[0].path == "data/maps/ctf_Ash.pms" && manifest.files[0].size == 12, "with its files")

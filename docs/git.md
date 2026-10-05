@@ -102,19 +102,23 @@ A tag whose tests fail releases nothing; delete it, fix, and tag again.
 ### What a release ships
 
 Each package is a program and the part of `assets/` it reads, unpacked flat so that the
-install's root is the zip's:
+install's root is the zip's. Their names carry no version, so the newest release's are
+always at the same addresses
+(`https://github.com/soldatreloaded/soldatreloaded-odin/releases/latest/download/<name>`):
 
-| Package | Holds |
+| File | Holds |
 |---|---|
-| `soldatreloaded-<version>-<platform>.zip` | `soldatreloaded(.exe)`, `soldatreloaded-launcher(.exe)`, `data/`, `mods/default/` |
-| `soldatreloaded-server-<version>-linux.zip` | `soldatreloaded-server`, `data/`, `scripts/` |
+| `soldatreloaded-windows.zip` | `soldatreloaded.exe`, `soldatreloaded-launcher.exe`, `data/`, `mods/default/`, `manifest.json` |
+| `soldatreloaded-linux.zip` | `soldatreloaded`, `soldatreloaded-launcher`, `data/`, `mods/default/`, `manifest.json` |
+| `manifest.windows.json`, `manifest.linux.json` | every file of the game's install on that platform (below) |
+| `soldatreloaded-server.zip` | `soldatreloaded-server`, `data/`, `scripts/`, for Linux |
 
-Both hold `license.md`, `version.txt`, and their own manifest as `manifest.json`. Players
-start the launcher, which brings the install up to the newest release and starts the
-game. The game has no use for the server's scripts and the server draws nothing, so
-neither carries the other's. The game is released for Windows and Linux; the server,
-for those who host, for Linux alone. A server runs on Windows built from the source,
-as it is developed.
+Each holds `license.md` and `version.txt` too. Players start the launcher, which brings
+the install up to the newest release and starts the game. The game has no use for the
+server's scripts and the server draws nothing, so neither carries the other's. The game
+is released for Windows and Linux; the server, for those who host, for Linux alone, and
+with no manifest: a host updates it by hand. A server runs on Windows built from the
+source, as it is developed.
 
 A player installs nothing: each program carries its libraries inside it, and asks the
 system only for what every machine has (the C library; on Linux, X11 and OpenGL). The
@@ -132,16 +136,14 @@ install leaves them as they are.
 
 ### The manifest
 
-Beside each zip is its manifest, `<package>.manifest.json`: every file of the install
-but the manifest itself, by its path, size and SHA-256, sorted by path. The install
-keeps a copy as `manifest.json`.
+Beside each of the game's zips is its manifest, `manifest.<platform>.json`: every file of
+the install but the manifest itself, by its path, size and SHA-256, sorted by path. The
+install keeps a copy as `manifest.json`. The two platforms' list the same files but for
+the programs, which are each platform's own.
 
 ```json
 {
-  "name": "soldatreloaded",
   "version": "0.1.0",
-  "platform": "windows",
-  "archive": "soldatreloaded-0.1.0-windows.zip",
   "files": [
     {"path": "data/anims/barret.poa", "size": 36550, "sha256": "35b33f7b…"},
     …
@@ -150,12 +152,12 @@ keeps a copy as `manifest.json`.
 ```
 
 It is what the launcher (`apps/launcher`) keeps an install by, from three things: the
-newest release's manifest, the files on disk, and the install's `manifest.json`. A file
-the newest release lists that is missing or differs on disk is brought out of that
-release's zip; a file the install's manifest lists that the newest doesn't was dropped,
-and is deleted. So an update brings what changed and repairs what is damaged. What no
-manifest lists is the player's and never touched: the configs, any mod beside
-`mods/default/`, demos, and the scripts a server's owner writes beside the examples.
+newest release's manifest for its platform, the files on disk, and the install's
+`manifest.json`. A file the newest release lists that is missing or differs on disk is
+brought out of that release's zip; a file the install's manifest lists that the newest
+doesn't was dropped, and is deleted. So an update brings what changed and repairs what
+is damaged. What no manifest lists is the player's and never touched: the configs, any
+mod beside `mods/default/`, and demos.
 
 The launcher follows GitHub's latest release, the newest that is published and not a
-pre-release.
+pre-release, by its fixed addresses: it asks GitHub's API nothing.

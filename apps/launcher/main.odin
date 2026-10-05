@@ -3,7 +3,7 @@ package launcher
 // The launcher: what a player starts. It brings the install up to the newest release,
 // then starts the game and leaves. Its whole job, in order:
 //
-//   1. ask GitHub for the newest release, and that release's manifest for this platform
+//   1. fetch the newest release's manifest for this platform from GitHub (release.odin)
 //   2. weigh it against the install: the files on disk, and the manifest the install
 //      was last brought up to (update.odin)
 //   3. bring what is missing or changed out of the release's zip, and delete what the
@@ -59,11 +59,8 @@ update :: proc() -> string {
 	installed, is_install := res.manifest_load(res.MANIFEST_FILE, context.temp_allocator)
 	if !is_install do return "this isn't an install of a release (it has no manifest.json)"
 
-	release, found := latest_release()
-	if !found do return "the newest release couldn't be found"
-
-	latest, latest_text, has_manifest := release_manifest(release)
-	if !has_manifest do return fmt.tprintf("release %s has no manifest for %s", release.tag, PLATFORM)
+	latest, latest_text, found := latest_manifest()
+	if !found do return "the newest release couldn't be reached"
 
 	plan := plan_update(installed, latest)
 	if len(plan.fetch) == 0 && len(plan.remove) == 0 {
@@ -74,8 +71,8 @@ update :: proc() -> string {
 
 	fmt.printfln("Updating to %s: %d files to bring, %d to delete.", latest.version, len(plan.fetch), len(plan.remove))
 	if len(plan.fetch) > 0 {
-		archive, downloaded := release_archive(release, latest)
-		if !downloaded do return fmt.tprintf("%s couldn't be downloaded", latest.archive)
+		archive, downloaded := latest_archive()
+		if !downloaded do return ARCHIVE + " couldn't be downloaded"
 		if err := apply_fetch(plan, archive); err != "" do return err
 	}
 	apply_remove(plan)

@@ -1,20 +1,20 @@
 name: package
 description: >
   One package of a release for the runner's platform, into build/dist/: the program,
-  the part of assets/ it reads, its zip, and its manifest
+  the part of assets/ it reads, its zip, and for the game its manifest
 
 # The game draws and plays mods/ and has no use for scripts/; the server plays by data/
 # and runs scripts/, and draws nothing. So each package holds only what its program
 # reads. The game's comes with the launcher, which players start and which keeps the
 # install at the newest release (apps/launcher). Into build/dist/:
 #
-#   soldatreloaded-<version>-<platform>/                 the install, unpacked
-#   soldatreloaded-<version>-<platform>.zip              what a player downloads
-#   soldatreloaded-<version>-<platform>.manifest.json    every file in it, by hash
+#   soldatreloaded-<platform>/           the game's install, unpacked
+#   soldatreloaded-<platform>.zip        what a player downloads
+#   manifest.<platform>.json             every file in it, by hash, for the launcher
+#   soldatreloaded-server.zip            the server, for Linux alone
 #
-# and soldatreloaded-server-<version>-linux for the server, which is released for Linux
-# alone. The install holds its own manifest too, as manifest.json, so the launcher knows
-# what release it was last brought up to.
+# The game's install holds its manifest too, as manifest.json, so the launcher knows
+# what release it was last brought up to. The server has none: hosts update it by hand.
 
 inputs:
   app:
@@ -41,8 +41,8 @@ runs:
           *) echo "::error::no packages for $RUNNER_OS"; exit 1 ;;
         esac
         case "$APP" in
-          client) name="soldatreloaded-$VERSION-$platform"; program="soldatreloaded$exe" ;;
-          server) name="soldatreloaded-server-$VERSION-$platform"; program="soldatreloaded-server$exe" ;;
+          client) name="soldatreloaded-$platform"; program="soldatreloaded$exe" ;;
+          server) name="soldatreloaded-server"; program="soldatreloaded-server" ;;
           *) echo "::error::app is client or server, not $APP"; exit 1 ;;
         esac
         if [ "$APP" = server ] && [ "$platform" != linux ]; then
@@ -89,35 +89,33 @@ runs:
         cp license.md "$stage/"
         printf '%s\n' "$VERSION" > "$stage/version.txt"
 
-        # The manifest: every file of the install by its path, size and SHA-256, sorted by
-        # path, so the updater can tell what an install has from what the release ships.
-        (
-          cd "$stage"
-          find . -type f -printf '%P\0' | LC_ALL=C sort -z > ../files.list
-          tr '\0' '\n' < ../files.list > ../paths.list
-          xargs -0 stat -c '%s' < ../files.list > ../sizes.list
-          xargs -0 sha256sum -b < ../files.list | sed 's/ \*.*$//' > ../hashes.list
-        )
-        {
-          printf '{\n'
-          printf '  "name": "%s",\n' "${name%-"$VERSION"-"$platform"}"
-          printf '  "version": "%s",\n' "$VERSION"
-          printf '  "platform": "%s",\n' "$platform"
-          printf '  "archive": "%s.zip",\n' "$name"
-          printf '  "files": [\n'
-          paste -d '\t' "$dist/paths.list" "$dist/sizes.list" "$dist/hashes.list" |
-            awk -F '\t' '{
-              gsub(/\\/, "\\\\", $1); gsub(/"/, "\\\"", $1)
-              printf "%s    {\"path\": \"%s\", \"size\": %s, \"sha256\": \"%s\"}", (NR > 1 ? ",\n" : ""), $1, $2, $3
-            } END { printf "\n" }'
-          printf '  ]\n'
-          printf '}\n'
-        } > "$dist/$name.manifest.json"
-        count=$(wc -l < "$dist/paths.list")
-        rm -f "$dist"/*.list
-
-        # The install's own copy, which lists every file but itself.
-        cp "$dist/$name.manifest.json" "$stage/manifest.json"
+        # The game's manifest: every file of the install by its path, size and SHA-256,
+        # sorted by path, so the launcher can tell what an install has from what the
+        # release ships. The install keeps a copy, which lists every file but itself.
+        if [ "$APP" = client ]; then
+          manifest="$dist/manifest.$platform.json"
+          (
+            cd "$stage"
+            find . -type f -printf '%P\0' | LC_ALL=C sort -z > ../files.list
+            tr '\0' '\n' < ../files.list > ../paths.list
+            xargs -0 stat -c '%s' < ../files.list > ../sizes.list
+            xargs -0 sha256sum -b < ../files.list | sed 's/ \*.*$//' > ../hashes.list
+          )
+          {
+            printf '{\n'
+            printf '  "version": "%s",\n' "$VERSION"
+            printf '  "files": [\n'
+            paste -d '\t' "$dist/paths.list" "$dist/sizes.list" "$dist/hashes.list" |
+              awk -F '\t' '{
+                gsub(/\\/, "\\\\", $1); gsub(/"/, "\\\"", $1)
+                printf "%s    {\"path\": \"%s\", \"size\": %s, \"sha256\": \"%s\"}", (NR > 1 ? ",\n" : ""), $1, $2, $3
+              } END { printf "\n" }'
+            printf '  ]\n'
+            printf '}\n'
+          } > "$manifest"
+          rm -f "$dist"/*.list
+          cp "$manifest" "$stage/manifest.json"
+        fi
 
         # The zip, its files at its root, as the install is laid out.
         (
@@ -126,4 +124,4 @@ runs:
           else 7z a -tzip -mx=9 -bso0 "../$name.zip" . > /dev/null
           fi
         )
-        echo "$dist/$name.zip: $count files"
+        echo "$dist/$name.zip: $(find "$stage" -type f | wc -l) files"

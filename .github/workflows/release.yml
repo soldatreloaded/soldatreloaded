@@ -43,7 +43,7 @@ jobs:
           name: ${{ matrix.app }}-${{ matrix.os }}
           path: |
             build/dist/*.zip
-            build/dist/*.manifest.json
+            build/dist/manifest.*.json
           if-no-files-found: error
 
   publish:
