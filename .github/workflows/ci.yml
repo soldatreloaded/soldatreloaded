@@ -28,7 +28,7 @@ jobs:
         run: |
           mkdir -p build/ci
           ext=""; if [ "$RUNNER_OS" = Windows ]; then ext=.exe; fi
-          for app in client server launcher sandbox; do
+          for app in client server launcher; do
             odin build apps/$app -vet $ODIN_FLAGS -out:build/ci/$app$ext
           done
 

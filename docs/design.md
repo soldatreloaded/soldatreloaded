@@ -17,7 +17,6 @@ what it is and which file does what.
 ```
 apps/server    ─► core/network, core/bots, core/http
 apps/client    ─► core/bots                  (and core/network, once it plays online)
-apps/sandbox   ─► core/game
 apps/launcher  ─► core/http, core/resources
 
 core/network   ─► core/game
@@ -40,7 +39,6 @@ network.
 | `core/http` | HTTPS through curl, started once and made to trust what it should, for the server's lobby and scripts and the launcher. |
 | `apps/server` | The hosted game and the dedicated server around it, one package, with the `lists` and `lobby` packages beneath it. |
 | `apps/client` | The game a player runs: a screen at a time, each screen and system a package of its own. |
-| `apps/sandbox` | Local play on one map against standing targets, drawn plainly, for looking at the simulation without the client. |
 | `apps/launcher` | What a player starts: it brings the install up to the newest release, then starts the game. |
 
 ## The install

@@ -20,8 +20,8 @@ The types:
 - `chore` — everything else: files in, files out, housekeeping.
 
 The scope is the part of the tree the change lands in, named as the tree names it: a
-package (`client`, `server`, `game`, `net`, `bots`, `resources`, `utils`, `sandbox`,
-`launcher`), a part of one (`weapons`, `console`, `hud`, `anim`, `polymap`), or a part
+package (`client`, `server`, `launcher`, `game`, `net`, `bots`, `http`, `resources`,
+`utils`), a part of one (`weapons`, `console`, `hud`, `anim`, `polymap`), or a part
 of the install (`config`, `data`, `mods`, `scripts`), and `readme`, `docs`, `tests`,
 `ci`. Leave it out when the change is the whole repo's.
 

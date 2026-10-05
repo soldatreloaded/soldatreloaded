@@ -47,15 +47,10 @@ cd assets && odin run ../apps/client
 cd assets && odin run ../apps/server
 ```
 
-```bash
-cd assets && odin run ../apps/sandbox -- ctf_Ash
-```
-
 The client and the server each make their config beside them the first time they run,
 with every setting at its default: `client.config.json` and `server.config.json`. The
 server takes `-map:<name>` and `-port:<port>` over its config, and commands typed at its
-console (`apps/server/console.odin` lists them). The sandbox is local play on one map
-against standing targets, drawn plainly, for looking at the simulation by itself.
+console (`apps/server/console.odin` lists them).
 
 ## Tests
 
@@ -96,7 +91,6 @@ core/network     the wire
 core/bots        the bots
 apps/server      the hosted game and the dedicated server
 apps/client      the game a player runs
-apps/sandbox     a plain look at the simulation
 apps/launcher    what a player starts: updates the install, then starts the game
 assets/          the install: data/, mods/ and scripts/
 tests/           a package of tests each
