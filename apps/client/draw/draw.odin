@@ -56,6 +56,12 @@ art_load :: proc(art: ^Art, mod: res.Mod, polymap: ^res.Poly_Map) {
 	art.bullets = bullets_load(source)
 	art.things = things_load(source)
 	art.sparks = sparks_load(source)
+
+	// Mipmapped as the original's: the map's texture, above, without a bias, as the
+	// original draws its polygons; the scenery and the sprites a touch sharp. The HUD's
+	// art, the original's interface, has none.
+	atlas_mipmap(&art.scenery_atlas)
+	atlas_mipmap(&art.sprite_atlas)
 }
 
 art_destroy :: proc(art: ^Art) {

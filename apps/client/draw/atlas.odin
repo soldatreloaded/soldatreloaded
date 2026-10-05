@@ -1,6 +1,7 @@
 package draw
 
 import rl "vendor:raylib"
+import rlgl "vendor:raylib/rlgl"
 import stbrp "vendor:stb/rect_pack"
 
 import res "../../../core/resources"
@@ -11,10 +12,22 @@ import "../../../core/utils"
 // ringed with a border of its own edge pixels, so the smoothing at its edge never takes
 // in a neighbour's; drawn, it is its own pixels alone, as if it were a texture of its
 // own. Images are packed as they are added, into the free room the earlier ones left;
-// those that won't fit start another page.
+// those that won't fit start another page. An atlas drawn small in the world is given
+// mipmaps once it is full (atlas_mipmap).
 
 ATLAS_SIDE :: 4096 // the largest page every GPU takes
-ATLAS_BORDER :: 2  // pixels round each image, its edge's
+
+// Pixels round each image, its edge's: 8 between two, as the original spaces the images
+// of its spritesheets, so its smaller mipmaps keep them apart too.
+ATLAS_BORDER :: 4
+
+// GL_TEXTURE_LOD_BIAS, through rlgl's texture parameters, in hundredths: rlgl's own
+// RL_TEXTURE_MIPMAP_BIAS_RATIO, which Odin's bindings leave out.
+@(private = "file")
+MIPMAP_BIAS_RATIO :: 0x4000
+
+// The original's r_mipmapbias: a mipmap a touch sharper than the size alone would pick.
+MIPMAP_BIAS :: -0.5
 
 Atlas :: struct {
 	side:   i32,                   // its pages' width and height
@@ -78,6 +91,20 @@ atlas_add_all :: proc(atlas: ^Atlas, images: []res.Texture, allocator := context
 		if kept > 0 do page_open(atlas, biggest)
 	}
 	return added
+}
+
+// The atlas's pages given mipmaps, filtered through them (trilinear) a touch sharp
+// (MIPMAP_BIAS), as the original filters its scenery and its sprites (OpenSoldat's
+// SetTextureFilter with mipmaps allowed, r_mipmapping on, r_mipmapbias -0.5): so what
+// is drawn small, zoomed out, is smooth rather than shimmering. Once all of its images
+// are in: a page added to after is not mipmapped again.
+@(private = "package")
+atlas_mipmap :: proc(atlas: ^Atlas) {
+	for &page in atlas.pages {
+		rl.GenTextureMipmaps(&page)
+		rl.SetTextureFilter(page, .TRILINEAR)
+		rlgl.TextureParameters(page.id, MIPMAP_BIAS_RATIO, i32(MIPMAP_BIAS * 100))
+	}
 }
 
 @(private = "package")
