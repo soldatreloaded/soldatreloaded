@@ -67,7 +67,7 @@ jobs:
         run: |
           prerelease=""
           if [[ "$TAG" == *-* ]]; then prerelease="--prerelease"; fi
-          gh release create "$TAG" dist/* -R "$GITHUB_REPOSITORY" \
+          gh release create "$TAG" dist/* \
             --title "$TAG" --notes-from-tag --verify-tag $prerelease
 
   # Off until the DISCORD_WEBHOOK secret is set: to turn it on, put back
