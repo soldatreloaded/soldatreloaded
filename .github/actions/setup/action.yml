@@ -22,6 +22,13 @@ runs:
         release: dev-2026-09
         token: ${{ github.token }} # without one it can't download a release
 
+    # Odin's Linux release leaves stb, which the game's fonts and images use, to be
+    # compiled where it is installed.
+    - name: stb
+      if: runner.os == 'Linux'
+      shell: bash
+      run: bash "$(odin root)/vendor/stb/src/build_stb.sh" unix
+
     - name: versions
       if: runner.os == 'Linux'
       shell: bash
