@@ -45,10 +45,10 @@ Face :: enum {
 
 @(rodata)
 FACE_FILES := [Face]string {
-	.Regular = "play-regular.ttf",
-	.Bold    = "play-bold.ttf",
-	.Display = "russo-one.ttf",
-	.Logo    = "black-ops-one.ttf",
+	.Regular = "fonts/play-regular.ttf",
+	.Bold    = "fonts/play-bold.ttf",
+	.Display = "fonts/russo-one.ttf",
+	.Logo    = "fonts/black-ops-one.ttf",
 }
 
 Ui :: struct {
