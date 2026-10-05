@@ -5,9 +5,10 @@ import "core:mem/virtual"
 import "../utils"
 
 // The game's own settings, client.config.json at the install's root (config.odin): your
-// soldier, the window and the effects, the sound, the server to join, the radio's calls
-// and the keys. Read as the game starts (the file made with the defaults if it isn't
-// there), written as it closes. A setting the file doesn't hold keeps its default.
+// soldier, the window and the effects, the sound, the server to join, Offline Play, the
+// radio's calls and the keys. Read as the game starts (the file made with the defaults
+// if it isn't there), written as it closes. A setting the file doesn't hold keeps its
+// default.
 
 Client_Config :: struct {
 	player:    Player_Settings,
@@ -17,6 +18,7 @@ Client_Config :: struct {
 	sound:     Sound_Settings,
 	network:   Network_Settings,
 	demos:     Demo_Settings,
+	offline:   Offline_Settings,  // a game against bots on this machine, alone
 	radio:     Radio_Settings,    // the radio menu's calls, and the places each can name
 	binds:     map[string]string, // your keys: a key to a command; an empty command lets one of the game's own go (client_config_bind)
 
@@ -144,6 +146,15 @@ Demo_Settings :: struct {
 	record_rounds: bool, // a demo of every round joined, into demos/
 }
 
+// Offline Play: capture the flag against bots, on this machine and no other, with no
+// server. Its limits, its bots and its maps.
+Offline_Settings :: struct {
+	time_limit:    i32,          // minutes a round lasts
+	capture_limit: i32,          // the captures that win a round
+	bots:          Bot_Settings, // the bots on each team, how well they play, whether they talk
+	maps:          []string,     // the rotation, played in turn; none plays the last map again
+}
+
 Radio_Settings :: struct {
 	call_1: Radio_Call,
 	call_2: Radio_Call,
@@ -200,6 +211,7 @@ DEFAULT_CLIENT_CONFIG := Client_Config {
 	},
 	sound = {volume = 18},
 	network = {server = "127.0.0.1:23073", lobby = LOBBY_URL, smooth = 100},
+	offline = {time_limit = 15, capture_limit = 10, bots = {difficulty = 100, chat = true}},
 	radio = {
 		call_1 = {"Enemy flagger", {"up!", "middle!", "down!"}},
 		call_2 = {"Friendly flagger", {"up!", "middle!", "down!"}},

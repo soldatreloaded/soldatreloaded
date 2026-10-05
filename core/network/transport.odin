@@ -188,7 +188,7 @@ net_answer_queries :: proc(l: ^Link, answer: Query_Answer, user: rawptr) -> bool
 }
 
 // The links answering queries. ENet's intercept is told only the host, so the host is
-// looked up here; a client hosting Local Play has two links, and nothing has more.
+// looked up here: a server answers on its one, and a test may open a few side by side.
 @(private = "file")
 Answering :: struct {
 	host:   ^enet.Host,

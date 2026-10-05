@@ -7,11 +7,10 @@ package menu
 // the menu's own background. The mouse, the keys (arrows, Enter, Escape, Tab, Q and E)
 // and a controller's pad all work it.
 //
-// It edits the client's config in place (the player, the keys, the options), and the
-// config Local Play hosts with (server.config.json, the rotation in it); it asks the
-// client to start a game, and plays nothing itself. Online play and the demos come
-// later: their pages are drawn and edited, and what would connect, host or play says it
-// isn't available yet.
+// It edits the client's config in place (the player, the keys, the options, Offline
+// Play's match and rotation); it asks the client to start a game, and plays nothing
+// itself. Online play and the demos come later: their pages are drawn and edited, and
+// what would connect or play says it isn't available yet.
 //
 // The menu is immediate, as the C client's: each frame its update gathers the keys and
 // the mouse, and its draw lays the page out anew in one pass of the ui's Kit, every
@@ -20,7 +19,7 @@ package menu
 //
 //   menu.odin      the menu, the rail, the header and footer, the background, the pages
 //   servers.odin   the server browser                 join.odin      join by address
-//   local.odin     local play: the match, the bots, the rotation
+//   offline.odin   Offline Play: the match, the bots, the rotation
 //   demos.odin     the demos recorded here            player.odin    name, look, loadout
 //   controls.odin  the keys                           taunts.odin    the taunt editor
 //   binds.odin     the keys and the taunts as the config's binds
@@ -48,7 +47,7 @@ VERSION :: #config(SOLDATRELOADED_VERSION, "dev") // the release build sets it
 Page :: enum {
 	Servers,
 	Join,
-	Local,
+	Offline,
 	Demos,
 	Player,
 	Controls,
@@ -59,7 +58,6 @@ Page :: enum {
 
 Menu :: struct {
 	config:       ^res.Client_Config,
-	host:         ^res.Server_Config, // what Local Play hosts with
 	kit:          ui.Kit,
 	page:         Page,
 	side:         int, // the rail's item with the keys: the pages, then Quit
@@ -69,7 +67,7 @@ Menu :: struct {
 	weapon_names: [res.Weapon]string,
 	servers:      Servers,
 	join:         Join,
-	local:        Local,
+	offline:      Offline,
 	demos:        Demos,
 	taunts:       Taunt_Editor,
 }
@@ -77,15 +75,14 @@ Menu :: struct {
 // What the menu asks of the client.
 //
 // Online play and the demos will ask more, once there is a network and a player: to
-// connect to a server (the servers and join pages), to host one for friends (local
-// play), and to play a demo. Until then those pages say so where they would ask.
+// connect to a server (the servers and join pages), and to play a demo. Until then those pages say so where they would ask.
 Request :: union {
 	Play,
 	Quit,
 }
 
-// An offline game against bots, as server.config.json has it: `maps` in turn, the first
-// first; a single map repeats.
+// An offline game against bots, as the config's `offline` has it: `maps` in turn, the
+// first first; a single map repeats.
 Play :: struct {
 	maps: []string,
 }
@@ -95,23 +92,22 @@ Quit :: struct {}
 // What the menu offers first, before anything has been played.
 FIRST_MAP :: "ctf_Ash"
 
-// The menu over `config` and `host`, its local play on `last_map`: the map played last,
-// or FIRST_MAP.
-menu_init :: proc(menu: ^Menu, config: ^res.Client_Config, host: ^res.Server_Config, mod: res.Mod, last_map: string) {
+// The menu over `config`, its Offline Play on `last_map`: the map played last, or
+// FIRST_MAP.
+menu_init :: proc(menu: ^Menu, config: ^res.Client_Config, mod: res.Mod, last_map: string) {
 	menu.config = config
-	menu.host = host
 	ui.kit_init(&menu.kit)
 	hud.art_load(&menu.art, mod)
 	draw.preview_load(&menu.preview, mod)
 	for info, weapon in sim.weapons_default() do menu.weapon_names[weapon] = info.name
-	local_init(&menu.local, last_map)
+	offline_init(&menu.offline, last_map)
 	menu.taunts.slot = -1
 	rl.HideCursor() // the menu draws its own
 	go_page(menu, .Servers)
 }
 
 menu_destroy :: proc(menu: ^Menu) {
-	local_destroy(&menu.local)
+	offline_destroy(&menu.offline)
 	demos_destroy(&menu.demos)
 	delete(menu.servers.search)
 	delete(menu.taunts.text)
@@ -153,7 +149,7 @@ menu_draw :: proc(menu: ^Menu, u: ^ui.Ui) {
 	switch menu.page {
 	case .Servers:  page_servers(menu)
 	case .Join:     page_join(menu)
-	case .Local:    page_local(menu)
+	case .Offline:  page_offline(menu)
 	case .Demos:    page_demos(menu)
 	case .Player:   page_player(menu)
 	case .Controls: page_controls(menu)
@@ -200,7 +196,7 @@ RAIL_PAD :: 10
 PAGE_NAMES := [Page]string {
 	.Servers  = "Servers",
 	.Join     = "Join by address",
-	.Local    = "Local play",
+	.Offline  = "Offline play",
 	.Demos    = "Demos",
 	.Player   = "Player",
 	.Controls = "Controls",
@@ -213,7 +209,7 @@ PAGE_NAMES := [Page]string {
 PAGE_LINES := [Page]string {
 	.Servers  = "The games being played now, from the lobby.",
 	.Join     = "Connect to a server you know the address of.",
-	.Local    = "Host a game on this machine, against bots or for friends on your network.",
+	.Offline  = "Capture the flag against bots, on this machine alone.",
 	.Demos    = "Games recorded here, to watch again.",
 	.Player   = "Your name, and how your soldier looks and what it carries.",
 	.Controls = "The keys. Click a binding, then press the new key; Escape cancels.",

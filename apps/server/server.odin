@@ -14,10 +14,8 @@ import "lists"
 
 // A hosted game: the world with authority, the line everyone joins by, the players on
 // it, the bots, and the rounds, ticked at TICK_RATE from whatever loop owns it. The
-// dedicated server is one of these with a console around it (main.odin); the game's
-// Local Play may run one beside its client, which then joins it over the loopback as
-// any other client would, so a game against bots and a game hosted for friends are the
-// same code and the same wire.
+// dedicated server is one of these with a console around it (main.odin). The game never
+// runs one: its Offline Play is the game and the bots alone.
 //
 // The owner calls server_pump as often as it likes with the seconds since the last
 // call: the ticks owed come out one whole tick at a time, the line heard before them

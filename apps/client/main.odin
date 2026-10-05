@@ -16,9 +16,7 @@ package main
 //
 // It runs from the install's root, where data/ and mods/ are: assets/ in this
 // repository, the unpacked folder in a release. It keeps its settings there in
-// client.config.json (core/resources/clientconfig.odin), and what Local Play hosts with
-// in server.config.json (core/resources/serverconfig.odin), which a server beside it
-// reads too.
+// client.config.json (core/resources/clientconfig.odin), Offline Play's among them.
 //
 //   cd assets && odin run ../apps/client
 
@@ -34,7 +32,6 @@ import "sound"
 import "ui"
 
 CONFIG_PATH :: "client.config.json"
-HOST_CONFIG_PATH :: "server.config.json"
 MODS_DIR :: "mods"
 
 TICK_SECONDS :: 1.0 / sim.TICK_RATE
@@ -44,7 +41,6 @@ MAX_FPS_HIGHEST :: 1000
 
 Client :: struct {
 	config:      ^res.Client_Config,
-	host:        ^res.Server_Config, // what Local Play hosts with
 	mod:         res.Mod,
 	ui:          ui.Ui,
 	sound:       sound.Sound,
@@ -66,7 +62,6 @@ main :: proc() {
 
 	client: Client
 	client.config = res.client_config_load(CONFIG_PATH)
-	client.host = res.server_config_load(HOST_CONFIG_PATH)
 	client.mod = res.mod_make(MODS_DIR, client.config.graphics.mod)
 	window_open(&client.window, &client.config.graphics)
 	rl.InitAudioDevice()
@@ -92,9 +87,8 @@ main :: proc() {
 	sound.sound_destroy(&client.sound)
 	rl.CloseAudioDevice()
 	rl.CloseWindow()
-	config_save(client.config, client.host)
+	config_save(client.config)
 	res.mod_destroy(&client.mod)
-	res.server_config_destroy(client.host)
 	res.client_config_destroy(client.config)
 }
 
@@ -106,7 +100,7 @@ update :: proc(client: ^Client, dt: f32) {
 		switch request in menu.menu_update(screen) {
 		case menu.Play:
 			playing := new(match.Match)
-			if match.match_start(playing, request.maps, client.host, client.config, client.mod, &client.sound) {
+			if match.match_start(playing, request.maps, client.config, client.mod, &client.sound) {
 				screen_switch(client, playing)
 			} else {
 				free(playing)
@@ -130,10 +124,10 @@ draw :: proc(client: ^Client) {
 	}
 }
 
-// The main menu, its local play on `last_map`.
+// The main menu, its Offline Play on `last_map`.
 menu_open :: proc(client: ^Client, last_map: string) -> Screen {
 	m := new(menu.Menu)
-	menu.menu_init(m, client.config, client.host, client.mod, last_map)
+	menu.menu_init(m, client.config, client.mod, last_map)
 	return m
 }
 
@@ -235,7 +229,6 @@ window_size :: proc(size: [2]i32) {
 	rl.SetWindowPosition((rl.GetMonitorWidth(monitor) - size.x) / 2, (rl.GetMonitorHeight(monitor) - size.y) / 2)
 }
 
-config_save :: proc(config: ^res.Client_Config, host: ^res.Server_Config) {
+config_save :: proc(config: ^res.Client_Config) {
 	if !res.client_config_save(config, CONFIG_PATH) do log.errorf("could not write %s", CONFIG_PATH)
-	if !res.server_config_save(host, HOST_CONFIG_PATH) do log.errorf("could not write %s", HOST_CONFIG_PATH)
 }

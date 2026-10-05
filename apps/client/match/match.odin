@@ -5,10 +5,10 @@ package match
 // command, steps the world, and hands what happened to the drawing, the sound and the
 // HUD. Offline, online and a demo differ only in where the other players come from.
 //
-// For now it is offline alone: this machine decides, I play against bots (core/bots, as a
-// server plays them), on the limits and the bots of the config Local Play hosts with
-// (server.config.json), and when a round is over the next starts on the next of its
-// maps, or the same one again.
+// For now it is Offline Play alone: this machine decides, and I play against bots
+// (core/bots) on the limits and the bots of the client config's `offline`, with no server
+// and no one else; when a round is over the next starts on the next of its maps, or the
+// same one again.
 //
 //   match.odin  the match's life, its frames and ticks, and the rounds
 //   hud.odin    the HUD: its facts each frame, the keys its menus take and their choices
@@ -63,31 +63,30 @@ Request :: union {
 // Back to the main menu.
 Leave :: struct {}
 
-// A match on `maps` (names under data/maps) in turn, the first first, as `host` has it:
-// the limits and the bots. False, with the reason logged, if the game or the first map
-// can't be loaded.
+// A match on `maps` (names under data/maps) in turn, the first first, as the config's
+// `offline` has it: the limits and the bots. False, with the reason logged, if the game
+// or the first map can't be loaded.
 match_start :: proc(
 	match: ^Match,
 	maps: []string,
-	host: ^res.Server_Config,
 	config: ^res.Client_Config,
 	mod: res.Mod,
 	sounds: ^sound.Sound,
 ) -> bool {
 	if len(maps) == 0 do return false
 	match.game = new(sim.Game)
-	if !sim.game_init(match.game, settings_from(host), authority = true) {
+	if !sim.game_init(match.game, settings_from(config.offline), authority = true) {
 		free(match.game)
 		return false
 	}
 	match.maps = make([]string, len(maps))
 	for name, i in maps do match.maps[i] = strings.clone(name)
 	match.map_name = match.maps[0]
-	match.bot_counts = host.bots
+	match.bot_counts = config.offline.bots
 	match.mod = mod
 	draw.sparks_init(&match.sparks)
 	hud.hud_init(&match.hud, mod)
-	bots_join(match, host.bots)
+	bots_join(match, config.offline.bots)
 	if !round_start(match, config) {
 		match_end(match)
 		return false
@@ -113,13 +112,12 @@ match_end :: proc(match: ^Match) {
 	match^ = {}
 }
 
-// How the game is played, as `host` says: its limits over the game's own settings, as a
-// server hosting it would.
+// How the game is played: Offline Play's limits over the game's own settings.
 @(private = "file")
-settings_from :: proc(host: ^res.Server_Config) -> sim.Game_Settings {
+settings_from :: proc(offline: res.Offline_Settings) -> sim.Game_Settings {
 	s := sim.DEFAULT_GAME_SETTINGS
-	if host.server.time_limit > 0 do s.time_limit = host.server.time_limit * 60 * sim.TICK_RATE
-	if host.server.capture_limit > 0 do s.capture_limit = host.server.capture_limit
+	if offline.time_limit > 0 do s.time_limit = offline.time_limit * 60 * sim.TICK_RATE
+	if offline.capture_limit > 0 do s.capture_limit = offline.capture_limit
 	return s
 }
 

@@ -2,12 +2,11 @@ package resources
 
 import "core:mem/virtual"
 
-// How this install hosts a game, server.config.json at the install's root (config.odin):
-// a dedicated server's settings, and the game's Local Play alike, so what a player hosts
-// with from the main menu is what a server beside it hosts with. Read as either starts
-// (the file made with the defaults if it isn't there); the server writes it whole as it
-// starts and as its bans and mutes change (apps/server/lists), the game as it closes. A
-// setting the file doesn't hold keeps its default.
+// How a dedicated server hosts its game, server.config.json at its install's root
+// (config.odin). Read as it starts (the file made with the defaults if it isn't there),
+// and written whole as it starts and as its bans and mutes change (apps/server/lists). A
+// setting the file doesn't hold keeps its default. The game has none of it: Offline
+// Play's settings are its own (clientconfig.odin).
 
 Server_Config :: struct {
 	server:  Host_Settings,

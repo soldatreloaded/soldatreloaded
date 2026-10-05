@@ -3,7 +3,7 @@ package game
 import res "../resources"
 
 // A game as one machine runs it: the world, the round around it, and, where this machine
-// decides, the authority. The server has authority; so do local play, tests and tools.
+// decides, the authority. The server has authority; so do Offline Play, tests and tools.
 // A client has none: it steps the same world, applies the rulings the server sends, and
 // takes its round from the snapshots.
 //
