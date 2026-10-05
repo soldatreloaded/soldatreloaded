@@ -6,8 +6,8 @@ import "core:mem"
 import "core:mem/virtual"
 import "core:strings"
 
-import res "../../core/resources"
-import "../../core/utils"
+import res "../../../core/resources"
+import "../../../core/utils"
 
 // The server's lists: who is banned (until when, as whom, why) and who is muted (their
 // chat goes to nobody), by address and by the machine's hardware ID, so a new address

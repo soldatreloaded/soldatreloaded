@@ -5,10 +5,10 @@ import "core:log"
 import "core:strconv"
 import "core:strings"
 
-import "../core/game"
-import net "../core/network"
-import res "../core/resources"
-import "../core/utils"
+import "../../core/game"
+import net "../../core/network"
+import res "../../core/resources"
+import "../../core/utils"
 
 // The votes as the original runs them (Game.pas StartVote, CountVote, TimerVote): twenty
 // seconds to decide; only a yes is counted, against the number of players on when it

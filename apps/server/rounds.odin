@@ -2,10 +2,10 @@ package server
 
 import "core:log"
 
-import "../core/game"
-import net "../core/network"
-import "../core/utils"
-import "../core/bots"
+import "../../core/game"
+import net "../../core/network"
+import "../../core/utils"
+import "../../core/bots"
 
 // Rounds: the match ends at its score or time limit, the scores stand a while, and the
 // next round begins on the next map of the rotation, or the same one again. The world

@@ -6,7 +6,7 @@ import "core:mem/virtual"
 // a dedicated server's settings, and the game's Local Play alike, so what a player hosts
 // with from the main menu is what a server beside it hosts with. Read as either starts
 // (the file made with the defaults if it isn't there); the server writes it whole as it
-// starts and as its bans and mutes change (server/lists), the game as it closes. A
+// starts and as its bans and mutes change (apps/server/lists), the game as it closes. A
 // setting the file doesn't hold keeps its default.
 
 Server_Config :: struct {
@@ -15,7 +15,7 @@ Server_Config :: struct {
 	bots:    Bot_Settings,    // the bots the server fills the game with
 	network: Flood_Settings,
 	lobby:   Lobby_Settings,  // whether, and how, the server lists itself for the game's server browser
-	admins:  []Admin_Entry,   // who may run the admin commands (server/admin.odin), by address; the server only reads these
+	admins:  []Admin_Entry,   // who may run the admin commands (apps/server/admin.odin), by address; the server only reads these
 	bans:    []Ban_Entry,     // who is kept out; the server writes these as players are banned and unbanned
 	mutes:   []Mute_Entry,    // whose chat reaches nobody; the server writes these as players are muted and unmuted
 	weapons: Weapon_Settings, // every weapon's numbers (weapons.odin), by its name: "punch", "desert_eagles", …
@@ -54,7 +54,7 @@ Lobby_Settings :: struct {
 	ip:     string, // the IPv4 address the lobby lists; empty for the one the server reaches it from
 }
 
-// The lists' entries (server/lists). A player is named by their address ("1.2.3.4") and
+// The lists' entries (apps/server/lists). A player is named by their address ("1.2.3.4") and
 // their machine's hardware ID (eleven hex digits): an entry names either, or both, and
 // leaves the other empty.
 

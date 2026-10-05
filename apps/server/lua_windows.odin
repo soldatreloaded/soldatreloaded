@@ -1,5 +1,5 @@
 #+build windows
-package script
+package server
 
 import "core:sync"
 import win "core:sys/windows"

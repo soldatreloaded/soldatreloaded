@@ -1,4 +1,4 @@
-package script
+package server
 
 import "core:c"
 import "core:log"
@@ -9,7 +9,6 @@ import lua "vendor:lua/5.4"
 
 import "../../core/game"
 import "../../core/utils"
-import "../../server"
 
 // The `server` table: what the script may ask of the game and do to it
 // (docs/scripting.md, "What the script may do"). Every call finds its Script in the
@@ -52,18 +51,18 @@ api_open :: proc(L: ^lua.State) {
 
 // Whether a player is in `slot`: a person joined, or a bot.
 @(private = "file")
-slot_present :: proc(sv: ^server.Server, slot: lua.Integer) -> bool {
-	return slot >= 0 && slot < server.MAX_PLAYERS && server.player_present(&sv.players[slot])
+slot_present :: proc(sv: ^Server, slot: lua.Integer) -> bool {
+	return slot >= 0 && slot < MAX_PLAYERS && player_present(&sv.players[slot])
 }
 
-push_name :: proc(L: ^lua.State, sv: ^server.Server, slot: game.Soldier_Id) {
+push_name :: proc(L: ^lua.State, sv: ^Server, slot: game.Soldier_Id) {
 	push_string(L, utils.short_string_text(&sv.players[slot].name))
 }
 
 // A player's table pushed: its slot, name, team, tally, ping, health, and whether it is
 // a bot, alive and watching.
 @(private = "file")
-push_player :: proc(L: ^lua.State, sv: ^server.Server, slot: game.Soldier_Id) {
+push_player :: proc(L: ^lua.State, sv: ^Server, slot: game.Soldier_Id) {
 	soldier := &sv.game.world.soldiers[slot]
 	lua.createtable(L, 0, 11)
 	lua.pushinteger(L, lua.Integer(slot))
@@ -91,11 +90,11 @@ push_player :: proc(L: ^lua.State, sv: ^server.Server, slot: game.Soldier_Id) {
 }
 
 // Every player's table, in slot order.
-push_players :: proc(L: ^lua.State, sv: ^server.Server) {
+push_players :: proc(L: ^lua.State, sv: ^Server) {
 	lua.newtable(L)
 	n: lua.Integer
 	for &player, i in sv.players {
-		if !server.player_present(&player) do continue
+		if !player_present(&player) do continue
 		push_player(L, sv, game.Soldier_Id(i))
 		n += 1
 		lua.rawseti(L, -2, n)
@@ -103,7 +102,7 @@ push_players :: proc(L: ^lua.State, sv: ^server.Server) {
 }
 
 // The teams' scores: their captures.
-push_scores :: proc(L: ^lua.State, sv: ^server.Server) {
+push_scores :: proc(L: ^lua.State, sv: ^Server) {
 	alpha, bravo := sv.game.round.captures[.Alpha], sv.game.round.captures[.Bravo]
 	lua.createtable(L, 0, 2)
 	lua.pushinteger(L, lua.Integer(alpha))
@@ -135,8 +134,8 @@ color_arg :: proc(L: ^lua.State, index: c.int) -> (color: utils.Rgba) {
 // The name of the map file the server has for `name`, in whatever case it was asked
 // for; nothing for a map it hasn't, which it couldn't load.
 @(private = "file")
-map_file :: proc(sv: ^server.Server, name: string) -> (file: string, found: bool) {
-	if !server.map_exists(sv, name) do return "", false
+map_file :: proc(sv: ^Server, name: string) -> (file: string, found: bool) {
+	if !map_exists(sv, name) do return "", false
 	path := utils.find_file_any_case(utils.temp_path(sv.options.data_dir, "maps"), name, ".pms", context.temp_allocator) or_return
 	if !strings.has_suffix(strings.to_lower(path, context.temp_allocator), ".pms") do return "", false
 	return filepath.stem(path), true
@@ -150,7 +149,7 @@ l_say :: proc "c" (L: ^lua.State) -> c.int {
 	s := script_of(L)
 	context = s.ctx
 	text := check_string(L, 1)
-	server.server_say_kind(s.server, .Script, color_arg(L, 2), text)
+	server_say_kind(s.server, .Script, color_arg(L, 2), text)
 	return 0
 }
 
@@ -161,7 +160,7 @@ l_say_to :: proc "c" (L: ^lua.State) -> c.int {
 	slot := lua.L_checkinteger(L, 1)
 	text := check_string(L, 2)
 	color := color_arg(L, 3)
-	if slot_present(s.server, slot) do server.server_say_to(s.server, game.Soldier_Id(slot), .Script, color, text)
+	if slot_present(s.server, slot) do server_say_to(s.server, game.Soldier_Id(slot), .Script, color, text)
 	return 0
 }
 
@@ -183,7 +182,7 @@ l_command :: proc "c" (L: ^lua.State) -> c.int {
 	if s.console.run != nil {
 		s.console.run(s.console.user, text)
 	} else {
-		server.admin_command(s.server, nil, text)
+		admin_command(s.server, nil, text)
 	}
 	return 0
 }
@@ -192,7 +191,7 @@ l_command :: proc "c" (L: ^lua.State) -> c.int {
 l_pause :: proc "c" (L: ^lua.State) -> c.int {
 	s := script_of(L)
 	context = s.ctx
-	lua.pushboolean(L, b32(server.server_pause(s.server, true)))
+	lua.pushboolean(L, b32(server_pause(s.server, true)))
 	return 1
 }
 
@@ -200,7 +199,7 @@ l_pause :: proc "c" (L: ^lua.State) -> c.int {
 l_unpause :: proc "c" (L: ^lua.State) -> c.int {
 	s := script_of(L)
 	context = s.ctx
-	lua.pushboolean(L, b32(server.server_pause(s.server, false)))
+	lua.pushboolean(L, b32(server_pause(s.server, false)))
 	return 1
 }
 
@@ -208,7 +207,7 @@ l_unpause :: proc "c" (L: ^lua.State) -> c.int {
 l_paused :: proc "c" (L: ^lua.State) -> c.int {
 	s := script_of(L)
 	context = s.ctx
-	lua.pushboolean(L, b32(server.server_paused(s.server)))
+	lua.pushboolean(L, b32(server_paused(s.server)))
 	return 1
 }
 
@@ -220,14 +219,14 @@ l_next_map :: proc "c" (L: ^lua.State) -> c.int {
 	context = s.ctx
 	name := opt_string(L, 1, "")
 	if name == "" {
-		server.server_end_round(s.server)
+		server_end_round(s.server)
 	} else {
 		file, found := map_file(s.server, name)
 		if !found {
 			lua.pushboolean(L, false)
 			return 1
 		}
-		server.server_change_map(s.server, file)
+		server_change_map(s.server, file)
 	}
 	lua.pushboolean(L, true)
 	return 1
@@ -251,7 +250,7 @@ l_maps :: proc "c" (L: ^lua.State) -> c.int {
 l_map :: proc "c" (L: ^lua.State) -> c.int {
 	s := script_of(L)
 	context = s.ctx
-	push_string(L, server.server_map(s.server))
+	push_string(L, server_map(s.server))
 	return 1
 }
 
@@ -312,10 +311,10 @@ l_kick :: proc "c" (L: ^lua.State) -> c.int {
 	if !slot_present(s.server, slot) do return 0
 	id := game.Soldier_Id(slot)
 	if s.server.players[id].bot {
-		server.player_remove_bot(s.server, id)
+		player_remove_bot(s.server, id)
 	} else {
 		s.server.players[id].kick_why = .Console
-		server.player_kick(s.server, id, reason)
+		player_kick(s.server, id, reason)
 	}
 	return 0
 }
@@ -327,7 +326,7 @@ l_add_bot :: proc "c" (L: ^lua.State) -> c.int {
 	context = s.ctx
 	team := team_of(opt_string(L, 1, ""))
 	name := opt_string(L, 2, "")
-	slot, ok := server.server_add_bot(s.server, team, name)
+	slot, ok := server_add_bot(s.server, team, name)
 	if !ok do return 0
 	lua.pushinteger(L, lua.Integer(slot))
 	return 1

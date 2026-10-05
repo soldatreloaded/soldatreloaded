@@ -1,7 +1,7 @@
 package server
 
-import "../core/game"
-import net "../core/network"
+import "../../core/game"
+import net "../../core/network"
 
 // The line each tick: everything that came in, the command each player's soldier steps
 // on, and after the tick a snapshot to every player.

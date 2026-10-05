@@ -91,8 +91,8 @@ idea; split a long one by what its parts do.
 
 ## The wire and the server
 
-The C game's `apps/shared/network` is `core/network`, and `apps/server` is `server/`
-with the program itself in `apps/server`. They are not compared tick by tick; their
+The C game's `apps/shared/network` is `core/network`, and `apps/server` is `apps/server`,
+the hosted game and the program around it in one package. They are not compared tick by tick; their
 tests are `tests/network`, `tests/server` (real sockets on the loopback, run with
 `-define:ODIN_TEST_THREADS=1`), `tests/bots`, `tests/lists`, `tests/lobby` and
 `tests/script`.
@@ -105,9 +105,9 @@ tests are `tests/network`, `tests/server` (real sockets on the loopback, run wit
 | `network/wire.c` | `core/network/wire.odin`: the words are `game.Word` (`core/game/word.odin`) |
 | `network/stream.c` | `core/network/stream.odin`, `stream_server.odin`, `stream_client.odin` |
 | `network/transport.c`, `query.c` | `core/network/transport.odin`, `query.odin` |
-| `server/host.c`, `connections.c`, `rounds.c` | `server/`, one file to an idea: `server.odin`, `players.odin`, `line.odin`, `chat.odin`, `votes.odin`, `admin.odin`, `flood.odin`, `rounds.odin`, `maps.odin` |
-| `server/bots.c`, `lists.c`, `lobby.c`, `script.c` | `server/bots`, `server/lists`, `server/lobby`, `server/script`: packages of their own, which know nothing of the line |
-| `server/main.c`, `host_cvars.c`, `stdin_reader.c` | `apps/server`: the console is a handful of commands over `server.config.json` (`core/resources/serverconfig.odin`), not cvars |
+| `server/host.c`, `connections.c`, `rounds.c` | `apps/server/`, one package with the executable, one file to an idea: `server.odin`, `players.odin`, `line.odin`, `chat.odin`, `votes.odin`, `admin.odin`, `flood.odin`, `rounds.odin`, `maps.odin` |
+| `server/bots.c`, `lists.c`, `lobby.c`, `script.c` | `core/bots`, `apps/server/lists`, `apps/server/lobby`: packages of their own, which know nothing of the line; the script is the server package's own (`apps/server/script.odin`, `api.odin`, `events.odin`) |
+| `server/main.c`, `host_cvars.c`, `stdin_reader.c` | `apps/server/main.odin`, `console.odin`: the console is a handful of commands over `server.config.json` (`core/resources/serverconfig.odin`), not cvars |
 | `server/weapons_ini.c` | `core/resources/weaponmod.odin` |
 
 **Word from another machine.** What the C game's passes heard through the mailbox

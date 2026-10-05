@@ -1,4 +1,4 @@
-package script
+package server
 
 // `json`, as the script sees it: json.encode(value) and json.decode(text) between Lua and
 // JSON; a table with keys 1..n is an array, any other an object; json.null stands for a

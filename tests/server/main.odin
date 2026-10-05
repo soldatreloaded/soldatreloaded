@@ -14,7 +14,7 @@ import "../../core/game"
 import net "../../core/network"
 import res "../../core/resources"
 import "../../core/utils"
-import "../../server"
+import "../../apps/server"
 
 import enet "vendor:ENet"
 

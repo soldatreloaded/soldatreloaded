@@ -3,8 +3,8 @@ package server
 import "core:log"
 import "core:crypto/sha2"
 
-import net "../core/network"
-import "../core/utils"
+import net "../../core/network"
+import "../../core/utils"
 
 // The round's map as the players hear of it: its name and its hash, told with the
 // round; the server's list, which the map window pages; and the map itself, its .pms,

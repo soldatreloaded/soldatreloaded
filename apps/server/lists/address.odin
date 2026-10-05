@@ -2,7 +2,7 @@ package lists
 
 import "core:fmt"
 
-import "../../core/utils"
+import "../../../core/utils"
 
 // The text forms of what names a player on the lists: an IPv4 address as ENet keeps it,
 // and a machine's hardware ID.

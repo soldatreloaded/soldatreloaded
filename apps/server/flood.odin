@@ -2,8 +2,8 @@ package server
 
 import "core:log"
 
-import "../core/game"
-import "../core/utils"
+import "../../core/game"
+import "../../core/utils"
 
 // Flooding (ServerLoop.pas): a player heard from more than the config's flooding_packets
 // times in a second gets a warning, and past flood_warnings of them is kicked and barred

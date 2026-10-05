@@ -1,6 +1,6 @@
-package main
+package server
 
-// The server, headless: a console around a hosted game (server/), and a loop that pumps
+// The server, headless: a console around a hosted game (server.odin), and a loop that pumps
 // it until it is told to stop. It reads its config, loads the map, listens on its port,
 // gives everyone who says Hello a soldier, plays the bots asked for, ticks the world
 // with authority, and stops on `quit` or Ctrl-C.
@@ -12,7 +12,7 @@ package main
 //                        mutes (core/resources/serverconfig.odin),
 //                        written whole as it starts, so it shows every setting, and as
 //                        the bans and mutes change
-//   scripts/main.lua     the script, as the config names it (script.odin)
+//   scripts/main.lua     the script, as the config names it (app_script.odin)
 //
 //   server [-map:<name>] [-port:<port>]
 //
@@ -30,9 +30,7 @@ import "core:time"
 import "../../core/game"
 import net "../../core/network"
 import res "../../core/resources"
-import "../../server"
-import "../../server/lobby"
-import scripting "../../server/script"
+import "lobby"
 
 // The files, at the install's root, where the server runs: assets/ in this repository.
 SERVER_CONFIG :: "server.config.json"
@@ -45,11 +43,11 @@ Arguments :: struct {
 }
 
 App :: struct {
-	sv:      server.Server,
+	sv:      Server,
 	config:  ^res.Server_Config,
 	weapons: res.Weapon_Settings, // the weapons as they stand: the config's, and the `weapon` lines since
 	lobby:   lobby.Lobby,
-	script:  scripting.Script, // held by its address while open
+	script:  Script, // held by its address while open
 	quit:    bool,
 }
 
@@ -75,7 +73,7 @@ main :: proc() {
 	for !app.quit && !sync.atomic_load(&interrupted) {
 		dt := time.duration_seconds(time.tick_lap_time(&last))
 		for line in stdin_take() do console_execute(app, line)
-		if !server.server_pump(&app.sv, dt) do app.quit = true
+		if !server_pump(&app.sv, dt) do app.quit = true
 		app_pump(app)
 		lobby.lobby_pump(&app.lobby, lobby_settings(app), time.duration_seconds(time.tick_since({})))
 		free_all(context.temp_allocator)
@@ -104,14 +102,14 @@ start :: proc(app: ^App, args: Arguments) -> bool {
 		log.error("ENet wouldn't start")
 		return false
 	}
-	options := server.Options {
+	options := Options {
 		config      = app.config,
 		config_path = SERVER_CONFIG,
 		data_dir    = game.DATA_DIR,
 		first_map   = args.map_name,
 		port        = args.port,
 	}
-	if !server.server_init(&app.sv, options) {
+	if !server_init(&app.sv, options) {
 		net.net_shutdown()
 		return false
 	}
@@ -124,7 +122,7 @@ start :: proc(app: ^App, args: Arguments) -> bool {
 stop :: proc(app: ^App) {
 	lobby.lobby_close(&app.lobby)
 	app_stop(app) // before the server it listens to
-	server.server_destroy(&app.sv)
+	server_destroy(&app.sv)
 	net.net_shutdown()
 	res.server_config_destroy(app.config)
 }
@@ -133,7 +131,7 @@ stop :: proc(app: ^App) {
 @(private = "file")
 lobby_settings :: proc(app: ^App) -> lobby.Settings {
 	l := &app.config.lobby
-	return {public = l.public, url = l.url if l.url != "" else lobby.DEFAULT_URL, address = l.ip, port = server.server_port(&app.sv)}
+	return {public = l.public, url = l.url if l.url != "" else lobby.DEFAULT_URL, address = l.ip, port = server_port(&app.sv)}
 }
 
 // ---------------------------------------------------------------------------------

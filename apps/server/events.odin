@@ -1,4 +1,4 @@
-package script
+package server
 
 import sa "core:container/small_array"
 import "core:c"
@@ -7,7 +7,6 @@ import lua "vendor:lua/5.4"
 
 import "../../core/game"
 import res "../../core/resources"
-import "../../server"
 
 // What a script may hear: each of the server's hooks below is one of these. A script
 // hands a function to as many as it likes with server.on(event, fn), and so does every
@@ -154,7 +153,7 @@ dispatch :: proc(s: ^Script, event: Event, nargs: c.int, until_true: bool) -> (t
 // ---------------------------------------------------------------------------------
 // The server's side: the hooks
 
-hooks :: proc(s: ^Script) -> server.Hooks {
+hooks :: proc(s: ^Script) -> Hooks {
 	return {
 		user          = s,
 		chat          = hook_chat,
@@ -254,7 +253,7 @@ hook_round_ending :: proc(user: rawptr, why: string) {
 	lua.createtable(L, 0, 7)
 	push_string(L, why)
 	lua.setfield(L, -2, "why")
-	push_string(L, server.server_map(sv))
+	push_string(L, server_map(sv))
 	lua.setfield(L, -2, "map")
 	lua.pushinteger(L, lua.Integer(sv.round))
 	lua.setfield(L, -2, "round")
@@ -277,7 +276,7 @@ hook_round_started :: proc(user: rawptr) {
 	s := (^Script)(user)
 	s.match_heard = false
 	if !listened(s, .Round_Start) do return
-	push_string(s.L, server.server_map(s.server))
+	push_string(s.L, server_map(s.server))
 	dispatch(s, .Round_Start, 1, false)
 }
 

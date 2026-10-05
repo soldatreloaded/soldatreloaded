@@ -4,11 +4,11 @@ import "core:fmt"
 import "core:log"
 import "core:time"
 
-import "../core/game"
-import net "../core/network"
-import res "../core/resources"
-import "../core/utils"
-import "../core/bots"
+import "../../core/game"
+import net "../../core/network"
+import res "../../core/resources"
+import "../../core/utils"
+import "../../core/bots"
 import "lists"
 
 // Who is on the line, by slot, which is the soldier's index. A peer that connects is
@@ -19,7 +19,7 @@ import "lists"
 // A bot holds a slot too: a soldier the server plays itself, with a name on the roster
 // and no peer. It is placed with the players each round, its name goes in the
 // snapshots, and its chat is relayed as a player's; what it does each tick is the bots'
-// (server/bots), not the line's.
+// (core/bots), not the line's.
 
 // Why a player is being cut off, for the word of its leaving.
 Kick_Why :: enum {

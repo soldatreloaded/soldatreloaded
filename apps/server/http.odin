@@ -1,4 +1,4 @@
-package script
+package server
 
 import "base:runtime"
 import "core:c"

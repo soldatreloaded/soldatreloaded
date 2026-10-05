@@ -1,5 +1,5 @@
 #+build windows, darwin
-package script
+package server
 
 // Curl trusts what the system trusts here (Schannel, Secure Transport): no bundle of
 // its own to find.

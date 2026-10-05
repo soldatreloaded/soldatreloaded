@@ -8,7 +8,7 @@ package lobby_test
 
 import "core:testing"
 
-import "../../server/lobby"
+import "../../apps/server/lobby"
 
 @(test)
 url :: proc(t: ^testing.T) {

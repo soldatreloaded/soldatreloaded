@@ -1,6 +1,6 @@
 package lists_test
 
-// The server's lists (server/lists): bans and mutes by address and hardware ID, admins by
+// The server's lists (apps/server/lists): bans and mutes by address and hardware ID, admins by
 // address, kept in server.config.json (`bans`, `mutes`, `admins`) and read back the
 // same; a ban lifts at its time; an entry naming nobody is passed over. The configs go
 // under the OS's temp directory.
@@ -15,7 +15,7 @@ import "core:time"
 
 import res "../../core/resources"
 import "../../core/utils"
-import "../../server/lists"
+import "../../apps/server/lists"
 
 // A fresh, empty directory for a test's files, under the OS's temp directory.
 scratch :: proc(t: ^testing.T, name: string) -> string {

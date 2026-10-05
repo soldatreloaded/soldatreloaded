@@ -5,16 +5,16 @@ import "core:path/filepath"
 import "core:strings"
 import "core:time"
 
-import "../core/game"
-import net "../core/network"
-import res "../core/resources"
-import "../core/utils"
-import "../core/bots"
+import "../../core/game"
+import net "../../core/network"
+import res "../../core/resources"
+import "../../core/utils"
+import "../../core/bots"
 import "lists"
 
 // A hosted game: the world with authority, the line everyone joins by, the players on
 // it, the bots, and the rounds, ticked at TICK_RATE from whatever loop owns it. The
-// dedicated server is one of these with a console around it (apps/server); the game's
+// dedicated server is one of these with a console around it (main.odin); the game's
 // Local Play may run one beside its client, which then joins it over the loopback as
 // any other client would, so a game against bots and a game hosted for friends are the
 // same code and the same wire.

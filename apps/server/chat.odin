@@ -4,9 +4,9 @@ import "core:fmt"
 import "core:log"
 import "core:strings"
 
-import "../core/game"
-import net "../core/network"
-import "../core/utils"
+import "../../core/game"
+import net "../../core/network"
+import "../../core/utils"
 
 // Chat: a player's line relayed to everyone, or its team, with the sender's slot. A
 // line beginning with '/' is a command: a vote, a team, a taunt, an admin's order, or

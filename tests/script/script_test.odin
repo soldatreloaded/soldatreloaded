@@ -21,8 +21,7 @@ import "core:time"
 import "../../core/game"
 import net "../../core/network"
 import res "../../core/resources"
-import "../../server"
-import "../../server/script"
+import "../../apps/server"
 
 PORT :: 40031
 
@@ -45,10 +44,10 @@ write_scripts :: proc(t: ^testing.T, dir_name: string, files: [][2]string) -> st
 
 // Whether a line of Lua runs without an error, saying nothing of one.
 @(private = "file")
-holds :: proc(s: ^script.Script, code: string) -> bool {
+holds :: proc(s: ^server.Script, code: string) -> bool {
 	quiet := s.quiet
 	s.quiet = true
-	ok := script.script_run(s, code, "check")
+	ok := server.script_run(s, code, "check")
 	s.quiet = quiet
 	return ok
 }
@@ -82,10 +81,10 @@ handlers :: proc(t: ^testing.T) {
 	path := write_scripts(t, "soldatreloaded_script_handlers", {{"main.lua", MAIN}, {"script_test_module.lua", MODULE}})
 	sv := new(server.Server)
 	defer free(sv)
-	s := new(script.Script)
+	s := new(server.Script)
 	defer free(s)
-	if !testing.expect(t, script.script_open(s, sv, path), "the script is read and run") do return
-	defer script.script_close(s)
+	if !testing.expect(t, server.script_open(s, sv, path), "the script is read and run") do return
+	defer server.script_close(s)
 	s.quiet = true // its errors are the checks' to report
 	hooks := sv.hooks
 	testing.expect(t, hooks.chat != nil && hooks.ticked != nil && hooks.round_ending != nil, "its ears are on the server")
@@ -116,7 +115,7 @@ handlers :: proc(t: ^testing.T) {
 
 	// handlers handed in by any script: heard in turn, an error passed over, the first to
 	// keep a line ending it, one taken off heard no more
-	testing.expect(t, script.script_run(s, `
+	testing.expect(t, server.script_run(s, `
 		heard = ''
 		server.on('chat', function(_, t) heard = heard .. 'a' end)
 		keeper = server.on('chat', function(_, t) heard = heard .. 'b'; return t == 'mine' end)
@@ -135,7 +134,7 @@ handlers :: proc(t: ^testing.T) {
 		"an event there isn't, or no function, is refused")
 
 	// a handler handed in while the event is heard is heard the next time
-	testing.expect(t, script.script_run(s, `
+	testing.expect(t, server.script_run(s, `
 		late = 0
 		server.on('command', function() server.on('command', function() late = late + 1 end) end)`, "late"), "a handler hands in another")
 	hooks.command(hooks.user, 0, "x")
@@ -144,7 +143,7 @@ handlers :: proc(t: ^testing.T) {
 	testing.expect(t, holds(s, "assert(late == 1, late)"), "but on the next")
 
 	// script_run
-	testing.expect(t, script.script_run(s, "ran = 1 + 1", "lua"), "a chunk runs in the script's state")
+	testing.expect(t, server.script_run(s, "ran = 1 + 1", "lua"), "a chunk runs in the script's state")
 	testing.expect(t, holds(s, "assert(ran == 2)"), "and stays there")
 	testing.expect(t, !holds(s, "error('no')") && !holds(s, "this is not Lua"), "an error, or what isn't Lua, is false")
 	testing.expect(t, holds(s, "assert(type(http.get) == 'function' and type(http.post) == 'function' and type(http.request) == 'function')"),
@@ -155,19 +154,19 @@ handlers :: proc(t: ^testing.T) {
 failing :: proc(t: ^testing.T) {
 	sv := new(server.Server)
 	defer free(sv)
-	s := new(script.Script)
+	s := new(server.Script)
 	defer free(s)
 	s.quiet = true
 	temp, _ := os.temp_directory(context.temp_allocator)
-	testing.expect(t, !script.script_open(s, sv, strings.concatenate({temp, "/no_such_script.lua"}, context.temp_allocator)) && s.L == nil,
+	testing.expect(t, !server.script_open(s, sv, strings.concatenate({temp, "/no_such_script.lua"}, context.temp_allocator)) && s.L == nil,
 		"a script that isn't there is none")
 	path := write_scripts(t, "soldatreloaded_script_failing", {{"main.lua", "server.on('join', print)\nerror('at once')"}})
-	testing.expect(t, !script.script_open(s, sv, path) && s.L == nil && sv.hooks.joined == nil, "nor is one that fails, and the server hears nothing")
+	testing.expect(t, !server.script_open(s, sv, path) && s.L == nil && sv.hooks.joined == nil, "nor is one that fails, and the server hears nothing")
 	path = write_scripts(t, "soldatreloaded_script_broken", {{"main.lua", "function ("}})
-	testing.expect(t, !script.script_open(s, sv, path) && s.L == nil, "nor one that isn't Lua")
-	testing.expect(t, !script.script_run(s, "x = 1", "none"), "and nothing runs without one")
-	script.script_pump(s)
-	script.script_close(s)
+	testing.expect(t, !server.script_open(s, sv, path) && s.L == nil, "nor one that isn't Lua")
+	testing.expect(t, !server.script_run(s, "x = 1", "none"), "and nothing runs without one")
+	server.script_pump(s)
+	server.script_close(s)
 }
 
 // ---------------------------------------------------------------------------------
@@ -191,16 +190,16 @@ http.request({url = 'http://127.0.0.1:1/', timeout = 2}, function(r) answered = 
 
 // One tick of the server, and the script's answers after it.
 @(private = "file")
-pump :: proc(sv: ^server.Server, s: ^script.Script, ticks := 1) {
+pump :: proc(sv: ^server.Server, s: ^server.Script, ticks := 1) {
 	for _ in 0 ..< ticks {
 		server.server_pump(sv, server.TICK_SECONDS)
-		script.script_pump(s)
+		server.script_pump(s)
 	}
 }
 
 // Ticks until the script's `flag` is set, or `max` ticks have run.
 @(private = "file")
-pump_until :: proc(sv: ^server.Server, s: ^script.Script, flag: string, max: int) -> bool {
+pump_until :: proc(sv: ^server.Server, s: ^server.Script, flag: string, max: int) -> bool {
 	code := fmt.tprintf("assert(%s ~= nil)", flag)
 	for _ in 0 ..< max {
 		pump(sv, s)
@@ -222,9 +221,9 @@ hosted :: proc(t: ^testing.T) {
 	defer server.server_destroy(sv)
 
 	path := write_scripts(t, "soldatreloaded_script_hosted", {{"main.lua", HOSTED}})
-	s := new(script.Script)
+	s := new(server.Script)
 	defer free(s)
-	if !testing.expect(t, script.script_open(s, sv, path), "the script is read and run") do return
+	if !testing.expect(t, server.script_open(s, sv, path), "the script is read and run") do return
 	s.quiet = true
 
 	// the API's answers
@@ -291,21 +290,21 @@ hosted :: proc(t: ^testing.T) {
 	start := time.now()
 	answered := false
 	for !answered && time.since(start) < 5 * time.Second {
-		script.script_pump(s)
+		server.script_pump(s)
 		answered = holds(s, "assert(answered ~= nil)")
 		if !answered do time.sleep(10 * time.Millisecond)
 	}
 	testing.expect(t, answered, "the request is answered")
 	testing.expect(t, holds(s, "assert(answered.status == 0 and answered.error and #answered.error > 0, answered.error)"), "with no status and the error")
 
-	script.script_close(s)
+	server.script_close(s)
 	testing.expect(t, sv.hooks.chat == nil && sv.hooks.ticked == nil, "closed, the script's ears are off the server")
 }
 
 // The game run from the chat, by the example that does it (scripts/examples/), where it
 // is to be found: this repository's, or the C game's beside it.
 @(private = "file")
-match_controls :: proc(t: ^testing.T, sv: ^server.Server, s: ^script.Script) {
+match_controls :: proc(t: ^testing.T, sv: ^server.Server, s: ^server.Script) {
 	dir := ""
 	for candidate in ([]string{"scripts", "../../bettersoldat/assets/scripts"}) {
 		if os.exists(strings.concatenate({candidate, "/examples/match_controls.lua"}, context.temp_allocator)) do dir = candidate
@@ -316,7 +315,7 @@ match_controls :: proc(t: ^testing.T, sv: ^server.Server, s: ^script.Script) {
 		return
 	}
 	take_up := strings.concatenate({"package.path = '", dir, "/?.lua;' .. package.path\nrequire('examples.match_controls')({countdown = 1})"}, context.temp_allocator)
-	testing.expect(t, script.script_run(s, take_up, "match_controls"), "the match controls example is taken up")
+	testing.expect(t, server.script_run(s, take_up, "match_controls"), "the match controls example is taken up")
 	hooks := sv.hooks
 	testing.expect(t, !hooks.chat(hooks.user, 0, "!p", false), "!p goes to the chat like any line")
 	pump(sv, s)

@@ -7,9 +7,9 @@ import "core:time"
 
 import sa "core:container/small_array"
 
-import "../core/game"
-import net "../core/network"
-import "../core/utils"
+import "../../core/game"
+import net "../../core/network"
+import "../../core/utils"
 import "lists"
 
 // The admin commands, said in the chat by an admin (`from` its slot) or typed at the
