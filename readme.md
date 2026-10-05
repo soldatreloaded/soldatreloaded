@@ -32,9 +32,10 @@ the bonus kits, the flamer and the bows are left out.
 
 You need a recent nightly of [Odin](https://odin-lang.org/). Everything else (raylib,
 ENet, Lua, curl, stb) comes with Odin's `vendor` collection. It is developed on
-Windows; on Linux, the game links X11 and the server the system's ENet, curl and
+Windows; on Linux, a build from the source links X11 and the system's ENet, curl and
 mbedTLS (on Debian and Ubuntu: `libx11-dev libenet-dev libcurl4-openssl-dev
-libmbedtls-dev`).
+libmbedtls-dev`). A release links its libraries in, so players install nothing
+(docs/git.md).
 
 Every program runs from the install's root, which is `assets/` in this repository:
 

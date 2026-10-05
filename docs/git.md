@@ -87,8 +87,8 @@ tag runs `.github/workflows/release.yml`, each step only if the one before succe
 
 1. **test**: `ci.yml`, the same as on every push to `main` and every pull request: the
    programs build and the tests pass, on Windows and Linux.
-2. **package**: `.github/actions/package`, for the client and the server on each
-   platform.
+2. **package**: `.github/actions/package`, for the game on Windows and Linux and the
+   server on Linux.
 3. **publish**: a GitHub release named after the tag, its notes the tag's message,
    with every package and manifest attached.
 4. **discord**: `discord.yml` posts the release to the channel behind the
@@ -106,13 +106,21 @@ install's root is the zip's:
 | Package | Holds |
 |---|---|
 | `soldatreloaded-<version>-<platform>.zip` | `soldatreloaded(.exe)`, `soldatreloaded-launcher(.exe)`, `data/`, `mods/default/` |
-| `soldatreloaded-server-<version>-<platform>.zip` | `soldatreloaded-server(.exe)`, `data/`, `scripts/`, and `lua54.dll` on Windows |
+| `soldatreloaded-server-<version>-linux.zip` | `soldatreloaded-server`, `data/`, `scripts/` |
 
 Both hold `license.md`, `version.txt`, and their own manifest as `manifest.json`. Players
 start the launcher, which brings the install up to the newest release and starts the
 game. The game has no use for the server's scripts and the server draws nothing, so
-neither carries the other's. The platforms are `windows` and `linux`. The server on Linux links the system's ENet, curl and mbedTLS,
-which a Linux server needs installed.
+neither carries the other's. The game is released for Windows and Linux; the server,
+for those who host, for Linux alone. A server runs on Windows built from the source,
+as it is developed.
+
+A player installs nothing: each program carries its libraries inside it, and asks the
+system only for what every machine has (the C library; on Linux, X11 and OpenGL). The
+setup action builds what Odin doesn't have as a static library from pinned sources
+(ENet, and curl on mbedTLS, for Linux), and the package action fails a release whose
+programs would look for any of them, or for the Visual C++ runtime, on a player's
+machine.
 
 No config ships. The game and the server each make theirs at the install's root, with
 the defaults, where it is missing (`client.config.json`, `server.config.json`); a
