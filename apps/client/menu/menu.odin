@@ -1,0 +1,462 @@
+package menu
+
+// The main menu: the first screen, and the one between games. A rail down the left picks
+// the page (the game's name written at its top, in the menu's own faces), and the page
+// beside it has its header (the title and a line under it), its body, and its footer
+// (what the page says of where it stands, and its one button), all on one ground over
+// the menu's own background. The mouse, the keys (arrows, Enter, Escape, Tab, Q and E)
+// and a controller's pad all work it.
+//
+// It edits the client's config in place (the player, the keys, the options), and the
+// config Local Play hosts with (server.config.json, the rotation in it); it asks the
+// client to start a game, and plays nothing itself. Online play and the demos come
+// later: their pages are drawn and edited, and what would connect, host or play says it
+// isn't available yet.
+//
+// The menu is immediate, as the C client's: each frame its update gathers the keys and
+// the mouse, and its draw lays the page out anew in one pass of the ui's Kit, every
+// widget drawing itself and acting on what was gathered. What a pass asks of the client
+// is handed over by the next update.
+//
+//   menu.odin      the menu, the rail, the header and footer, the background, the pages
+//   servers.odin   the server browser                 join.odin      join by address
+//   local.odin     local play: the match, the bots, the rotation
+//   demos.odin     the demos recorded here            player.odin    name, look, loadout
+//   controls.odin  the keys                           taunts.odin    the taunt editor
+//   binds.odin     the keys and the taunts as the config's binds
+//   options.odin   sound, mouse, interface, network   graphics.odin  the window, the world
+//
+// Uses: ui, draw (the player's preview), hud (the pointer), demo (the listing). From
+// the C client: ui/mainmenu.c, ui/taunts.c.
+
+import "core:math"
+import "core:mem"
+import "core:mem/virtual"
+import "core:strings"
+
+import rl "vendor:raylib"
+import rlgl "vendor:raylib/rlgl"
+
+import sim "../../../core/game"
+import res "../../../core/resources"
+import "../draw"
+import "../hud"
+import "../ui"
+
+VERSION :: #config(SOLDATRELOADED_VERSION, "dev") // the release build sets it
+
+Page :: enum {
+	Servers,
+	Join,
+	Local,
+	Demos,
+	Player,
+	Controls,
+	Taunts,
+	Options,
+	Graphics,
+}
+
+Menu :: struct {
+	config:       ^res.Client_Config,
+	host:         ^res.Server_Config, // what Local Play hosts with
+	kit:          ui.Kit,
+	page:         Page,
+	side:         int, // the rail's item with the keys: the pages, then Quit
+	request:      Request, // what the last pass asked of the client
+	art:          hud.Art, // the pointer
+	preview:      draw.Preview,
+	weapon_names: [res.Weapon]string,
+	servers:      Servers,
+	join:         Join,
+	local:        Local,
+	demos:        Demos,
+	taunts:       Taunt_Editor,
+}
+
+// What the menu asks of the client.
+//
+// Online play and the demos will ask more, once there is a network and a player: to
+// connect to a server (the servers and join pages), to host one for friends (local
+// play), and to play a demo. Until then those pages say so where they would ask.
+Request :: union {
+	Play,
+	Quit,
+}
+
+// An offline game against bots, as server.config.json has it: `maps` in turn, the first
+// first; a single map repeats.
+Play :: struct {
+	maps: []string,
+}
+
+Quit :: struct {}
+
+// What the menu offers first, before anything has been played.
+FIRST_MAP :: "ctf_Ash"
+
+// The menu over `config` and `host`, its local play on `last_map`: the map played last,
+// or FIRST_MAP.
+menu_init :: proc(menu: ^Menu, config: ^res.Client_Config, host: ^res.Server_Config, mod: res.Mod, last_map: string) {
+	menu.config = config
+	menu.host = host
+	ui.kit_init(&menu.kit)
+	hud.art_load(&menu.art, mod)
+	draw.preview_load(&menu.preview, mod)
+	for info, weapon in sim.weapons_default() do menu.weapon_names[weapon] = info.name
+	local_init(&menu.local, last_map)
+	menu.taunts.slot = -1
+	rl.HideCursor() // the menu draws its own
+	go_page(menu, .Servers)
+}
+
+menu_destroy :: proc(menu: ^Menu) {
+	local_destroy(&menu.local)
+	demos_destroy(&menu.demos)
+	delete(menu.servers.search)
+	delete(menu.taunts.text)
+	draw.preview_destroy(&menu.preview)
+	hud.art_destroy(&menu.art)
+	rl.ShowCursor()
+	menu^ = {}
+}
+
+// The keys and the mouse since the last pass; and what that pass asked, once.
+menu_update :: proc(menu: ^Menu) -> Request {
+	ui.kit_input(&menu.kit)
+	request := menu.request
+	menu.request = nil
+	return request
+}
+
+menu_draw :: proc(menu: ^Menu, u: ^ui.Ui) {
+	k := &menu.kit
+	ui.kit_begin(k, u, rl.GetTime())
+	rlgl.DisableBackfaceCulling() // the shapes are wound either way
+	rl.EndBlendMode()
+
+	background(u, rl.GetTime())
+	ui.rect(u, 0, 0, u.width, VIEW_H, ui.SURFACE) // one ground for the rail and the page, the embers faint through it
+
+	// the page beside the rail: as wide as the window allows, up to a width the rows
+	// read well at
+	panel_w := min(u.width - EDGE - PANEL_X, 740)
+	x, w := f32(PANEL_X + PAD), panel_w - 2 * PAD
+
+	ui.popup_input(k) // the popup first: it has the keys and the clicks while open
+	rail_keys(menu)
+	rail(menu)
+	header(menu, x, w)
+	ui.rule(u, x, x + w, PANEL_BOTTOM - FOOTER_H, ui.LINE) // the footer's
+
+	ui.kit_column(k, x, w, BODY_TOP, BODY_BOTTOM)
+	switch menu.page {
+	case .Servers:  page_servers(menu)
+	case .Join:     page_join(menu)
+	case .Local:    page_local(menu)
+	case .Demos:    page_demos(menu)
+	case .Player:   page_player(menu)
+	case .Controls: page_controls(menu)
+	case .Taunts:   page_taunts(menu)
+	case .Options:  k.w = min(w, 520); page_options(menu)
+	case .Graphics: k.w = min(w, 520); page_graphics(menu)
+	}
+	k.x, k.w = x, w
+	if note := PAGE_NOTES[menu.page]; note != "" do footer_text(menu, x, w, note, ui.MUTED) // a settings page: where its changes go
+
+	if ui.kit_page_keys(k) do menu.side = int(menu.page) // up from the page's first widget: back out to the rail
+	ui.kit_page_scroll(k, {PANEL_X, BODY_TOP, panel_w, BODY_BOTTOM - BODY_TOP}, x + w + 8)
+	ui.popup_draw(k)
+	ui.kit_end(k)
+
+	rlgl.DrawRenderBatchActive()
+	rlgl.EnableBackfaceCulling()
+	graphics := &menu.config.graphics
+	hud.pointer_draw(u, &menu.art, u.mouse, rl.Color(graphics.cursor_color), f32(clamp(graphics.cursor_size, 50, 200)) / 100)
+	rl.EndBlendMode()
+}
+
+// ---------------------------------------------------------------------------------
+// Layout, in the view's units (480 tall): the rail down the left, and the page beside
+// it with its header, its body and its footer.
+
+VIEW_H :: ui.VIEW_HEIGHT
+RAIL_W :: 148
+EDGE :: 14 // the panel's distance from the rail and the window's edges
+PAD :: 18  // inside the panel
+PANEL_X :: RAIL_W + EDGE
+PANEL_TOP :: EDGE
+PANEL_BOTTOM :: VIEW_H - EDGE
+HEADER_H :: 58
+FOOTER_H :: 50
+BODY_TOP :: PANEL_TOP + HEADER_H + 10
+BODY_BOTTOM :: PANEL_BOTTOM - FOOTER_H - 8
+ACTION_CY :: PANEL_BOTTOM - FOOTER_H / 2
+BIG_H :: 30 // the footer's button
+RAIL_ITEM_H :: 24
+RAIL_PAD :: 10
+
+@(rodata)
+PAGE_NAMES := [Page]string {
+	.Servers  = "Servers",
+	.Join     = "Join by address",
+	.Local    = "Local play",
+	.Demos    = "Demos",
+	.Player   = "Player",
+	.Controls = "Controls",
+	.Taunts   = "Taunts",
+	.Options  = "Options",
+	.Graphics = "Graphics",
+}
+
+@(rodata)
+PAGE_LINES := [Page]string {
+	.Servers  = "The games being played now, from the lobby.",
+	.Join     = "Connect to a server you know the address of.",
+	.Local    = "Host a game on this machine, against bots or for friends on your network.",
+	.Demos    = "Games recorded here, to watch again.",
+	.Player   = "Your name, and how your soldier looks and what it carries.",
+	.Controls = "The keys. Click a binding, then press the new key; Escape cancels.",
+	.Taunts   = "What a key says: a message to everyone or the team, or your own words as a radio call.",
+	.Options  = "Sound, the mouse, the interface and the connection.",
+	.Graphics = "The window, and what is drawn of the world.",
+}
+
+// What the footer says on the pages with nothing of their own to say there.
+@(rodata)
+PAGE_NOTES := #partial [Page]string {
+	.Taunts   = "Saved in client.config.json as the game closes.",
+	.Controls = "Changes take effect at once, and are saved in client.config.json when the game closes.",
+	.Player   = "Changes take effect at once, and are saved in client.config.json when the game closes.",
+	.Options  = "Changes take effect at once, and are saved in client.config.json when the game closes.",
+	.Graphics = "Changes take effect at once, and are saved in client.config.json when the game closes.",
+}
+
+// What can't be done until the game has a network, and demos to play: said where it
+// would be.
+NOT_YET_ONLINE :: "Online play isn't available yet: there is no network in this build."
+NOT_YET_DEMOS :: "Playing demos isn't available yet."
+
+// The footer's line: what the page says of where it stands.
+footer_text :: proc(menu: ^Menu, x, w: f32, text: string, color: rl.Color) {
+	ui.text_fit(&menu.kit, ui.BODY, text, x, ACTION_CY, w, color)
+}
+
+// The footer's button, its right edge at `right`: the page's one thing to do (Join,
+// Connect, Play), in the accent when `primary`; `left` is where it begins, for what goes
+// beside it.
+big_button :: proc(menu: ^Menu, right: f32, caption: string, primary, disabled: bool) -> (pressed: bool, left: f32) {
+	k := &menu.kit
+	w := max(ui.width_of(k.ui, ui.BIG, caption) + 52, 130)
+	left = right - w
+	pressed = ui.button_styled(k, left, ACTION_CY - BIG_H / 2, w, BIG_H, caption, primary, disabled, ui.BIG, ACTION_CY)
+	return
+}
+
+// The allocator the config's strings are kept in.
+config_allocator :: proc(menu: ^Menu) -> mem.Allocator {
+	return virtual.arena_allocator(&menu.config.arena)
+}
+
+// `text` into a string of the menu's own.
+set_text :: proc(s: ^string, text: string) {
+	delete(s^)
+	s^ = strings.clone(text)
+}
+
+// ---------------------------------------------------------------------------------
+// The pages and the rail
+
+go_page :: proc(menu: ^Menu, page: Page) {
+	if page == .Demos && menu.page != .Demos do menu.demos.listed = false // demos/ as it is now
+	menu.page = page
+	menu.side = int(page)
+	ui.kit_reset_page(&menu.kit)
+}
+
+// The rail's items, in the keys' order: the pages, then Quit.
+RAIL_COUNT :: len(Page) + 1
+
+@(private = "file")
+rail_activate :: proc(menu: ^Menu, item: int) {
+	if item < len(Page) {
+		if int(menu.page) != item do go_page(menu, Page(item))
+		menu.kit.in_page = true
+		menu.kit.nav = 0
+	} else {
+		menu.request = Quit{}
+	}
+}
+
+// The keys while the rail has them: up and down go along it (a page is shown as its
+// item is reached), right or Enter goes into the page. In the page, Escape (or up from
+// its first widget) comes back out here; Q and E, or a controller's shoulders, turn the
+// pages from anywhere.
+@(private = "file")
+rail_keys :: proc(menu: ^Menu) {
+	k := &menu.kit
+	if k.page != 0 {
+		to := (int(menu.page) + k.page + len(Page)) %% len(Page)
+		in_page := k.in_page
+		go_page(menu, Page(to))
+		k.in_page = in_page
+		k.page = 0
+	}
+	if k.in_page {
+		if k.back {
+			k.in_page = false
+			menu.side = int(menu.page)
+			k.back = false
+		}
+		return
+	}
+	menu.side = clamp(menu.side, 0, RAIL_COUNT - 1)
+	if k.move != 0 {
+		menu.side = clamp(menu.side + k.move, 0, RAIL_COUNT - 1)
+		if menu.side < len(Page) && int(menu.page) != menu.side do go_page(menu, Page(menu.side))
+	}
+	if k.enter || (k.side > 0 && menu.side < len(Page)) do rail_activate(menu, menu.side)
+	k.enter, k.back = false, false
+	k.side, k.move = 0, 0
+}
+
+// The rail down the left, on the same ground as the page, a divider between: the name,
+// the pages under their groups, and at the bottom Quit and the version.
+@(private = "file")
+rail :: proc(menu: ^Menu) {
+	k := &menu.kit
+	u := k.ui
+	ui.rect(u, RAIL_W - ui.hairline(u), 0, RAIL_W, VIEW_H, ui.DIVIDER)
+
+	x, y := f32(RAIL_PAD + 8), f32(24)
+	y += logo(k, x, y, RAIL_W - 2 * x) + 28
+
+	focus_rail := !k.in_page
+	Group :: struct {
+		name:        string,
+		first, last: Page,
+	}
+	groups := [?]Group{{"PLAY", .Servers, .Demos}, {"SETTINGS", .Player, .Graphics}}
+	for group in groups {
+		// the group's label: small, faint and set apart, so it reads as a heading and not
+		// as one more item
+		ui.text_at(k, ui.GROUP, group.name, x, y, ui.with_alpha(ui.FAINT, 200))
+		y += ui.height_of(u, ui.GROUP) + 6
+		for page in group.first ..= group.last {
+			chosen, focused := menu.page == page, focus_rail && menu.side == int(page)
+			ix, iw := f32(RAIL_PAD), f32(RAIL_W - 2 * RAIL_PAD)
+			hot := ui.over(k, ix, y, iw, RAIL_ITEM_H)
+			if chosen {
+				ui.rrect(u, ix, y, iw, RAIL_ITEM_H, ui.RADIUS, ui.ACCENT_SOFT)
+				ui.rrect(u, ix, y + 5, 2, RAIL_ITEM_H - 10, 1, ui.ACCENT)
+			} else if hot {
+				ui.rrect(u, ix, y, iw, RAIL_ITEM_H, ui.RADIUS, ui.HOVER)
+			}
+			ui.focus_ring(k, focused, ix, y, iw, RAIL_ITEM_H, ui.RADIUS)
+			ui.text_fit(k, ui.NAV, PAGE_NAMES[page], x, y + RAIL_ITEM_H / 2, iw - 16, ui.TEXT if chosen || hot else ui.MUTED)
+			if ui.take(k, -1, ix, y, iw, RAIL_ITEM_H) {
+				go_page(menu, page)
+				k.in_page = false
+			}
+			y += RAIL_ITEM_H + 2
+		}
+		y += 18
+	}
+
+	// the bottom, from the bottom up: the version, and Quit
+	vy := VIEW_H - 14 - ui.height_of(u, ui.TINY)
+	ui.text_at(k, ui.TINY, "v" + VERSION, x, vy, ui.FAINT)
+	bw, by := f32(RAIL_W - 2 * RAIL_PAD), vy - 10 - ui.CTRL_H
+	if rail_button(k, RAIL_PAD, by, bw, ui.CTRL_H, "Quit", focus_rail && menu.side == RAIL_COUNT - 1) do menu.request = Quit{}
+}
+
+// A button of the rail, outside the page's order (the rail's keys reach it).
+@(private = "file")
+rail_button :: proc(k: ^ui.Kit, x, y, w, h: f32, caption: string, focused: bool) -> bool {
+	hot := ui.over(k, x, y, w, h)
+	ui.focus_ring(k, focused, x, y, w, h, ui.RADIUS)
+	ui.button_ground(k, x, y, w, h, false, false, hot)
+	tw := ui.width_of(k.ui, ui.BUTTON, caption)
+	ui.text_mid(k, ui.BUTTON, caption, x + (w - tw) / 2, y + h / 2, ui.TEXT)
+	return ui.take(k, -1, x, y, w, h)
+}
+
+// The name, written: SOLDAT in the stencil face, and RELOADED under it in the accent,
+// its letters spaced out to the same width. The height it took.
+@(private = "file")
+logo :: proc(k: ^ui.Kit, x, y, width: f32) -> f32 {
+	u := k.ui
+	name := ui.LOGO // as large as the rail allows
+	w := ui.width_of(u, name, "SOLDAT")
+	if w > width {
+		name.size *= width / w
+		w = ui.width_of(u, name, "SOLDAT")
+	}
+	ui.text_at(k, name, "SOLDAT", x, y, ui.TEXT)
+	h := ui.height_of(u, name)
+	sub := ui.LOGO_SUB
+	w0 := ui.width_of(u, sub, "RELOADED")
+	sub.tracking = 0.1
+	w1 := ui.width_of(u, sub, "RELOADED") // the width grows evenly with the tracking
+	sub.tracking = 0.1 * (w - w0) / (w1 - w0) if w1 > w0 else 0
+	sy := y + h - 5
+	ui.text_at(k, sub, "RELOADED", x, sy, ui.ACCENT)
+	return sy + ui.height_of(u, sub) - y
+}
+
+// The panel's header: the page's title, and a line on what it is for.
+@(private = "file")
+header :: proc(menu: ^Menu, x, w: f32) {
+	k := &menu.kit
+	y := f32(PANEL_TOP + 13)
+	ui.text_at(k, ui.TITLE, PAGE_NAMES[menu.page], x, y, ui.TEXT)
+	y += ui.height_of(k.ui, ui.TITLE) + 4
+	ui.text_fit(k, ui.SUBTITLE, PAGE_LINES[menu.page], x, y + ui.height_of(k.ui, ui.SUBTITLE) / 2, w, ui.MUTED)
+	ui.rule(k.ui, x, x + w, PANEL_TOP + HEADER_H, ui.LINE)
+}
+
+// ---------------------------------------------------------------------------------
+// The background
+
+EMBERS :: 70
+
+// What is behind the menu: night falling to steel, a warm glow low on the left and a
+// cool one high on the right, the edges darkened, and embers rising slowly through it,
+// each flickering and fading as it goes. All of it from the clock alone: nothing kept.
+@(private = "file")
+background :: proc(u: ^ui.Ui, time: f64) {
+	W, t := u.width, f32(time)
+	ui.shade(u, 0, 0, W, VIEW_H, {18, 24, 38, 255}, {10, 12, 18, 255}, false)
+	breathe := 0.85 + 0.15 * math.sin(t * 0.4)
+	ui.glow(u, W * 0.12, VIEW_H * 1.02, VIEW_H * 0.85, {255, 104, 24, u8(72 * breathe)})
+	ui.glow(u, W * 0.9, -VIEW_H * 0.05, VIEW_H * 0.75, {79, 163, 255, 20})
+	for i in 0 ..< EMBERS {
+		n := u32(i) * 7
+		speed, size := 6 + 16 * hash01(n + 1), 0.8 + 1.7 * hash01(n + 2)
+		span := f32(VIEW_H + 60)
+		rise := math.mod(t * speed + hash01(n + 3) * span, span)
+		y, life := VIEW_H + 20 - rise, rise / span // 0 as it starts, 1 as it goes
+		x := hash01(n + 4) * W + math.sin(t * (0.3 + 0.5 * hash01(n + 5)) + f32(i)) * 14 + life * 30
+		flicker := 0.7 + 0.3 * math.sin(t * (3 + 4 * hash01(n + 6)) + f32(i))
+		fade := (1 - life) * min(life * 8, 1) * flicker
+		g := u8(110 + 80 * hash01(n + 7))
+		ui.glow(u, x, y, size * 6, {255, g, 40, u8(70 * fade)})
+		ui.circle(u, x, y, size * 0.6, {255, u8(min(int(g) + 60, 255)), 120, u8(255 * fade)})
+	}
+	// the vignette
+	dark, none := rl.Color{0, 0, 0, 120}, rl.Color{0, 0, 0, 0}
+	ui.shade(u, 0, 0, W * 0.18, VIEW_H, dark, none, true)
+	ui.shade(u, W * 0.82, 0, W, VIEW_H, none, dark, true)
+	ui.shade(u, 0, VIEW_H * 0.75, W, VIEW_H, none, dark, false)
+}
+
+// A number from 0 to 1 that `seed` always gives.
+@(private = "file")
+hash01 :: proc(seed: u32) -> f32 {
+	n := (seed ~ 61) ~ (seed >> 16)
+	n *= 9
+	n ~= n >> 4
+	n *= 0x27d4eb2d
+	n ~= n >> 15
+	return f32(n & 0xffffff) / f32(0x1000000)
+}

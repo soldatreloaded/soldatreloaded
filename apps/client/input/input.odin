@@ -1,0 +1,153 @@
+package input
+
+// The keyboard and mouse made into a command for my soldier, through the player's binds;
+// and the keys the menus and chat read.
+//
+// A key bound to a button's command ("+left", "+fire") holds that button down while it
+// is; the one-shot buttons (throw, change, prone, …) are kept from the frame they go
+// down until a tick takes them, so a press between two ticks is never lost or counted
+// twice. A key bound to anything else ("escmenu", "chat") is an action, handed to the
+// caller the frame it goes down. A key pressed with a modifier held is bound as
+// "alt+q" where that has a bind, and as "q" where not.
+//
+// The mouse is the original's: the system cursor is held in the window, and the game
+// keeps its own, moved by the mouse's motion times the sensitivity and kept inside the
+// view, in the view's units (480 tall, whatever the window), so it feels the same at any
+// window size.
+//
+// Uses: raylib, core/game. From the C client: input/input.c.
+
+import sa "core:container/small_array"
+import "core:strings"
+
+import rl "vendor:raylib"
+
+import sim "../../../core/game"
+import res "../../../core/resources"
+
+Input :: struct {
+	held:    sim.Buttons, // the buttons whose keys are down
+	pressed: sim.Buttons, // the one-shot buttons gone down since a tick last took them
+	cursor:  [2]f32,      // the game's own cursor, in view units from the view's top-left
+	clicked: bool,        // a menu took the left button's press: it is no bind's until let go
+}
+
+// What an open menu takes this frame, before the binds: the left click, a number key and
+// whether Ctrl is held with it.
+Menu_Keys :: struct {
+	click: bool,
+	digit: Maybe(int),
+	ctrl:  bool,
+}
+
+MAX_ACTIONS :: 8
+
+Actions :: sa.Small_Array(MAX_ACTIONS, string)
+
+// The buttons' commands, the original's.
+@(private = "file", rodata)
+BUTTON_COMMANDS := [?]struct {
+	command: string,
+	button:  sim.Button,
+} {
+	{"+left", .Left}, {"+right", .Right}, {"+jump", .Jump}, {"+crouch", .Crouch}, {"+prone", .Prone},
+	{"+jet", .Jet}, {"+fire", .Fire}, {"+throw", .Throw}, {"+reload", .Reload}, {"+change", .Change},
+	{"+drop", .Drop}, {"+flagthrow", .Flag_Throw},
+}
+
+// The window is the game's: the system cursor hidden and held, and the game's in the
+// middle of a view this size.
+input_start :: proc(input: ^Input, view: [2]f32) {
+	rl.DisableCursor()
+	input^ = {cursor = view / 2}
+}
+
+// The window is the menus' again.
+input_stop :: proc(input: ^Input) {
+	rl.EnableCursor()
+	input^ = {}
+}
+
+// Each frame: the mouse's motion, and the keys through the binds. The actions whose
+// keys went down this frame. With a `menu` open, the left button and the number keys
+// are its own (input_menu_keys), not their binds'.
+input_poll :: proc(input: ^Input, config: ^res.Client_Config, view: [2]f32, menu: bool) -> (actions: Actions) {
+	motion := rl.GetMouseDelta() * config.controls.sensitivity
+	input.cursor = {clamp(input.cursor.x + motion.x, 0, view.x), clamp(input.cursor.y + motion.y, 0, view.y)}
+
+	if input.clicked && !rl.IsMouseButtonDown(.LEFT) do input.clicked = false
+	input.held = {}
+	for name, command in config.binds {
+		modifier, key, is_key := key_parse(name)
+		if !is_key || command == "" || !modifier_down(modifier) || overridden(config, modifier, name) do continue
+		if menu_owns(input, key, menu) do continue
+
+		if button, is_button := button_of(command); is_button {
+			if key_down(key) do input.held += {button}
+			if key_pressed(key) && button in sim.ONE_SHOT_BUTTONS do input.pressed += {button}
+		} else if key_pressed(key) {
+			sa.append(&actions, command)
+		}
+	}
+	return
+}
+
+// With a menu open, after input_poll: what the menu takes of the keys this frame. A click
+// the menu takes stays its own until the button is let go, so a click that closes a
+// menu fires nothing.
+input_menu_keys :: proc(input: ^Input) -> (keys: Menu_Keys) {
+	if rl.IsMouseButtonPressed(.LEFT) {
+		keys.click = true
+		input.clicked = true
+	}
+	for digit in 0 ..= 9 {
+		if rl.IsKeyPressed(digit_key(digit)) do keys.digit = digit
+	}
+	keys.ctrl = modifier_down(.Ctrl)
+	return
+}
+
+// The command for a tick, aimed at `aim` in the world: the buttons held, and the
+// presses since the last, which it takes.
+input_take_command :: proc(input: ^Input, sequence: u32, aim: [2]f32) -> sim.Command {
+	command := sim.Command{sequence = sequence, buttons = input.held + input.pressed, aim = aim}
+	input.pressed = {}
+	return command
+}
+
+// The keys a menu has for its own: the left button, while open or while its click is
+// held; the number keys, while open.
+@(private = "file")
+menu_owns :: proc(input: ^Input, key: Key, menu: bool) -> bool {
+	#partial switch k in key {
+	case rl.MouseButton:  return k == .LEFT && (menu || input.clicked)
+	case rl.KeyboardKey: return menu && k >= .ZERO && k <= .NINE
+	}
+	return false
+}
+
+@(private = "file")
+digit_key :: proc(digit: int) -> rl.KeyboardKey {
+	return rl.KeyboardKey(int(rl.KeyboardKey.ZERO) + digit)
+}
+
+@(private = "file")
+button_of :: proc(command: string) -> (button: sim.Button, ok: bool) {
+	for b in BUTTON_COMMANDS {
+		if b.command == command do return b.button, true
+	}
+	return
+}
+
+// A plain key's bind gives way to the same key's with a modifier held, where that has a
+// bind of its own.
+@(private = "file")
+overridden :: proc(config: ^res.Client_Config, modifier: Modifier, name: string) -> bool {
+	if modifier != .None do return false
+	for held in Modifier {
+		if held == .None || !modifier_down(held) do continue
+		with := strings.concatenate({modifier_name(held), "+", name}, context.temp_allocator)
+		if _, bound := res.client_config_bind(config, with); bound do return true
+	}
+	return false
+}
