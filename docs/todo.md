@@ -2,6 +2,7 @@
 
 Launcher
 - Github workflows
+- Static compile the libs on both windows and linux
 - CLI based manifest updater
 
 Client
