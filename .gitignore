@@ -1,6 +1,4 @@
 tests/compare/build/
 build/
 assets/*.exe
-assets/client.config.json
-assets/server.config.json
 assets/*.config.json
