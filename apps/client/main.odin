@@ -16,7 +16,7 @@ package main
 //
 // It runs from the install's root, where data/ and mods/ are: assets/ in this
 // repository, the unpacked folder in a release. It keeps its settings there in
-// client.config.json (core/resources/clientconfig.odin), Offline Play's among them.
+// client.config.json (core/resources/client_config.odin), Offline Play's among them.
 //
 //   cd assets && odin run ../apps/client
 

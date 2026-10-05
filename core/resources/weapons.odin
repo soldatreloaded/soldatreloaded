@@ -1,8 +1,8 @@
 package resources
 
 // Which weapons there are, and the numbers of each a server sets: server.config.json's
-// `weapons` (serverconfig.odin), each weapon an object by its name in lower case, as the
-// config writes enums ("desert_eagles"), its numbers keys of Weapon_Stats' names.
+// `weapons` (server_config.odin), each weapon an object by its name in lower case, as
+// the config writes enums ("desert_eagles"), its numbers keys of Weapon_Stats' names.
 
 // Every weapon, in the order the game and the network number them.
 Weapon :: enum {

@@ -6,7 +6,7 @@ import "core:mem/virtual"
 // (config.odin). Read as it starts (the file made with the defaults if it isn't there),
 // and written whole as it starts and as its bans and mutes change (apps/server/lists). A
 // setting the file doesn't hold keeps its default. The game has none of it: Offline
-// Play's settings are its own (clientconfig.odin).
+// Play's settings are its own (client_config.odin).
 
 Server_Config :: struct {
 	server:  Host_Settings,

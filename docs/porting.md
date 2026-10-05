@@ -107,7 +107,7 @@ tests are `tests/network`, `tests/server` (real sockets on the loopback, run wit
 | `network/transport.c`, `query.c` | `core/network/transport.odin`, `query.odin` |
 | `server/host.c`, `connections.c`, `rounds.c` | `apps/server/`, one package with the executable, one file to an idea: `server.odin`, `players.odin`, `line.odin`, `chat.odin`, `votes.odin`, `admin.odin`, `flood.odin`, `rounds.odin`, `maps.odin` |
 | `server/bots.c`, `lists.c`, `lobby.c`, `script.c` | `core/bots`, `apps/server/lists`, `apps/server/lobby`: packages of their own, which know nothing of the line; the script is the server package's own (`apps/server/script.odin`, `api.odin`, `events.odin`) |
-| `server/main.c`, `host_cvars.c`, `stdin_reader.c` | `apps/server/main.odin`, `console.odin`: the console is a handful of commands over `server.config.json` (`core/resources/serverconfig.odin`), not cvars |
+| `server/main.c`, `host_cvars.c`, `stdin_reader.c` | `apps/server/main.odin`, `console.odin`: the console is a handful of commands over `server.config.json` (`core/resources/server_config.odin`), not cvars |
 | `server/weapons_ini.c` | `core/resources/weapons.odin`: a server's weapons are `server.config.json`'s `weapons`, and the console's `weapon` changes them as it runs |
 
 **Word from another machine.** What the C game's passes heard through the mailbox

@@ -9,7 +9,7 @@ package server
 // keeps its files there:
 //
 //   server.config.json   how it hosts, the rotation, the weapons, the admins, bans and
-//                        mutes (core/resources/serverconfig.odin),
+//                        mutes (core/resources/server_config.odin),
 //                        written whole as it starts, so it shows every setting, and as
 //                        the bans and mutes change
 //   scripts/main.lua     the script, as the config names it (app_script.odin)
