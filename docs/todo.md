@@ -1,14 +1,7 @@
 # Todo
 
-Repo
-x Move server to apps/server
-x change branch to main
-x rewrite commits as granular and standard commit msgs
-- design.md
-- readme.md
-- Github workflows
-
 Launcher
+- Github workflows
 - CLI based manifest updater
 
 Client
