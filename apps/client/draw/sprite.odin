@@ -2,7 +2,6 @@ package draw
 
 import "core:fmt"
 import "core:math"
-import "core:strconv"
 import "core:strings"
 
 import rlgl "vendor:raylib/rlgl"
@@ -13,7 +12,7 @@ import "../../../core/utils"
 // A sprite: one of the mod's images with its size in the world, drawn as a turned,
 // scaled quad. The soldiers, the bullets, the things and the sparks are all sprites,
 // their images packed into one atlas as they load (atlas.odin), so they draw in one go.
-// How big an image is in the world is the mod's to say, in mod.ini's [SCALE] (the
+// How big an image is in the world is the mod's to say, in mod.json's `scale` (the
 // original's ScaleData): its pixels over its scale. From the C client's render/sprite.c
 // and render/scale_data.c.
 
@@ -25,14 +24,12 @@ Sprite :: struct {
 	size:  [2]f32,      // in world units
 }
 
-// How big the mod's images are: by a file's path ("interface-gfx/cursor.png=10"), else
+// How big the mod's images are: by a file's path ("interface-gfx/cursor.png"), else
 // by its folder's, else the default (4.5 pixels to a unit).
 Scales :: struct {
 	default: f32,
 	by_path: map[string]f32, // lowercase, with forward slashes, as the original keys them
 }
-
-DEFAULT_SCALE :: 4.5
 
 // Where sprites are loaded from: the mod, and its scales; and the atlas they are packed
 // into.
@@ -69,22 +66,13 @@ sprite_book_load :: proc(book: ^Sprite_Book, dir, name: string) -> Sprite {
 	return sprite_find({book.mod, &book.scales, &book.atlas}, dir, name, res.COLOR_KEY)
 }
 
-// mod.ini's [SCALE]; everything at the default without one.
+// mod.json's `scale` (res.Mod_Config); everything at the default without one. A scale
+// that isn't above 0 is passed over.
 scales_load :: proc(mod: res.Mod) -> (scales: Scales) {
-	scales.default = DEFAULT_SCALE
-	text, read := utils.read_file(res.mod_file(mod, "mod.ini"), context.temp_allocator)
-	if !read do return
-
-	it := utils.ini_iterator(string(text))
-	for entry in utils.ini_next(&it) {
-		if !strings.equal_fold(entry.section, "SCALE") do continue
-		value, is_number := strconv.parse_f32(entry.value)
-		if !is_number || value <= 0 do continue
-		if strings.equal_fold(entry.key, "DefaultScale") {
-			scales.default = value
-		} else {
-			scales.by_path[scale_key(entry.key)] = value
-		}
+	config := res.mod_config_load(mod, context.temp_allocator)
+	scales.default = config.scale.default if config.scale.default > 0 else res.DEFAULT_MOD_SCALE
+	for path, scale in config.scale.paths {
+		if scale > 0 do scales.by_path[scale_key(path)] = scale
 	}
 	return
 }

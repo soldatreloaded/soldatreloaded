@@ -1,0 +1,10 @@
+{
+  "scale": {
+    "default": 4.5,
+    "paths": {
+      "interface-gfx/cursor.png": 10,
+      "interface-gfx/title-l.png": 1,
+      "interface-gfx/title-r.png": 1
+    }
+  }
+}
