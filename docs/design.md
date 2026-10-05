@@ -105,8 +105,8 @@ authority. Who holds it is what makes each program what it is:
 
 - **A server** has authority. Its players' commands come over the line, its bots'
   commands from `core/bots`, and it sends everyone the snapshots and its rulings.
-- **The client offline** (Local Play) has authority itself, and plays against bots as a
-  server would, on the same `server.config.json`.
+- **The client offline** (Offline Play) has authority itself, and plays against bots on
+  its own settings (the client config's `offline`): the game and the bots, no server.
 - **The client online** will have none: it steps the same world from the server's word.
   See netcode.md for how a player's own soldier is never corrected.
 - **The tests and tools** have authority, and drive the world directly.
@@ -119,10 +119,9 @@ and whoever hosts does with their commands what it does with a player's.
 `apps/server` is one package: the hosted game (`server.odin`, with players, rounds,
 votes, chat, flood control and the admin commands each in a file of their own), the Lua
 script (`script.odin`, `api.odin`, `events.odin`), and the program around them
-(`main.odin`, `console.odin`). `server_pump` is the whole of a tick, so the dedicated
-server and Local Play could host the same way. Its two subpackages know nothing of it:
-`lists` keeps the bans, mutes and admins, and `lobby` lists the server with the server
-browser.
+(`main.odin`, `console.odin`). `server_pump` is the whole of a tick. Its two subpackages
+know nothing of it: `lists` keeps the bans, mutes and admins, and `lobby` lists the
+server with the server browser.
 
 The script hears the server through `Hooks` and acts on it through the server's own
 procedures; scripting.md is its reference.

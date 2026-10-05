@@ -19,8 +19,8 @@ Now that the game is in a decent state, with most issues fixed, a refactor is du
   checked tick by tick against it (`tests/compare`).
 - **The dedicated server** hosts games over the network, with bots, votes, admin
   commands, bans and mutes, a listing in the server browser and Lua scripts.
-- **The client** has its main menu, and Local Play against bots with the HUD, sound and
-  the full look of the game. Online play and demos are not there yet.
+- **The client** has its main menu, and Offline Play against bots with the HUD, sound
+  and the full look of the game. Online play and demos are not there yet.
 - **Releases** are built and published by tagging (docs/git.md), each package with a
   manifest of its files. **The launcher** keeps a player's install at the newest
   release by them, then starts the game.
