@@ -1,0 +1,41 @@
+name: ci
+
+# Every push to main and every pull request: the programs build and the tests pass, on
+# Windows and Linux. A release runs this first (release.yml).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+
+      - name: build
+        run: |
+          mkdir -p build/ci
+          ext=""; if [ "$RUNNER_OS" = Windows ]; then ext=.exe; fi
+          for app in client server sandbox; do
+            odin build apps/$app -vet -out:build/ci/$app$ext
+          done
+
+      # tests/compare is left out: it needs the C game and a C toolchain (docs/porting.md).
+      - name: test
+        run: |
+          for suite in bots lists lobby network script; do
+            odin test tests/$suite
+          done
+          odin test tests/server -define:ODIN_TEST_THREADS=1 # real sockets, one at a time

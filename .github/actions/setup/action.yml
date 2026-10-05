@@ -1,0 +1,19 @@
+name: setup
+description: Odin, and on Linux the libraries the game and the server link against
+
+runs:
+  using: composite
+  steps:
+    - name: odin
+      uses: laytan/setup-odin@v2
+      with:
+        release: dev-2026-09
+
+    # The game links X11 (raylib); the server ENet, and curl with what it was built
+    # against. Lua is linked in from Odin's vendor collection.
+    - name: libraries
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        sudo apt-get update -q
+        sudo apt-get install -yq libx11-dev libgl-dev libenet-dev libcurl4-openssl-dev libmbedtls-dev zlib1g-dev
