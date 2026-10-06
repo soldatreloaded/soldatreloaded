@@ -80,6 +80,7 @@ main :: proc() {
 		loading_show(&client, step.doing, f32(i) / len(START_STEPS))
 		step.run(&client)
 	}
+	screenshots_collect() // any left where the game runs, from before
 
 	for client.screen != nil && !rl.WindowShouldClose() {
 		window_follow(&client.window, &client.config.graphics)
@@ -88,9 +89,11 @@ main :: proc() {
 		update(&client, rl.GetFrameTime())
 		sound.sound_update(&client.sound)
 		// Discord presence will be pumped here, while client.config.interface.discord
+		shot := rl.IsKeyPressed(.F12) // raylib takes a screenshot as the frame ends
 		rl.BeginDrawing()
 		draw(&client)
 		rl.EndDrawing()
+		if shot do screenshots_collect()
 		free_all(context.temp_allocator)
 	}
 
