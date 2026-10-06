@@ -63,8 +63,9 @@ Match :: struct {
 	bot_counts: res.Bot_Settings, // how many bots, on which teams
 	mod:        res.Mod, // the art of each next map is the mod's
 	art:        draw.Art,
-	camera:     draw.Camera,
-	sparks:     draw.Sparks,
+	camera:     draw.Camera, // as the ticks move it
+	seen:       draw.Camera, // as the frame draws it: between the last two ticks'
+	sparks:    draw.Sparks,
 	minimap:    draw.Minimap,
 	before:     draw.Snapshot, // the world a tick ago, which a frame blends from
 	frame:      draw.Frame,    // what is drawn: the world between its last two ticks
@@ -232,14 +233,14 @@ match_update :: proc(match: ^Match, config: ^res.Client_Config, sounds: ^sound.S
 		offsets = &stream.blend
 	}
 	draw.frame_build(&match.frame, &match.before, match.game, alpha, offsets)
-	camera_move(match, alpha, dt)
+	match.seen = draw.camera_between(match.camera, alpha)
 	return match.request
 }
 
 match_draw :: proc(match: ^Match, u: ^ui.Ui, config: ^res.Client_Config) {
 	sky := draw.sky_of(&match.game.polymap, &config.graphics)
 	draw.minimap_fit(&match.minimap, &match.art, &match.game.polymap, u.scale, sky)
-	draw.draw_world(&match.art, match.game, &match.frame, &match.sparks, match.camera, &config.graphics)
+	draw.draw_world(&match.art, match.game, &match.frame, &match.sparks, match.seen, &config.graphics)
 	data := hud_data(match, config)
 	hud.hud_draw(u, &match.hud, &data, &match.minimap)
 }
@@ -259,7 +260,8 @@ match_open :: proc(match: ^Match) {
 @(private = "file")
 view_open :: proc(match: ^Match, sounds: ^sound.Sound) {
 	draw.camera_fit(&match.camera)
-	match.camera.pos = match.game.world.soldiers[match.me].body.pos
+	draw.camera_place(&match.camera, match.game.world.soldiers[match.me].body.pos)
+	match.seen = match.camera
 	input.input_start(&match.input, match.camera.view)
 	shown(match, match.config, sounds)
 }
@@ -288,6 +290,8 @@ keys :: proc(match: ^Match, config: ^res.Client_Config, sounds: ^sound.Sound) {
 // the demo's), then what that made seen and heard.
 @(private = "package")
 tick :: proc(match: ^Match, config: ^res.Client_Config, sounds: ^sound.Sound) {
+	match.camera.prev = match.camera.pos
+	input.input_tick_begin(&match.input)
 	mine: sim.Command
 	switch match.mode {
 	case .Offline:
@@ -302,6 +306,7 @@ tick :: proc(match: ^Match, config: ^res.Client_Config, sounds: ^sound.Sound) {
 	shown(match, config, sounds)
 	if match.mode != .Demo do limbo_tick(match, mine)
 	watch_tick(match, mine)
+	camera_tick(match)
 	chat_tick(match)
 }
 

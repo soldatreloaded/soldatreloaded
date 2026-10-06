@@ -57,6 +57,7 @@ world_make :: proc(match: ^Match) -> bool {
 	match.watch = {}
 	match.speech = {}
 	match.record.round_recorded = false
+	if .Escape not_in match.hud.menus.open do input.input_centre(&match.input)
 	hud_new_round(match)
 	return true
 }

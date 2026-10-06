@@ -197,7 +197,7 @@ DEFAULT_CLIENT_CONFIG := Client_Config {
 		primary_weapon   = .M79,
 		secondary_weapon = .Knife,
 	},
-	controls = {sensitivity = 0.4},
+	controls = {sensitivity = 1.0},
 	graphics = {
 		screen_width      = 1600,
 		screen_height     = 900,

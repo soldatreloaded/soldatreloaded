@@ -97,6 +97,7 @@ round_start :: proc(match: ^Match) -> bool {
 	}
 	ai.bots_new_round(&match.bots)
 	draw.snapshot_take(&match.before, &game.world) // a new round is a jump, not a journey
+	if .Escape not_in match.hud.menus.open do input.input_centre(&match.input)
 	hud_new_round(match)
 	return true
 }

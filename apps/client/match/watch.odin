@@ -5,6 +5,7 @@ import sa "core:container/small_array"
 import sim "../../../core/game"
 import "../draw"
 import "../hud"
+import "../input"
 
 // The camera while I watch (LocalInput.pas, "change camera when dead"): as I die it stays
 // on my body; joining as a spectator, with no body, it goes to the first player up. Then,
@@ -15,7 +16,7 @@ import "../hud"
 // any time: fire and jet go round the players and its recorder, jump is the free camera.
 //
 // And a scoped Barrett shot of mine (the original's bullet Tracking): the camera rides
-// it, five ticks ahead, until it is gone, or I stand up or die (graphics.track_shot).
+// it, five ticks ahead, until it is gone or I stand up (graphics.track_shot).
 
 SPECTATOR_AIM_DIST :: 30 // the free camera's speed, by the cursor's offset from the middle
 TRACK_LEAD :: 5 // ticks of its flight the camera keeps ahead of a tracked shot
@@ -47,12 +48,13 @@ watch_tick :: proc(match: ^Match, mine: sim.Command) {
 		if !w.was_watching {
 			w.follow, w.free = nil, false
 			if me.team == .Spectator && !camera_next(match, false) do camera_free(match)
-		} else if .Weapons not_in match.hud.menus.open {
+		} else if .Weapons not_in match.hud.menus.open && pressed & {.Jump, .Fire, .Jet} != {} {
 			if .Jump in pressed {
 				camera_free(match)
-			} else if pressed & {.Fire, .Jet} != {} && !camera_next(match, .Jet in pressed) {
+			} else if !camera_next(match, .Jet in pressed) {
 				camera_free(match)
 			}
+			input.input_centre(&match.input) // the original's cursor goes back to the middle on a switch
 		}
 	case:
 		w.follow, w.free = nil, false
@@ -81,7 +83,7 @@ scoped_now :: proc(match: ^Match) -> bool {
 }
 
 // After the tick: a Barrett shot of mine this tick, scoped before it, is followed, the
-// newest if there are several; until it is gone, or I stand up or die.
+// newest if there are several; until it is gone or I stand up.
 track_shot :: proc(match: ^Match, scoped: bool) {
 	w := &match.watch
 	if scoped && match.config.graphics.track_shot {
@@ -94,41 +96,52 @@ track_shot :: proc(match: ^Match, scoped: bool) {
 	shot, tracking := w.tracking.?
 	if !tracking do return
 	me := &match.game.world.soldiers[match.me]
-	if !match.config.graphics.track_shot || !me.active || me.vitals.dead || me.controls.stance == .Stand || my_shot(match, shot) == nil {
+	if !match.config.graphics.track_shot || !me.active || me.controls.stance == .Stand || my_shot(match, shot) == nil {
 		w.tracking = nil
 	}
 }
 
-// The camera after the frame's ticks: on the shot it rides, pushed by the cursor while
-// free, or chasing whom it follows and leading toward the cursor, as the original's.
-camera_move :: proc(match: ^Match, alpha, dt: f32) {
+// The camera's move at the end of a tick (UpdateFrame.pas): put ahead of the shot it
+// rides, if it rides one (Bullets.pas, before the move); then pushed by the cursor while
+// free, or chasing whom it follows where the tick left them and leading toward the
+// cursor.
+camera_tick :: proc(match: ^Match) {
 	w := &match.watch
 	camera := &match.camera
 	followed := match.me
 	if f, following := w.follow.?; following && match.game.world.soldiers[f].active do followed = f
 	if shot, tracking := w.tracking.?; tracking {
-		if bullet := my_shot(match, shot); bullet != nil {
-			camera.pos = bullet.old_pos + (bullet.pos - bullet.old_pos) * alpha + bullet.velocity * TRACK_LEAD
-			return
-		}
+		if bullet := my_shot(match, shot); bullet != nil do camera.pos = bullet.pos + bullet.velocity * TRACK_LEAD
 	}
+	cursor := cursor_aimed(match)
 	if w.free {
-		off := match.input.cursor - camera.view / 2
-		if abs(off.x) > 10 || abs(off.y) > 10 do camera.pos += off * (dt * sim.TICK_RATE / SPECTATOR_AIM_DIST)
+		// still with the cursor in the middle: 10 either way, wider with a wider view
+		ratio := camera.view.x / 640
+		middle := cursor.x > 310 * ratio && cursor.x < 330 * ratio && cursor.y > 230 && cursor.y < 250
+		if !middle do camera.pos += (cursor - camera.view / 2) / SPECTATOR_AIM_DIST
 		return
 	}
-	aim := match.game.world.soldiers[followed].aim.distance
-	draw.camera_follow(camera, match.frame.figures[followed].pos, cursor_shown(match), aim, dt)
+	soldier := &match.game.world.soldiers[followed]
+	draw.camera_follow(camera, soldier.body.pos, cursor, soldier.aim.distance)
 }
 
-// The cursor as drawn, which the camera leads toward: a demo's recorder's own while the
-// camera is on the recorder and no menu wants mine.
-cursor_shown :: proc(match: ^Match) -> [2]f32 {
-	w := &match.watch
-	if match.mode == .Demo && w.follow == nil && !w.free && !hud.menus_any_open(&match.hud.menus) {
-		return match.playback.tick.cursor
-	}
+// The cursor the camera leads toward: a demo's recorder's own while the camera is on the
+// recorder and no menu wants mine.
+cursor_aimed :: proc(match: ^Match) -> [2]f32 {
+	if recorders_cursor(match) do return match.playback.tick.cursor
 	return match.input.cursor
+}
+
+// The cursor as drawn: as cursor_aimed, but mine between the last tick's start and now.
+cursor_shown :: proc(match: ^Match) -> [2]f32 {
+	if recorders_cursor(match) do return match.playback.tick.cursor
+	return input.input_cursor_between(&match.input, match.frame.alpha)
+}
+
+@(private = "file")
+recorders_cursor :: proc(match: ^Match) -> bool {
+	w := &match.watch
+	return match.mode == .Demo && w.follow == nil && !w.free && !hud.menus_any_open(&match.hud.menus)
 }
 
 // The next player to watch, from the one watched: alive, no spectator, and a teammate

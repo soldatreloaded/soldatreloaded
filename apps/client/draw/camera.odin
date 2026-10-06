@@ -1,7 +1,5 @@
 package draw
 
-import "core:math"
-
 import rl "vendor:raylib"
 
 import sim "../../../core/game"
@@ -13,8 +11,11 @@ import sim "../../../core/game"
 VIEW_HEIGHT :: 480
 CAMERA_SPEED :: 0.14 // the share of the distance to the target closed per tick (CAMSPEED)
 
+// It moves once a tick, as the original's does, and is drawn `alpha` of the way from
+// where the tick before left it (CameraPrev; GameRendering.pas).
 Camera :: struct {
-	pos:  [2]f32, // the middle of the view
+	pos:  [2]f32, // the middle of the view, as the last tick left it
+	prev: [2]f32, // as the tick before left it
 	view: [2]f32, // the size of the view, in world units
 }
 
@@ -23,21 +24,29 @@ camera_fit :: proc(camera: ^Camera) {
 	camera.view = {VIEW_HEIGHT * f32(rl.GetScreenWidth()) / f32(rl.GetScreenHeight()), VIEW_HEIGHT}
 }
 
-// The camera chases `target` and leads toward the cursor (in view units) by
-// `aim_distance` (the followed soldier's: a scope shortens it, and the lead grows), as
-// the original does, over `dt` seconds so it feels the same at any frame rate.
-camera_follow :: proc(camera: ^Camera, target, cursor: [2]f32, aim_distance: f32, dt: f32) {
+// The camera put at `pos`, with nothing to come from.
+camera_place :: proc(camera: ^Camera, pos: [2]f32) {
+	camera.pos, camera.prev = pos, pos
+}
+
+// The camera as it is drawn, `alpha` of the way from the tick before's to the last's.
+camera_between :: proc(camera: Camera, alpha: f32) -> Camera {
+	shown := camera
+	shown.pos = camera.prev + (camera.pos - camera.prev) * alpha
+	return shown
+}
+
+// A tick's move (UpdateFrame.pas): the camera closes CAMERA_SPEED of the distance to
+// `target` and leads toward the cursor (in view units) by `aim_distance` (the followed
+// soldier's: a scope shortens it, and the lead grows), with the original's wide-screen
+// term, and its correction for a scoped aim distance on a wide view.
+camera_follow :: proc(camera: ^Camera, target, cursor: [2]f32, aim_distance: f32) {
 	aim_distance := aim_distance if aim_distance >= 1 else sim.DEFAULT_AIM_DISTANCE
-	half := camera.view / 2
-	offset := [2]f32{clamp(cursor.x - half.x, -half.x, half.x), clamp(cursor.y - half.y, -half.y, half.y)}
-	// UpdateFrame.pas: the lead is the offset over the aim distance, with the original's
-	// wide-screen term, and its correction for a scoped aim distance on a wide view
+	offset := cursor - camera.view / 2
 	width := camera.view.x
 	factor := (2 * 640 / width - 1) + (width - 640) / width * (sim.DEFAULT_AIM_DISTANCE - aim_distance) / 6.8
-	ticks := dt * sim.TICK_RATE
-	k := 1 - math.pow(1 - f32(CAMERA_SPEED), ticks)
-	camera.pos.x += (target.x - camera.pos.x) * k + offset.x / aim_distance * factor * ticks
-	camera.pos.y += (target.y - camera.pos.y) * k + offset.y / aim_distance * ticks
+	camera.pos.x += (target.x - camera.pos.x) * CAMERA_SPEED + offset.x / aim_distance * factor
+	camera.pos.y += (target.y - camera.pos.y) * CAMERA_SPEED + offset.y / aim_distance
 }
 
 // A point in the view, in view units from its top-left, in the world.
