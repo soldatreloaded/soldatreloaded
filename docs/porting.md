@@ -42,7 +42,7 @@ animations in the same order, closed up; `ref_probe` gives the C ids the port's 
 | `damage.c` | the decision in `referee.odin`; the effect (`soldier_hurt`, `soldier_kill`) in `soldier.odin` |
 | `spawn.c` | `spawn.odin` |
 | `rand.c` | `rng.odin` (done) |
-| `history.c` | `referee.odin` |
+| `history.c` | `history.odin` |
 | `game.c` (match) | `round.odin` |
 | `event.c`, the passes' mail | gone: see below |
 | `resources/*`, `utils/*` | `core/resources`, `core/utils` (done) |

@@ -288,7 +288,7 @@ thing_update :: proc(world: ^World, resources: ^Resources, id: Thing_Id, authori
 
 	if thing_out_of_bounds(world.polymap, thing) {
 		if thing_is_flag(thing.kind) || thing_is_kit(thing.kind) {
-			judge_thing_lost(world, resources, authority, id, out)
+			if authority != nil do rule(world, resources, Thing_Respawn{id}, out) // back at a spawn point of its kind
 		} else if thing.kind == .Weapon {
 			thing_kill(thing)
 			return

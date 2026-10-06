@@ -5,24 +5,6 @@ package game
 // random numbers a thing put back at a spawn point rolls keep their place in the tick.
 // Without authority each does nothing, and the rulings come from the server.
 
-// A gun out of a hand, laid down at the things' turn: the server's to make.
-judge_gun_drop :: proc(world: ^World, resources: ^Resources, authority: ^Authority, drop: Gun_Drop, out: ^Tick_Output) {
-	if authority == nil do return
-	rule(world, resources, drop, out)
-}
-
-// A thrown knife that landed, laid down at the things' turn: the server's to make.
-judge_knife_land :: proc(world: ^World, resources: ^Resources, authority: ^Authority, land: Knife_Land, out: ^Tick_Output) {
-	if authority == nil do return
-	rule(world, resources, land, out)
-}
-
-// The flag thrown, as its carrier asked: the server's to allow.
-judge_flag_throw :: proc(world: ^World, resources: ^Resources, authority: ^Authority, throw: Flag_Throw, out: ^Tick_Output) {
-	if authority == nil do return
-	rule(world, resources, throw, out)
-}
-
 // The soldier nearest a thing that would take it (thing_taker) touches a flag, or takes
 // a gun or a kit it has use for.
 judge_pickup :: proc(world: ^World, resources: ^Resources, authority: ^Authority, id: Thing_Id, out: ^Tick_Output) {
@@ -89,11 +71,5 @@ judge_flag_timeout :: proc(world: ^World, resources: ^Resources, authority: ^Aut
 	} else {
 		rule(world, resources, Flag_Return{flag = id}, out)
 	}
-}
-
-// A flag or a kit off the map is back at a spawn point of its kind.
-judge_thing_lost :: proc(world: ^World, resources: ^Resources, authority: ^Authority, id: Thing_Id, out: ^Tick_Output) {
-	if authority == nil do return
-	rule(world, resources, Thing_Respawn{id}, out)
 }
 

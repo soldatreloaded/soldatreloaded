@@ -2,8 +2,6 @@ package game
 
 import sa "core:container/small_array"
 
-import "../utils"
-
 // The referee: what only the machine with authority (the server) does. It judges the
 // events of a step into rulings and applies each at once, so a soldier killed by a
 // bullet is dead before the things move, as in Soldat.
@@ -11,17 +9,6 @@ import "../utils"
 // What the machine with authority has that others don't.
 Authority :: struct {
 	history: History,
-}
-
-HISTORY_TICKS :: 64
-
-// Where everyone was over the last second, so a shot is judged against the soldiers as
-// its shooter saw them.
-History :: struct {
-	soldiers: [HISTORY_TICKS][MAX_PLAYERS]Soldier, // by tick, round the ring
-	things:   [HISTORY_TICKS][MAX_THINGS]Thing,    // for the snapshots' deltas
-	newest:   u32,
-	count:    u32,
 }
 
 // Judges the events not yet judged, in the order they happened. A hit lands as the C
@@ -83,46 +70,10 @@ judge_respawn :: proc(world: ^World, resources: ^Resources, id: Soldier_Id, out:
 	rule(world, resources, respawn, out)
 }
 
-// The idle clock run out on a soldier with no antic: one of the four idle ones is picked,
-// and asked of its owner.
-judge_idle_antic :: proc(world: ^World, authority: ^Authority, id: Soldier_Id) {
-	if authority == nil do return
-	antics := &world.soldiers[id].antics
-	if antics.idle_time != 1 || antics.idle_antic >= 0 do return
-	antics.idle_time = 0
-	antics.idle_antic = i8(rng_below(&world.rng, 4))
-	antics.asked = antics.idle_antic
-	antics.asked_count += 1
-	antics.seen_count = antics.asked_count
-}
-
-// An exploding polygon goes off under the soldier: the map's own grenade.
-judge_exploding_polygon :: proc(world: ^World, resources: ^Resources, authority: ^Authority, id: Soldier_Id, origin: utils.Vec2, out: ^Tick_Output) {
-	if authority == nil do return
-	soldier_shoot(world, resources, id, .M79, origin, {}, resources.weapons[.M79].stats.damage, out)
-}
-
 // Records a ruling and carries it out.
 rule :: proc(world: ^World, resources: ^Resources, ruling: Ruling, out: ^Tick_Output) {
 	sa.push_back(&out.rulings, ruling)
 	apply_ruling(world, resources, ruling)
-}
-
-// The world as it stands, as the history's newest frame.
-history_record :: proc(history: ^History, world: ^World) {
-	frame := world.tick % HISTORY_TICKS
-	history.soldiers[frame] = world.soldiers
-	history.things[frame] = world.things
-	history.newest = world.tick
-	history.count = min(history.count + 1, HISTORY_TICKS)
-}
-
-// The soldiers as they were `ticks_ago`; nil if that is further back than is kept.
-history_soldiers :: proc(history: ^History, ticks_ago: u32) -> ^[MAX_PLAYERS]Soldier {
-	if ticks_ago >= history.count {
-		return nil
-	}
-	return &history.soldiers[(history.newest - ticks_ago) % HISTORY_TICKS]
 }
 
 // A hit lands (the C game's damage_apply): its shove and spray on every machine, then,
@@ -189,12 +140,4 @@ judge_hit :: proc(world: ^World, resources: ^Resources, hit: Hit, out: ^Tick_Out
 		airtime   = hit.airtime,
 		ricochets = hit.ricochets,
 	}, out)
-}
-
-// The soldiers and the things as they stood at the end of `tick`, if it is still kept.
-history_at :: proc(history: ^History, tick: u32) -> (soldiers: ^[MAX_PLAYERS]Soldier, things: ^[MAX_THINGS]Thing, ok: bool) {
-	if tick > history.newest || history.newest - tick >= history.count {
-		return
-	}
-	return &history.soldiers[tick % HISTORY_TICKS], &history.things[tick % HISTORY_TICKS], true
 }

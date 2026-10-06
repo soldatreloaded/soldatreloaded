@@ -41,14 +41,20 @@ soldier_antics :: proc(world: ^World, resources: ^Resources, id: Soldier_Id, aut
 	}
 
 	// the clock runs down while standing still, and on through an antic's longer wait; as
-	// it runs out the referee picks one of the four idle antics
+	// it runs out the server picks one of the four idle antics, and asks it of the owner
 	still := body.id == .Stand && legs.id == .Stand && !soldier.vitals.dead && antics.idle_time > 0
 	if still || antics.idle_time > DEFAULT_IDLE_TIME {
 		antics.idle_time -= 1
 	} else {
 		antics.idle_time = DEFAULT_IDLE_TIME
 	}
-	judge_idle_antic(world, authority, id)
+	if authority != nil && antics.idle_time == 1 && antics.idle_antic < 0 {
+		antics.idle_time = 0
+		antics.idle_antic = i8(rng_below(&world.rng, 4))
+		antics.asked = antics.idle_antic
+		antics.asked_count += 1
+		antics.seen_count = antics.asked_count
+	}
 
 	switch antics.idle_antic {
 	case ANTIC_TOBACCO: // a chew, and the spit when the clock next runs out

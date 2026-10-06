@@ -49,9 +49,10 @@ things_ask :: proc(world: ^World, request: Thing_Request) {
 things_take_requests :: proc(world: ^World, resources: ^Resources, authority: ^Authority, out: ^Tick_Output) {
 	for request in sa.slice(&world.things_asked) {
 		switch r in request {
-		case Gun_Drop:    judge_gun_drop(world, resources, authority, r, out)
-		case Knife_Land:  judge_knife_land(world, resources, authority, r, out)
-		case Flag_Throw:  judge_flag_throw(world, resources, authority, r, out)
+		// a gun or a knife laid down, a flag thrown: the server's to make
+		case Gun_Drop:    if authority != nil do rule(world, resources, r, out)
+		case Knife_Land:  if authority != nil do rule(world, resources, r, out)
+		case Flag_Throw:  if authority != nil do rule(world, resources, r, out)
 		case Thing_Knock: thing_knock(&world.things[r.thing], r.point, r.velocity, r.push)
 		case Let_Go:      things_let_go(world, r.soldier, out)
 		case Placed:      things_on_respawn(world, resources, r.soldier)

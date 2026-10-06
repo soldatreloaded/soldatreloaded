@@ -288,7 +288,8 @@ soldier_touch_polygon :: proc(
 		if !soldier.vitals.dead {
 			origin := pos - {0, 3}
 			emit(out, Polygon_Effect{id, type, origin, false})
-			judge_exploding_polygon(world, resources, authority, id, origin, out)
+			// the map's own grenade, the server's to fire
+			if authority != nil do soldier_shoot(world, resources, id, .M79, origin, {}, resources.weapons[.M79].stats.damage, out)
 			self_hit(soldier, id, 4000.0, out)
 		}
 	case .Hurts_Flaggers:
