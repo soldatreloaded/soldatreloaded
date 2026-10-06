@@ -52,8 +52,8 @@ Hud_Data :: struct {
 
 	// the settings
 	minimap:      bool,
-	info:         bool, // the FPS line
-	player_names: bool, // and my ping
+	stats:        Stats, // which of the frame rate and the line's numbers stack in the top right
+	player_names: bool,
 	team_names:   bool, // teammates' names by them always, not only out of view
 	typing:       res.Typing_Style, // over a player typing
 	kill_log:     res.Kill_Log_Position,

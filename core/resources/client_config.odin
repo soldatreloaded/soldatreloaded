@@ -109,8 +109,11 @@ Window_Mode :: enum {
 
 Interface_Settings :: struct {
 	minimap:           bool,              // the minimap
-	info:              bool,              // the FPS and ping line
-	player_names:      bool,              // teammates' names at the screen's edge when out of view (everyone's, spectating), and your ping
+	show_fps:          bool,              // the frame rate, in the top right
+	show_ping:         bool,              // your ping, under it
+	show_loss:         bool,              // the share of the server's snapshots lost over the last second
+	show_jitter:       bool,              // how much the round trip varies
+	player_names:      bool,              // teammates' names at the screen's edge when out of view (everyone's, spectating)
 	team_names:        bool,              // teammates' names by them always, not only at the screen's edge when out of view (with player_names)
 	typing:            Typing_Style,      // over a player typing: off, dots (the original's) or typing, the word
 	kill_log_length:   i32,               // the kill log's lines, two a kill, 0 to 50; 0 shows none
@@ -217,6 +220,7 @@ DEFAULT_CLIENT_CONFIG := Client_Config {
 		track_shot        = true,
 	},
 	interface = {
+		show_ping       = true,
 		player_names    = true,
 		typing          = .Dots,
 		kill_log_length = 15,

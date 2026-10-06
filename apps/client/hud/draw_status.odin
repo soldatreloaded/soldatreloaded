@@ -7,25 +7,49 @@ import rl "vendor:raylib"
 
 import "../ui"
 
-// What the HUD says of where I stand beyond the game: my ping in the corner, greener the
-// lower (where the original has its ping dot); whom the camera follows while I watch;
-// the demo being recorded, blinking, and the one playing, how far through it is.
+// What the HUD says of where I stand beyond the game: the frame rate and the line's
+// numbers stacked in the top-right corner, each as the settings show it, with the demo
+// being recorded blinking over them; whom the camera follows while I watch; and the
+// demo playing, how far through it is.
 
-// My ping on the line, in the original's colours for it.
-draw_ping :: proc(u: ^ui.Ui, data: ^Hud_Data) {
-	ping := data.players[data.me].ping
-	color: rl.Color
-	switch {
-	case ping <= 50:  color = {0x00, 0xFF, 0x00, 230}
-	case ping <= 100: color = {0x22, 0xFF, 0x00, 230}
-	case ping <= 150: color = {0x54, 0xC7, 0x00, 230}
-	case ping <= 200: color = {0x76, 0xA7, 0x00, 230}
-	case ping <= 250: color = {0x93, 0x88, 0x00, 230}
-	case ping <= 300: color = {0xA1, 0x77, 0x00, 230}
-	case ping <= 350: color = {0xCC, 0x48, 0x00, 230}
-	case:             color = {0xFF, 0x00, 0x00, 230}
+// Each as it is set to show; off a server the line's read 0.
+Stat :: enum {
+	FPS,
+	Ping,
+	Loss,
+	Jitter,
+}
+
+Stats :: bit_set[Stat]
+
+STATS_EDGE :: 4 // from the view's top and right
+STATS_FONT :: SMALLEST_FONT
+STATS_ROW :: 11
+@(private = "file") STATS_COLOR :: rl.Color{239, 170, 200, 255}
+
+// The corner's lines, top down: REC while a demo is recorded, then each stat shown.
+draw_readouts :: proc(u: ^ui.Ui, data: ^Hud_Data) {
+	y: f32 = STATS_EDGE
+	if data.recording {
+		blink := u8(abs(math.sin(5.1 * data.seconds / 2)) * 255)
+		readout(u, "REC", &y, {195, 0, 0, blink})
 	}
-	write(u, fmt.tprintf("%d ms", ping), {600 * wide(u), 18}, SMALL_FONT, color)
+	shown := data.stats
+	if .FPS in shown do readout(u, fmt.tprintf("FPS: %d", data.fps), &y, STATS_COLOR)
+	if .Ping in shown do readout(u, fmt.tprintf("Ping: %d ms", data.players[data.me].ping), &y, STATS_COLOR)
+	if .Loss in shown do readout(u, fmt.tprintf("Loss: %d%%", data.loss), &y, STATS_COLOR)
+	if .Jitter in shown do readout(u, fmt.tprintf("Jitter: %d ms", data.jitter), &y, STATS_COLOR)
+}
+
+// Where the corner's lines end, for what is drawn under them.
+readouts_bottom :: proc(data: ^Hud_Data) -> f32 {
+	return STATS_EDGE + f32(card(data.stats) + int(data.recording)) * STATS_ROW
+}
+
+@(private = "file")
+readout :: proc(u: ^ui.Ui, text: string, y: ^f32, color: rl.Color) {
+	write(u, text, {u.width - STATS_EDGE - text_width(u, text, STATS_FONT), y^}, STATS_FONT, color)
+	y^ += STATS_ROW
 }
 
 // Watching: the free camera, or the player followed, redder while they are dead.
@@ -43,13 +67,9 @@ draw_watching :: proc(u: ^ui.Ui, data: ^Hud_Data) {
 	write(u, text, {(u.width - text_width(u, text, SMALL_FONT)) / 2, 430}, SMALL_FONT, color)
 }
 
-// A demo being recorded: REC, blinking. One playing: how far through it is, where the
-// original puts it, and whether it is held or hurried.
+// A demo playing: how far through it is, where the original puts it, and whether it is
+// held or hurried.
 draw_demo_marks :: proc(u: ^ui.Ui, data: ^Hud_Data) {
-	if data.recording {
-		blink := u8(abs(math.sin(5.1 * data.seconds / 2)) * 255)
-		write(u, "REC", {612 * wide(u), 1}, SMALL_FONT, {195, 0, 0, blink})
-	}
 	demo, playing := data.demo.?
 	if !playing do return
 	pace := ""

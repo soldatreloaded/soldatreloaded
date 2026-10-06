@@ -12,7 +12,7 @@ import "../ui"
 
 // What the feed says (feed.odin), and the HUD's other words: the big message, the kill
 // feed down the right (or left) with its weapons' icons, the console in the corner, the respawn
-// count, the FPS line and my last kill's shot. The original's RenderInterface's texts.
+// count and my last kill's shot. The original's RenderInterface's texts.
 
 KILL_FEED_LEFT_TEXT :: 45 // a line's start, the kill feed on the left: past the icon
 KILL_ROW :: 10 // font_weaponmenusize and its gap
@@ -46,22 +46,30 @@ KILL_FEED_TOP := [res.Kill_Log_Position]f32 {
 	.Top_Left    = 110,
 }
 
-// The kill feed's weapon icons, beside its lines.
-draw_kill_icons :: proc(u: ^ui.Ui, art: ^Art, feed: ^Feed, place: res.Kill_Log_Position, dim: bool) {
+// Where the kill feed begins: its place's top, or at the top on the right below the
+// corner's stats, where they reach down past it.
+kill_feed_top :: proc(data: ^Hud_Data) -> f32 {
+	top := KILL_FEED_TOP[data.kill_log]
+	if data.kill_log == .Top_Right do top = max(top, readouts_bottom(data) + 2)
+	return top
+}
+
+// The kill feed's weapon icons, beside its lines, from `top`.
+draw_kill_icons :: proc(u: ^ui.Ui, art: ^Art, feed: ^Feed, place: res.Kill_Log_Position, top: f32, dim: bool) {
 	alpha: u8 = 50 if dim && narrow(u) else 255
 	gap: f32 = 0
 	x := 5 if place == .Top_Left else 605 * wide(u)
 	for &kill, row in sa.slice(&feed.kills) {
 		if !kill.icon do continue
 		gap += KILL_GAP
-		at := [2]f32{x, f32(row * KILL_ROW) + KILL_FEED_TOP[place] - 1 + gap}
+		at := [2]f32{x, f32(row * KILL_ROW) + top - 1 + gap}
 		picture(u, art.guns[kill.weapon], at, {255, 255, 255, alpha}, {0.8, 0.8})
 	}
 }
 
 // Its lines, right-aligned (or from the left, past the icons), smaller when long; on a
 // narrow window, faint behind the scoreboard and fainter while a line is typed.
-draw_kill_feed :: proc(u: ^ui.Ui, feed: ^Feed, place: res.Kill_Log_Position, dim, typing: bool) {
+draw_kill_feed :: proc(u: ^ui.Ui, feed: ^Feed, place: res.Kill_Log_Position, top: f32, dim, typing: bool) {
 	alpha := 245
 	if narrow(u) && dim do alpha = 80
 	else if narrow(u) && typing do alpha = 180
@@ -71,7 +79,7 @@ draw_kill_feed :: proc(u: ^ui.Ui, feed: ^Feed, place: res.Kill_Log_Position, dim
 		if kill.icon do gap += KILL_GAP
 		font := SMALLEST_FONT if len(text) > 14 else WEAPONS_FONT
 		x := KILL_FEED_LEFT_TEXT if place == .Top_Left else 595 * wide(u) - text_width(u, text, font)
-		at := [2]f32{x, KILL_FEED_TOP[place] + f32(row * KILL_ROW) + gap}
+		at := [2]f32{x, top + f32(row * KILL_ROW) + gap}
 		write(u, text, at, font, with_alpha(kill.color, alpha))
 	}
 }
@@ -104,18 +112,6 @@ draw_respawn :: proc(u: ^ui.Ui, art: ^Art, mine: ^Mine) {
 	if mine.respawn > 0 {
 		write(u, fmt.tprintf("Respawn in... %.1f", f32(mine.respawn) / 60), {200 * wide(u), 4}, MENU_FONT, {255, 65, 55, 255})
 	}
-}
-
-// The FPS line (ui_info), and my ping; online, under it, how the line has been over the
-// last second.
-draw_info :: proc(u: ^ui.Ui, data: ^Hud_Data) {
-	color := rl.Color{239, 170, 200, 255}
-	write(u, fmt.tprintf("FPS: %d", data.fps), {460 * wide(u), 10}, SMALL_FONT, color)
-	write(u, fmt.tprintf("Ping: %d", data.players[data.me].ping), {550 * wide(u), 10}, SMALL_FONT, color)
-	if !data.online do return
-	line := fmt.tprintf("Loss: %d%%  Jitter: %d", data.loss, data.jitter)
-	x := min(550 * wide(u), u.width - text_width(u, line, SMALL_FONT) - 4)
-	write(u, line, {x, 26}, SMALL_FONT, {255, 90, 70, 255} if data.loss >= 5 else color)
 }
 
 // My last kill's shot: how far, how long in the air, how many ricochets; pulsing.

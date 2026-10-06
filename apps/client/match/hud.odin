@@ -128,7 +128,10 @@ hud_data :: proc(match: ^Match, config: ^res.Client_Config) -> (data: hud.Hud_Da
 	interface := &config.interface
 	graphics := &config.graphics
 	data.minimap = interface.minimap
-	data.info = interface.info
+	if interface.show_fps do data.stats += {.FPS}
+	if interface.show_ping do data.stats += {.Ping}
+	if interface.show_loss do data.stats += {.Loss}
+	if interface.show_jitter do data.stats += {.Jitter}
 	data.player_names = interface.player_names
 	data.team_names = interface.team_names
 	data.typing = interface.typing

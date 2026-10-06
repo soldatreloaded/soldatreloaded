@@ -139,8 +139,12 @@ toggle :: proc(match: ^Match, name: string) {
 	config := match.config
 	setting: ^bool
 	switch name {
+	case "ui_info": // the frame rate and the line's numbers, all on, or all off once they are
+		i := &config.interface
+		on := !(i.show_fps && i.show_ping && i.show_loss && i.show_jitter)
+		i.show_fps, i.show_ping, i.show_loss, i.show_jitter = on, on, on, on
+		return
 	case "ui_minimap":     setting = &config.interface.minimap
-	case "ui_info":        setting = &config.interface.info
 	case "ui_playernames": setting = &config.interface.player_names
 	case "r_swapeffect":   setting = &config.graphics.vsync
 	case:

@@ -89,7 +89,7 @@ hud_draw :: proc(u: ^ui.Ui, hud: ^Hud, data: ^Hud_Data, minimap: ^draw.Minimap) 
 		if !menus_any_open(menus) && !mine.dead do draw_crosshair(u, art, data)
 		draw_my_arrow(u, art, data)
 	}
-	draw_kill_icons(u, art, feed, data.kill_log, hud.scoreboard)
+	draw_kill_icons(u, art, feed, data.kill_log, kill_feed_top(data), hud.scoreboard)
 	if data.minimap do draw_minimap(u, art, minimap, data)
 	board_bottom: f32
 	if hud.scoreboard do board_bottom = draw_scoreboard_box(u, art, data)
@@ -108,15 +108,14 @@ hud_draw :: proc(u: ^ui.Ui, hud: ^Hud, data: ^Hud_Data, minimap: ^draw.Minimap) 
 	draw_vote(u, data)
 	if data.radio.open && !escape do draw_radio(u, art, data, hud.scoreboard || hud.stats)
 	draw_prompt(u, data)
-	draw_kill_feed(u, feed, data.kill_log, hud.scoreboard, typing)
+	draw_kill_feed(u, feed, data.kill_log, kill_feed_top(data), hud.scoreboard, typing)
 	if me.active {
 		draw_said(u, data)
 		if data.player_names do draw_names(u, data)
 	}
 	if !mine.dead && !team && !escape do draw_under_cursor(u, data)
 	draw_watching(u, data)
-	if data.info do draw_info(u, data)
-	if data.player_names && data.online && !data.info do draw_ping(u, data) // the FPS line says it already
+	draw_readouts(u, data)
 	draw_demo_marks(u, data)
 	draw_shot(u, feed, data.seconds)
 
