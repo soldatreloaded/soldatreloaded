@@ -74,7 +74,7 @@ admin_command :: proc(sv: ^Server, from: Maybe(game.Soldier_Id), text: string) -
 	case "unban": // by address, hardware ID, or the name the ban was given
 		arg, _ := next_word(rest)
 		host, hwid, named := whom_named(arg, sa.slice(&sv.lists.bans))
-		if named && lists.lists_unban(&sv.lists, host, hwid) {
+		if named && lists.lists_unban(&sv.lists, host, utils.short_string_text(&hwid)) {
 			reply(sv, from, fmt.tprintf("%s unbanned.", arg))
 		} else {
 			reply(sv, from, fmt.tprintf("%s isn't banned.", arg))
@@ -93,14 +93,15 @@ admin_command :: proc(sv: ^Server, from: Maybe(game.Soldier_Id), text: string) -
 	case "unmute": // a player on, or by address, hardware ID or name
 		arg, _ := next_word(rest)
 		host: u32
-		hwid: string
+		id: lists.Hwid // what hwid is the text of, kept while it is used
 		slot, found := player_named(sv, arg)
 		named := found && sv.players[slot].peer != nil
 		if named {
-			host, hwid = net.peer_address(sv.players[slot].peer), utils.short_string_text(&sv.players[slot].hwid)
+			host, id = net.peer_address(sv.players[slot].peer), sv.players[slot].hwid
 		} else {
-			host, hwid, named = whom_named(arg, sa.slice(&sv.lists.mutes))
+			host, id, named = whom_named(arg, sa.slice(&sv.lists.mutes))
 		}
+		hwid := utils.short_string_text(&id)
 		if named && lists.lists_unmute(&sv.lists, host, hwid) {
 			set_muted(sv, host, hwid, false)
 			if found && sv.players[slot].peer != nil do tell(sv, slot, "You have been unmuted.")
@@ -161,6 +162,7 @@ ban :: proc(sv: ^Server, from: Maybe(game.Soldier_Id), by, word, rest: string) {
 	arg, after := next_word(rest)
 	host: u32
 	hwid, name: string
+	parsed: lists.Hwid // banhw's, which hwid is the text of: kept past the switch
 	switch word {
 	case "ban":
 		slot, found := person_named(sv, from, arg)
@@ -174,8 +176,8 @@ ban :: proc(sv: ^Server, from: Maybe(game.Soldier_Id), by, word, rest: string) {
 			return
 		}
 	case "banhw":
-		parsed, ok := lists.hwid_parse(arg)
-		if !ok {
+		ok: bool
+		if parsed, ok = lists.hwid_parse(arg); !ok {
 			reply(sv, from, fmt.tprintf("%s is not a hardware ID (eleven hex digits).", arg))
 			return
 		}
@@ -241,16 +243,18 @@ set_muted :: proc(sv: ^Server, host: u32, hwid: string, muted: bool) {
 }
 
 // Whom a command's word names, for unban and unmute: an address, a hardware ID, or the
-// name an entry of `entries` was given.
+// name an entry of `entries` was given. The hardware ID comes back whole, for the caller
+// to keep while it uses its text: text of a local here would outlive this procedure's
+// frame, and text of an entry would shift under the unban that takes the entry out.
 @(private = "file")
-whom_named :: proc(word: string, entries: []$E) -> (host: u32, hwid: string, ok: bool) {
+whom_named :: proc(word: string, entries: []$E) -> (host: u32, hwid: lists.Hwid, ok: bool) {
 	if host, ok = lists.address_parse(word); ok do return
-	if parsed, is_hwid := lists.hwid_parse(word); is_hwid do return 0, utils.short_string_text(&parsed), true
+	if hwid, ok = lists.hwid_parse(word); ok do return
 	for &entry in entries {
 		if utils.short_string_text(&entry.name) != word do continue
-		return entry.host, utils.short_string_text(&entry.hwid), true
+		return entry.host, entry.hwid, true
 	}
-	return 0, "", false
+	return 0, {}, false
 }
 
 // The player a command names, a person on the line and not a bot; said, otherwise.

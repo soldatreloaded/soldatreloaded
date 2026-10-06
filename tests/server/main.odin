@@ -15,6 +15,7 @@ import net "../../core/network"
 import res "../../core/resources"
 import "../../core/utils"
 import "../../apps/server"
+import "../../apps/server/lists"
 
 import enet "vendor:ENet"
 
@@ -329,4 +330,36 @@ query :: proc(t: ^testing.T) {
 		time.sleep(10 * time.Millisecond)
 	}
 	testing.expect(t, got, "the query was answered")
+}
+
+// The console's bans and mutes by hardware ID, and an unban by the name a ban was given:
+// what the command takes from the word must still be there when the lists are asked.
+@(test)
+hardware_ids :: proc(t: ^testing.T) {
+	testing.expect(t, net.net_init())
+	defer net.net_shutdown()
+	sv := new(server.Server)
+	defer free(sv)
+	config: res.Server_Config
+	testing.expect(t, open_server(sv, &config))
+	defer server.server_destroy(sv)
+	now := time.to_unix_seconds(time.now())
+
+	testing.expect(t, server.admin_command(sv, nil, "banhw 0a1b2c3d4e5 Cheating"))
+	_, banned := lists.lists_banned(&sv.lists, 0, "0A1B2C3D4E5", now)
+	testing.expect(t, banned, "banhw bans the machine")
+	testing.expect(t, server.admin_command(sv, nil, "unban 0A1B2C3D4E5"))
+	_, banned = lists.lists_banned(&sv.lists, 0, "0A1B2C3D4E5", now)
+	testing.expect(t, !banned, "unban by the hardware ID lifts it")
+
+	lists.lists_ban(&sv.lists, 0, "AAAAAAAAAAA", 0, "Machine", "Cheating")
+	lists.lists_ban(&sv.lists, 0, "BBBBBBBBBBB", 0, "Other", "Cheating")
+	testing.expect(t, server.admin_command(sv, nil, "unban Machine"))
+	_, banned = lists.lists_banned(&sv.lists, 0, "AAAAAAAAAAA", now)
+	_, other := lists.lists_banned(&sv.lists, 0, "BBBBBBBBBBB", now)
+	testing.expect(t, !banned && other, "unban by name lifts that ban, and no other")
+
+	lists.lists_mute(&sv.lists, 0, "CCCCCCCCCCC", "Loud")
+	testing.expect(t, server.admin_command(sv, nil, "unmute ccccccccccc"))
+	testing.expect(t, !lists.lists_muted(&sv.lists, 0, "CCCCCCCCCCC"), "unmute by the hardware ID lifts it")
 }
