@@ -36,6 +36,7 @@ page_player :: proc(menu: ^Menu) {
 	x, w := k.x, k.w
 	pw := clamp(w * 0.34, 150, 220)
 	k.w = w - pw - 20
+	menu.bar_x = x + k.w + (20 - ui.SCROLL_W) / 2 // in the gap between the rows and the stand, so it scrolls the rows it is beside
 
 	ui.section(k, "IDENTITY")
 	ui.text_row(k, "Name", &player.name, NAME_MAX, "Major", config_allocator(menu))

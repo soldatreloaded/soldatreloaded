@@ -69,6 +69,7 @@ Menu :: struct {
 	request:      Request, // what the last pass asked of the client
 	art:          hud.Art, // the pointer
 	preview:      draw.Preview,
+	bar_x:        Maybe(f32), // where this pass's page wants its scrollbar; nil for the right of its column
 	weapon_names: [res.Weapon]string,
 	servers:      Servers,
 	join:         Join,
@@ -170,6 +171,7 @@ menu_draw :: proc(menu: ^Menu, u: ^ui.Ui) {
 	ui.rule(u, x, x + w, PANEL_BOTTOM - FOOTER_H, ui.LINE) // the footer's
 
 	ui.kit_column(k, x, w, BODY_TOP, BODY_BOTTOM)
+	menu.bar_x = nil
 	switch menu.page {
 	case .Servers:  page_servers(menu)
 	case .Join:     page_join(menu)
@@ -185,7 +187,7 @@ menu_draw :: proc(menu: ^Menu, u: ^ui.Ui) {
 	if note := PAGE_NOTES[menu.page]; note != "" do footer_text(menu, x, w, note, ui.MUTED) // a settings page: where its changes go
 
 	if ui.kit_page_keys(k) do menu.side = int(menu.page) // up from the page's first widget: back out to the rail
-	ui.kit_page_scroll(k, {PANEL_X, BODY_TOP, panel_w, BODY_BOTTOM - BODY_TOP}, x + w + 8)
+	ui.kit_page_scroll(k, {PANEL_X, BODY_TOP, panel_w, BODY_BOTTOM - BODY_TOP}, menu.bar_x.? or_else x + w + 8)
 	ui.popup_draw(k)
 	ui.kit_end(k)
 
