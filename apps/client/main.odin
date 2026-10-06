@@ -296,10 +296,11 @@ tick_fraction :: proc(client: ^Client) -> f32 {
 
 // The window's settings as they were last applied.
 Window :: struct {
-	mode:   res.Window_Mode,
-	size:   [2]i32, // windowed
-	vsync:  bool,
-	fps:    i32, // the frames a second at most; 0 for no limit
+	mode:    res.Window_Mode,
+	size:    [2]i32, // windowed
+	vsync:   bool,
+	fps:     i32,  // the frames a second at most; 0 for no limit
+	focused: bool, // it had the keys last frame
 }
 
 // The window as the config has it: its size and mode, and how fast it is drawn.
@@ -323,13 +324,24 @@ window_open :: proc(window: ^Window, graphics: ^res.Graphics_Settings) {
 // The window changed to what the config has now, where it differs from what was made:
 // the mode, the size while windowed, vsync and the frame rate's limit, as the C client
 // applies them, at once.
+//
+// On Windows, GLFW holds a fullscreen window on top of every other, and raylib turns off
+// the minimizing that would get it out of the way: Alt+Tab gave another window the
+// keys, but left it hidden behind the game. So a fullscreen window that loses the keys
+// is minimized here, as GLFW would have done (its display's mode restored with it), and
+// comes back fullscreen from the taskbar. raylib's borderless is GLFW's fullscreen too,
+// at the display's own mode, so borderless is made here instead (window_borderless).
 window_follow :: proc(window: ^Window, graphics: ^res.Graphics_Settings) {
+	focused := rl.IsWindowFocused()
+	if window.mode == .Fullscreen && window.focused && !focused do rl.MinimizeWindow()
+	window.focused = focused
+
 	size := [2]i32{graphics.screen_width, graphics.screen_height}
 	if graphics.window_mode != window.mode {
 		switch window.mode { // out of the one it was in
 		case .Windowed:
 		case .Fullscreen: rl.ToggleFullscreen()
-		case .Borderless: rl.ToggleBorderlessWindowed()
+		case .Borderless: rl.ClearWindowState({.WINDOW_UNDECORATED})
 		}
 		switch graphics.window_mode { // into the one asked for
 		case .Windowed:
@@ -339,7 +351,7 @@ window_follow :: proc(window: ^Window, graphics: ^res.Graphics_Settings) {
 			rl.SetWindowSize(rl.GetMonitorWidth(monitor), rl.GetMonitorHeight(monitor))
 			rl.ToggleFullscreen()
 		case .Borderless:
-			rl.ToggleBorderlessWindowed()
+			window_borderless()
 		}
 		window.mode = graphics.window_mode
 		window.size = size
@@ -364,6 +376,16 @@ window_size :: proc(size: [2]i32) {
 	rl.SetWindowSize(size.x, size.y)
 	monitor := rl.GetCurrentMonitor()
 	rl.SetWindowPosition((rl.GetMonitorWidth(monitor) - size.x) / 2, (rl.GetMonitorHeight(monitor) - size.y) / 2)
+}
+
+// Borderless: an ordinary window, undecorated and over the whole of its display, so it
+// goes behind another as any window does.
+window_borderless :: proc() {
+	monitor := rl.GetCurrentMonitor()
+	at := rl.GetMonitorPosition(monitor)
+	rl.SetWindowState({.WINDOW_UNDECORATED})
+	rl.SetWindowPosition(i32(at.x), i32(at.y))
+	rl.SetWindowSize(rl.GetMonitorWidth(monitor), rl.GetMonitorHeight(monitor))
 }
 
 // The system cursor as `screen` wants it. The menu draws its own pointer where the
