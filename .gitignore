@@ -4,3 +4,6 @@ assets/*.exe
 assets/*.config.json
 assets/data/downloads/
 assets/demos/
+assets/screenshots
+assets/mods/*
+!assets/mods/classic/

@@ -82,7 +82,7 @@ runs:
         cp -r assets/data "$stage/"
         if [ "$APP" = client ]; then
           mkdir -p "$stage/mods"
-          cp -r assets/mods/default "$stage/mods/"
+          cp -r assets/mods/classic "$stage/mods/" # the game's own look and sound; a player's mods sit beside it
         else
           cp -r assets/scripts "$stage/"
         fi

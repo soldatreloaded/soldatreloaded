@@ -108,8 +108,8 @@ always at the same addresses
 
 | File | Holds |
 |---|---|
-| `soldatreloaded-windows.zip` | `soldatreloaded.exe`, `soldatreloaded-launcher.exe`, `data/`, `mods/default/`, `manifest.json` |
-| `soldatreloaded-linux.zip` | `soldatreloaded`, `soldatreloaded-launcher`, `data/`, `mods/default/`, `manifest.json` |
+| `soldatreloaded-windows.zip` | `soldatreloaded.exe`, `soldatreloaded-launcher.exe`, `data/`, `mods/classic/`, `manifest.json` |
+| `soldatreloaded-linux.zip` | `soldatreloaded`, `soldatreloaded-launcher`, `data/`, `mods/classic/`, `manifest.json` |
 | `manifest.windows.json`, `manifest.linux.json` | every file of the game's install on that platform (below) |
 | `soldatreloaded-server.zip` | `soldatreloaded-server`, `data/`, `scripts/`, for Linux |
 
@@ -156,8 +156,8 @@ newest release's manifest for its platform, the files on disk, and the install's
 `manifest.json`. A file the newest release lists that is missing or differs on disk is
 brought out of that release's zip; a file the install's manifest lists that the newest
 doesn't was dropped, and is deleted. So an update brings what changed and repairs what
-is damaged. What no manifest lists is the player's and never touched: the configs, any
-mod beside `mods/default/`, and demos.
+is damaged. What no manifest lists is the player's and never touched: the configs, a
+player's own mods beside `mods/classic/`, and demos.
 
 The launcher follows GitHub's latest release, the newest that is published and not a
 pre-release, by its fixed addresses: it asks GitHub's API nothing.

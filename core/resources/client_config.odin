@@ -79,7 +79,7 @@ Control_Settings :: struct {
 }
 
 Graphics_Settings :: struct {
-	mod:               string,            // the mod in mods/ the game looks and sounds like, over mods/default/; empty for none. Chosen on the Mods page, which uses it at once.
+	mod:               string,            // the mod the game looks and sounds like, over Classic (mods/classic/): one of mods/; empty for Classic alone. Chosen on the Mods page, which uses it at once.
 	screen_width:      i32,               // the window's width
 	screen_height:     i32,               // the window's height
 	window_mode:       Window_Mode,       // windowed, fullscreen or borderless

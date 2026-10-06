@@ -8,7 +8,7 @@ is in [LICENSE.txt](LICENSE.txt).
 - **Source:** <https://github.com/opensoldat/base>
 - **Licence:** CC BY 4.0, <https://creativecommons.org/licenses/by/4.0/>
 - **Modifications:** the files were reorganised: what the game plays by is here, in
-  `data/`, and what it looks and sounds like is in `mods/default/`, which has its own
+  `data/`, and what it looks and sounds like is in `mods/classic/`, which has its own
   notice. Upstream keeps them under `shared/`, `client/` and `server/configs/`. The bot
   personalities were rewritten from their `.bot` (INI) files as JSON (`bots/*.json`),
   each with the same name, look, weapons, skill and lines.

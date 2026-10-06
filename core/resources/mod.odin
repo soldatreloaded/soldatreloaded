@@ -7,25 +7,27 @@ import "core:strings"
 
 import "../utils"
 
-// What the game looks and sounds like: mods/default/, the game's own, and over it the
-// one mod a player picks (graphics.mod), mods/<name>/. A mod holds only what it
-// changes: each file is looked for in the mod first, then in the default, so a mod may
-// be a single sound. What the game plays by (the maps, animations, skeletons) is not a
-// mod's but data/'s, the same for everyone in a game.
+// What the game looks and sounds like: mods/classic/, the game's own, which ships with it,
+// and the players' mods, each in mods/<name>/. Classic is under every other: a player
+// picks one mod (graphics.mod), and each file is looked for in it first, then in
+// Classic, so a mod holds only what it changes; a mod may be a single sound. Classic is
+// the release's, kept and updated by the launcher; the players' are theirs, and never
+// touched by an update. What the game plays by (the maps, animations, skeletons) is not
+// a mod's but data/'s, the same for everyone in a game.
 
-MOD_DEFAULT :: "default"
+MOD_CLASSIC :: "classic"
 MODS_DIR :: "mods" // where the mods are, from the client's working directory
 
 Mod :: struct {
-	dir:      string, // mods/<name>; empty for the default alone
-	fallback: string, // mods/default
+	dir:      string, // the mod's folder; empty for Classic alone
+	fallback: string, // Classic's
 }
 
-// The mod `name` over the default, both under `mods_dir`; an empty name, or "default",
-// for the default alone.
+// The mod `name` over Classic, both under `mods_dir`. An empty name, Classic's, or the
+// "default" that named it before, for Classic alone.
 mod_make :: proc(mods_dir, name: string, allocator := context.allocator) -> (mod: Mod) {
-	mod.fallback = strings.join({mods_dir, MOD_DEFAULT}, "/", allocator)
-	if name != "" && name != MOD_DEFAULT {
+	mod.fallback = strings.join({mods_dir, MOD_CLASSIC}, "/", allocator)
+	if name != "" && !mod_builtin(name) && !strings.equal_fold(name, "default") {
 		mod.dir = strings.join({mods_dir, name}, "/", allocator)
 	}
 	return
@@ -39,25 +41,53 @@ mod_destroy :: proc(mod: ^Mod, allocator := context.allocator) {
 
 MOD_NAME_MAX :: 32
 
-// The mods under `mods_dir`, by their folders' names: the default first, the rest
-// sorted. Free with mods_list_destroy.
-mods_list :: proc(mods_dir: string, allocator := context.allocator) -> []string {
-	names := make([dynamic]string, allocator)
-	append(&names, strings.clone(MOD_DEFAULT, allocator))
-	entries, err := os.read_all_directory_by_path(mods_dir, context.temp_allocator)
-	if err == nil {
-		for entry in entries {
-			if entry.type != .Directory || strings.equal_fold(entry.name, MOD_DEFAULT) do continue
-			append(&names, strings.clone(entry.name, allocator))
-		}
+// A mod as the Mods page lists it.
+Mod_Listing :: struct {
+	name:    string,
+	builtin: bool, // Classic: the game's, not to be deleted, and kept by the launcher
+}
+
+// The mods under `mods_dir`: Classic first, then the players', sorted by name. Free with
+// mods_list_destroy.
+mods_list :: proc(mods_dir: string, allocator := context.allocator) -> []Mod_Listing {
+	listings := make([dynamic]Mod_Listing, allocator)
+	append(&listings, Mod_Listing{strings.clone(MOD_CLASSIC, allocator), true})
+	for name in folders(mods_dir) {
+		if mod_builtin(name) || reserved(name) do continue
+		append(&listings, Mod_Listing{strings.clone(name, allocator), false})
 	}
-	slice.sort(names[1:])
+	return listings[:]
+}
+
+mods_list_destroy :: proc(listings: []Mod_Listing, allocator := context.allocator) {
+	for listing in listings do delete(listing.name, allocator)
+	delete(listings, allocator)
+}
+
+// The folders in `dir`, sorted; with the temp allocator.
+@(private = "file")
+folders :: proc(dir: string) -> []string {
+	entries, err := os.read_all_directory_by_path(dir, context.temp_allocator)
+	if err != nil do return nil
+	names := make([dynamic]string, context.temp_allocator)
+	for entry in entries {
+		if entry.type == .Directory do append(&names, entry.name)
+	}
+	slice.sort(names[:])
 	return names[:]
 }
 
-mods_list_destroy :: proc(names: []string, allocator := context.allocator) {
-	for name in names do delete(name, allocator)
-	delete(names, allocator)
+// A name no player's mod may have besides Classic's: the old default's, which an install
+// updated from before may still hold until the launcher clears it.
+@(private = "file")
+reserved :: proc(name: string) -> bool {
+	return strings.equal_fold(name, "default")
+}
+
+// Whether the mod `name` is the one the game ships, Classic, in any case: so no player's
+// mod takes its name, even where the files' names are told apart by it.
+mod_builtin :: proc(name: string) -> bool {
+	return strings.equal_fold(name, MOD_CLASSIC)
 }
 
 // Why `name` can't be a new mod's folder under `mods_dir`; empty if it can.
@@ -75,29 +105,31 @@ mod_name_problem :: proc(mods_dir, name: string) -> string {
 	for c in name {
 		if c < 32 do return "That name has a character a folder can't."
 	}
-	if strings.equal_fold(name, MOD_DEFAULT) || utils.file_exists(utils.temp_path(mods_dir, name)) {
+	if reserved(name) do return "That name is the game's own."
+	if mod_builtin(name) || utils.file_exists(utils.temp_path(mods_dir, name)) {
 		return "There is a mod by that name already."
 	}
 	return ""
 }
 
-// A new mod, `name`: a copy of the default to change. Why not, if it can't be made; a
-// copy only part made is taken away again.
+// A new mod of the player's, `name`: a copy of Classic to change. Why not, if it can't be
+// made; a copy only part made is taken away again.
 mod_create :: proc(mods_dir, name: string) -> (problem: string) {
 	if problem = mod_name_problem(mods_dir, name); problem != "" do return
 	dir := utils.temp_path(mods_dir, name)
-	if err := os.copy_directory_all(dir, utils.temp_path(mods_dir, MOD_DEFAULT)); err != nil {
-		log.errorf("cannot copy %s/%s to %s: %v", mods_dir, MOD_DEFAULT, dir, err)
+	classic := utils.temp_path(mods_dir, MOD_CLASSIC)
+	if err := os.copy_directory_all(dir, classic); err != nil {
+		log.errorf("cannot copy %s to %s: %v", classic, dir, err)
 		os.remove_all(dir)
-		return "The default mod couldn't be copied."
+		return "Classic couldn't be copied."
 	}
 	return
 }
 
-// The mod `name` gone from `mods_dir`, all its files; never the default. False, with the
-// reason logged, if it couldn't be.
+// The player's mod `name` gone from `mods_dir`, all its files; never Classic. False,
+// with the reason logged, if it couldn't be.
 mod_delete :: proc(mods_dir, name: string) -> bool {
-	if name == "" || strings.equal_fold(name, MOD_DEFAULT) || name == "." || name == ".." || strings.contains_any(name, "\\/") do return false
+	if name == "" || reserved(name) || mod_builtin(name) || name == "." || name == ".." || strings.contains_any(name, "\\/") do return false
 	dir := utils.temp_path(mods_dir, name)
 	if err := os.remove_all(dir); err != nil {
 		log.errorf("cannot delete %s: %v", dir, err)
@@ -107,7 +139,7 @@ mod_delete :: proc(mods_dir, name: string) -> bool {
 }
 
 // The path of a file named relative to a mod ("sfx/shotgun.wav"): the mod's if it has
-// it, else the default's, whether it is there or not, so a file that can't be found is
+// it, else Classic's, whether it is there or not, so a file that can't be found is
 // reported where it belongs. Allocated with the temp allocator.
 mod_file :: proc(mod: Mod, file: string) -> string {
 	if mod.dir != "" {
@@ -121,7 +153,7 @@ mod_file :: proc(mod: Mod, file: string) -> string {
 
 // An image in a mod's directory `dir` ("scenery-gfx"), as Soldat finds one: in any
 // case, preferring a .png whatever extension `name` gives. The mod's if it has it, else
-// the default's. Allocated with the temp allocator.
+// Classic's. Allocated with the temp allocator.
 mod_image :: proc(mod: Mod, dir, name: string, listings: ^utils.Dir_Listings = nil) -> (path: string, ok: bool) {
 	if mod.dir != "" {
 		path, ok = utils.find_file_any_case(utils.temp_path(mod.dir, dir), name, ".png", context.temp_allocator, listings)

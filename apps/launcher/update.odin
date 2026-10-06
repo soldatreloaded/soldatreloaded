@@ -9,7 +9,8 @@ package launcher
 // A file the latest release lists that is missing on disk, or whose hash differs, is
 // fetched: so an update repairs as it goes. A file the installed manifest lists that the
 // latest doesn't is the old release's, dropped, and deleted. What neither manifest lists
-// is the player's (the configs, other mods, demos, their scripts) and never touched.
+// is the player's (the configs, their own mods beside mods/classic, demos, their
+// scripts) and never touched.
 
 import "core:crypto/hash"
 import "core:encoding/hex"

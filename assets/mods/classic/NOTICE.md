@@ -9,7 +9,7 @@ with it, and this notice.
 - **Source:** <https://github.com/opensoldat/base>
 - **Licence:** CC BY 4.0, <https://creativecommons.org/licenses/by/4.0/>
 - **Modifications:** the files were reorganised: what the game looks and sounds like
-  is here, in `mods/default/`, and what it plays by is in `data/`, which has its own
+  is here, in `mods/classic/`, and what it plays by is in `data/`, which has its own
   notice. Upstream keeps them under `shared/`, `client/` and `server/configs/`.
 
 Credits named in the upstream `Credits.md`:

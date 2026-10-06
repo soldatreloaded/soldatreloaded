@@ -5,13 +5,13 @@ import "core:fmt"
 import res "../../../core/resources"
 import "../ui"
 
-// The mods in mods/, a row each, the one in use marked: the default (the game's own)
-// first. A new one is a copy of the default, named, to change as one likes; one picked
-// is used at once (Use, or a second click), or deleted, after a second press to be sure.
-// The default, and the mod in use, can't be deleted.
+// The mods, a row each, the one in use marked: Classic, the game's own, first, then the
+// player's, from mods/. A new one is a copy of Classic, named, to change as one likes;
+// one picked is used at once (Use, or a second click), or deleted after a second press
+// to be sure. Classic, and the mod in use, can't be deleted.
 
 Mods :: struct {
-	names:      []string,
+	listings:   []res.Mod_Listing,
 	listed:     bool, // read from mods/ since the page was opened
 	selected:   int,  // the mod picked, -1 for none
 	clicked_at: f64,  // when it was picked, so a second click soon after uses it
@@ -24,7 +24,7 @@ Mods :: struct {
 MOD_ROW :: 24
 
 mods_destroy :: proc(mods: ^Mods) {
-	res.mods_list_destroy(mods.names)
+	res.mods_list_destroy(mods.listings)
 	delete(mods.name)
 	delete(mods.note)
 	mods^ = {}
@@ -38,7 +38,7 @@ page_mods :: proc(menu: ^Menu) {
 	in_use := mod_in_use(menu)
 
 	ui.section(k, "NEW MOD")
-	if typed, changed := ui.field_row(k, "Name", &mods.name, mods.name, res.MOD_NAME_MAX, "A copy of the default, to change"); changed {
+	if typed, changed := ui.field_row(k, "Name", &mods.name, mods.name, res.MOD_NAME_MAX, "A copy of Classic, to change"); changed {
 		set_text(&mods.name, typed)
 	}
 	create := ui.edit_entered(k, &mods.name)
@@ -50,12 +50,12 @@ page_mods :: proc(menu: ^Menu) {
 	if create && mods.name != "" do mod_create(menu)
 
 	ui.section(k, "MODS")
-	for name, i in mods.names {
+	for listing, i in mods.listings {
 		r := ui.row(k, MOD_ROW, true)
 		picked := i == mods.selected
 		if ui.take_enter(k, r.focused) do pick(mods, i)
 		if r.shown && ui.take(k, r.id, r.x, r.y, r.w, r.h) {
-			if picked && k.time - mods.clicked_at < ui.DOUBLE_CLICK && i != in_use do use(menu, name)
+			if picked && k.time - mods.clicked_at < ui.DOUBLE_CLICK && i != in_use do use(menu, listing.name)
 			pick(mods, i)
 			mods.clicked_at = k.time
 		}
@@ -65,54 +65,55 @@ page_mods :: proc(menu: ^Menu) {
 			ui.rrect(u, r.x, r.y + 1, r.w, r.h - 2, ui.RADIUS, ui.ACCENT_SOFT)
 			ui.rrect(u, r.x, r.y + 5, 2, r.h - 10, 1, ui.ACCENT)
 		}
-		status := "In use" if i == in_use else "The game's own" if i == 0 else ""
+		status := "In use" if i == in_use else "Built in" if listing.builtin else ""
 		sw := ui.width_of(u, ui.BODY, status)
-		ui.text_fit(k, ui.LABEL, name, r.x + 12, cy, r.w - sw - 36, ui.TEXT)
+		ui.text_fit(k, ui.LABEL, listing.name, r.x + 12, cy, r.w - sw - 36, ui.TEXT)
 		if status != "" do ui.text_mid(k, ui.BODY, status, r.x + r.w - 10 - sw, cy, ui.ACCENT if i == in_use else ui.FAINT)
 	}
 
 	// the action bar: Use, and Delete before it; what was last done, or the mod picked
 	x, w := k.x, k.w
-	selected := mods.selected >= 0 && mods.selected < len(mods.names)
+	selected := mods.selected >= 0 && mods.selected < len(mods.listings)
 	used, px := big_button(menu, x + w, "USE", true, !selected || mods.selected == in_use)
-	if used && selected do use(menu, mods.names[mods.selected])
-	deletable := selected && mods.selected != 0 && mods.selected != in_use
+	if used && selected do use(menu, mods.listings[mods.selected].name)
+	builtin := selected && mods.listings[mods.selected].builtin
+	deletable := selected && !builtin && mods.selected != in_use
 	if !deletable do mods.confirm = false
 	deleted, dx := big_button(menu, px - 10, "SURE?" if mods.confirm else "DELETE", false, !deletable)
 	if deleted && deletable {
-		if mods.confirm do mod_delete(menu, mods.names[mods.selected])
+		if mods.confirm do mod_delete(menu, mods.listings[mods.selected].name)
 		else do mods.confirm = true
 	}
 	tw := dx - x - 16
 	switch {
 	case mods.confirm:
-		footer_text(menu, x, tw, fmt.tprintf("Delete %s and all its files? Press again to.", mods.names[mods.selected]), ui.WARN)
+		footer_text(menu, x, tw, fmt.tprintf("Delete %s and all its files? Press again to.", mods.listings[mods.selected].name), ui.WARN)
 	case mods.note != "":
 		footer_text(menu, x, tw, mods.note, ui.WARN if mods.note_bad else ui.GOOD)
-	case selected && mods.selected == 0:
-		footer_text(menu, x, tw, "The game's own look and sound. It can't be deleted.", ui.MUTED)
+	case builtin:
+		footer_text(menu, x, tw, "The game's own look and sound, under every other mod. It can't be deleted.", ui.MUTED)
 	case selected && mods.selected == in_use:
 		footer_text(menu, x, tw, "In use. Use another to delete this one.", ui.MUTED)
 	case:
-		footer_text(menu, x, tw, "A mod changes only the files it has; the rest come from the default.", ui.MUTED)
+		footer_text(menu, x, tw, "A mod changes only the files it has; the rest come from Classic.", ui.MUTED)
 	}
 }
 
 // mods/ read again; the mod in use picked.
 @(private = "file")
 mods_relist :: proc(mods: ^Mods, active: string) {
-	res.mods_list_destroy(mods.names)
-	mods.names = res.mods_list(res.MODS_DIR)
+	res.mods_list_destroy(mods.listings)
+	mods.listings = res.mods_list(res.MODS_DIR)
 	mods.listed = true
 	mods.selected = 0
-	for name, i in mods.names do if name == active do mods.selected = i
+	for listing, i in mods.listings do if listing.name == active do mods.selected = i
 	mods.confirm = false
 }
 
-// The row of the mod in use: the default's when none, or one no longer there, is set.
+// The row of the mod in use: Classic's when none, or one no longer there, is set.
 @(private = "file")
 mod_in_use :: proc(menu: ^Menu) -> int {
-	for name, i in menu.mods.names do if name == menu.config.graphics.mod do return i
+	for listing, i in menu.mods.listings do if listing.name == menu.config.graphics.mod do return i
 	return 0
 }
 
@@ -135,10 +136,10 @@ mod_create :: proc(menu: ^Menu) {
 		note(mods, problem, true)
 		return
 	}
-	note(mods, fmt.tprintf("%s made, a copy of the default in mods/%s.", name, name), false)
+	note(mods, fmt.tprintf("%s made, a copy of Classic in mods/%s.", name, name), false)
 	made := name
 	mods_relist(mods, menu.config.graphics.mod)
-	for n, i in mods.names do if n == made do mods.selected = i
+	for listing, i in mods.listings do if listing.name == made do mods.selected = i
 	set_text(&mods.name, "")
 }
 

@@ -221,7 +221,7 @@ menu_open :: proc(client: ^Client) -> Screen {
 // match loads its own art as it starts.
 mod_use :: proc(client: ^Client, name: string) {
 	graphics := &client.config.graphics
-	graphics.mod = strings.clone("" if name == res.MOD_DEFAULT else name, virtual.arena_allocator(&client.config.arena))
+	graphics.mod = strings.clone("" if name == res.MOD_CLASSIC else name, virtual.arena_allocator(&client.config.arena))
 	res.mod_destroy(&client.mod)
 	client.mod = res.mod_make(res.MODS_DIR, graphics.mod)
 	ui.ui_destroy(&client.ui)
