@@ -160,11 +160,12 @@ draw_scoreboard :: proc(u: ^ui.Ui, data: ^Hud_Data, bottom: f32) {
 		placed[g] += 1
 		totals[g] += player.kills
 		color := rl.Color{220, 50, 200, 113} if player.team == .Spectator else with_alpha(player.shirt, 255)
-		write(u, player.name, {x + 44, y}, MENU_FONT, color)
-		write(u, fmt.tprintf("%d", player.kills), {x + 284, y}, MENU_FONT, color)
-		write(u, fmt.tprintf("%d", player.deaths), {x + 394, y}, MENU_FONT, color)
-		if player.flags > 0 do write(u, fmt.tprintf("x%d", player.flags), {x + 348, y}, MENU_FONT, color)
-		if !player.bot do write(u, fmt.tprintf("%d", player.ping), {x + 534, y}, MENU_FONT, color)
+		// the small font the counts above left set: the original's rows set none of their own
+		write(u, player.name, {x + 44, y}, SMALL_FONT, color)
+		write(u, fmt.tprintf("%d", player.kills), {x + 284, y}, SMALL_FONT, color)
+		write(u, fmt.tprintf("%d", player.deaths), {x + 394, y}, SMALL_FONT, color)
+		if player.flags > 0 do write(u, fmt.tprintf("x%d", player.flags), {x + 348, y}, SMALL_FONT, color)
+		if !player.bot do write(u, fmt.tprintf("%d", player.ping), {x + 534, y}, SMALL_FONT, color)
 	}
 
 	for g, i in groups {
