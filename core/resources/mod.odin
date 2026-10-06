@@ -153,6 +153,14 @@ mod_file :: proc(mod: Mod, file: string) -> string {
 // An image in a mod's directory `dir` ("scenery-gfx"), as Soldat finds one: in any
 // case, preferring a .png whatever extension `name` gives. The mod's if it has it, else
 // Classic's. Allocated with the temp allocator.
+// Whether the mod itself, not Classic under it, has the image `name` in `dir`, found as
+// mod_image finds one.
+mod_has_image :: proc(mod: Mod, dir, name: string, listings: ^utils.Dir_Listings = nil) -> bool {
+	if mod.dir == "" do return false
+	_, found := utils.find_file_any_case(utils.temp_path(mod.dir, dir), name, ".png", context.temp_allocator, listings)
+	return found
+}
+
 mod_image :: proc(mod: Mod, dir, name: string, listings: ^utils.Dir_Listings = nil) -> (path: string, ok: bool) {
 	if mod.dir != "" {
 		path, ok = utils.find_file_any_case(utils.temp_path(mod.dir, dir), name, ".png", context.temp_allocator, listings)

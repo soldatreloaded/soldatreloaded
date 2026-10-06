@@ -1,6 +1,7 @@
 package draw
 
 import "core:math"
+import "core:strings"
 
 import res "../../../core/resources"
 import sim "../../../core/game"
@@ -166,7 +167,7 @@ gostek_load :: proc(art: ^Gostek_Art, source: Source) {
 			if style != .Male && part_shared(part) do continue
 			for team in 0 ..< (2 if part.team else 1) {
 				for mirrored in 0 ..< (2 if part.flip else 1) {
-					art.parts[style][i][team][mirrored] = sprite_load(source, part_path(part, style, team == 1, mirrored == 1), flat = part.nade > 0)
+					art.parts[style][i][team][mirrored] = sprite_load(source, style_part_path(source, part, style, team == 1, mirrored == 1), flat = part.nade > 0)
 				}
 			}
 		}
@@ -354,4 +355,22 @@ part_path :: proc(part: Part, style: res.Gostek, team2, mirrored: bool) -> strin
 	dir := "gostek-gfx" if style == .Male || part_shared(part) else concat("gostek-gfx/", STYLE_DIRS[style])
 	if team2 do dir = concat(dir, "/team2")
 	return utils.temp_path(dir, concat(part.file, suffix))
+}
+
+// Where a style's part is loaded from: the mod's own art for the style, else the mod's
+// male art, else Classic's for the style. So a mod made for the original, which dresses
+// the male alone, dresses every style in its art, rather than leaving the rest Classic's.
+@(private = "file")
+style_part_path :: proc(source: Source, part: Part, style: res.Gostek, team2, mirrored: bool) -> string {
+	path := part_path(part, style, team2, mirrored)
+	if style == .Male || part_shared(part) || mod_has(source, path) do return path
+	male := part_path(part, .Male, team2, mirrored)
+	return male if mod_has(source, male) else path
+}
+
+// Whether the mod itself has the image at `path`, relative to it, not just Classic.
+@(private = "file")
+mod_has :: proc(source: Source, path: string) -> bool {
+	slash := strings.last_index_byte(path, '/')
+	return res.mod_has_image(source.mod, path[:max(slash, 0)], path[slash + 1:], source.listings)
 }
