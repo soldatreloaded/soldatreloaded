@@ -14,8 +14,9 @@ WINDOW_NAMES := [?]string{"Windowed", "Fullscreen", "Borderless"}
 @(private = "file", rodata)
 RESOLUTIONS := [?][2]i32{{640, 480}, {800, 600}, {1024, 768}, {1280, 720}, {1280, 960}, {1600, 900}, {1920, 1080}, {2560, 1440}}
 
-@(private = "file", rodata)
-RATES := [?]i32{30, 60, 75, 120, 144, 165, 240, 360, 500}
+// The frame rate's limit, while it is on: the client holds graphics.max_fps within them.
+MAX_FPS_LOWEST :: 60
+MAX_FPS_HIGHEST :: 3000
 
 @(private = "file", rodata)
 SKY_NAMES := [?]string{"The map's", "My colours"}
@@ -43,29 +44,8 @@ page_graphics :: proc(menu: ^Menu) {
 		}
 	}
 	ui.toggle(k, "VSync", &graphics.vsync)
-	{
-		// the frame rate's limit: none, a preset, or the one set by hand
-		limit := clamp(graphics.max_fps, 10, 1000) if graphics.fps_limit else 0
-		names := make([dynamic]string, context.temp_allocator)
-		values := make([dynamic]i32, context.temp_allocator)
-		append(&names, "None")
-		append(&values, 0)
-		current := 0
-		for rate in RATES {
-			if rate == limit do current = len(values)
-			append(&names, fmt.tprintf("%d FPS", rate))
-			append(&values, rate)
-		}
-		if limit != 0 && current == 0 { // set by hand: shown as it is
-			current = len(values)
-			append(&names, fmt.tprintf("%d FPS", limit))
-			append(&values, limit)
-		}
-		if picked := ui.select_box(k, "Frame rate limit", names[:], nil, current); picked >= 0 && picked != current {
-			graphics.fps_limit = values[picked] != 0
-			if values[picked] != 0 do graphics.max_fps = values[picked]
-		}
-	}
+	ui.toggle(k, "Limit frame rate", &graphics.fps_limit)
+	if graphics.fps_limit do ui.slider(k, "Max frame rate", &graphics.max_fps, MAX_FPS_LOWEST, MAX_FPS_HIGHEST, 10, "%d FPS")
 	ui.section(k, "WORLD")
 	ui.toggle(k, "Background scenery", &graphics.scenery)
 	ui.toggle(k, "Weather", &graphics.weather)

@@ -43,8 +43,6 @@ MODS_DIR :: "mods"
 
 TICK_SECONDS :: 1.0 / sim.TICK_RATE
 MAX_FRAME :: 0.25 // seconds: a stall never turns into a burst of ticks
-MAX_FPS_LOWEST :: 10 // graphics.max_fps is kept within these
-MAX_FPS_HIGHEST :: 1000
 
 Client :: struct {
 	config:      ^res.Client_Config,
@@ -364,7 +362,7 @@ window_follow :: proc(window: ^Window, graphics: ^res.Graphics_Settings) {
 		else do rl.ClearWindowState({.VSYNC_HINT})
 		window.vsync = graphics.vsync
 	}
-	fps := clamp(graphics.max_fps, MAX_FPS_LOWEST, MAX_FPS_HIGHEST) if graphics.fps_limit else 0
+	fps := clamp(graphics.max_fps, menu.MAX_FPS_LOWEST, menu.MAX_FPS_HIGHEST) if graphics.fps_limit else 0
 	if fps != window.fps {
 		rl.SetTargetFPS(fps)
 		window.fps = fps

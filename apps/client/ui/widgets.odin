@@ -4,6 +4,7 @@ import "base:intrinsics"
 import "core:fmt"
 import "core:math"
 import "core:mem"
+import "core:strconv"
 import "core:strings"
 
 import rl "vendor:raylib"
@@ -43,32 +44,46 @@ toggle :: proc(k: ^Kit, label: string, value: ^bool) -> (flipped: bool) {
 // ---------------------------------------------------------------------------------
 // Slider
 
+SLIDER_BOX_W :: 62 // the box its number is shown, and typed, in
+
 // A number from `lo` to `hi` in steps of `step`, dragged along its track or stepped by
-// the side keys, shown as `format` of it (a %d for an integer, else a %f). True if it
+// the side keys, shown as `format` of it (a %d for an integer, else a %f) in a box on
+// its right. A click on the box, or Enter, types the number in, to any step: it is taken
+// as it is typed once it is within `lo` and `hi`, and held to them on Enter. True if it
 // changed.
 slider :: proc(k: ^Kit, label: string, value: ^$T, lo, hi, step: f32, format: string) -> (changed: bool) where intrinsics.type_is_numeric(T) {
 	r := row(k, ROW_H, true)
 	v := clamp(f32(value^), lo, hi)
 	cw := ctrl_w(r)
-	x0, x1, cy := ctrl_x(r) + 6, ctrl_x(r) + cw - 58, r.y + r.h / 2
+	box_x := ctrl_x(r) + cw - SLIDER_BOX_W
+	x0, x1, cy := ctrl_x(r) + 6, box_x - 14, r.y + r.h / 2
 	next := v
 	if side := take_side(k, r.focused); side != 0 do next = v + f32(side) * step
-	if r.shown && take(k, r.id, x0 - 8, r.y, x1 - x0 + 16, r.h) do k.drag = r.id
+	if r.shown && take(k, r.id, x0 - 8, r.y, x1 - x0 + 16, r.h) {
+		k.drag = r.id
+		if k.edit.key == value do edit_stop(k) // the track taken: its box shows the value again, as it moves
+	}
 	if k.drag == r.id && k.held {
 		t := clamp((k.ui.mouse.x - x0) / (x1 - x0), 0, 1)
 		next = lo + math.round(t * (hi - lo) / step) * step
 	}
 	next = clamp(next, lo, hi)
 	if abs(next - v) > step * 0.01 {
-		when intrinsics.type_is_integer(T) {
-			value^ = T(math.round(next))
-		} else {
-			value^ = T(math.round(next * 100) / 100) // as the cvar kept it, to two places
-		}
+		slider_set(value, next)
 		v = next
 		changed = true
 	}
-	if !r.shown do return
+	if edit_entered(k, value) { // typed, and Enter: held to the range
+		if typed, ok := leading_number(edit_text(k)); ok {
+			slider_set(value, clamp(typed, lo, hi))
+			v = clamp(typed, lo, hi)
+			changed = true
+		}
+	}
+	if !r.shown {
+		take_enter(k, r.focused) // the page scrolls to it first
+		return
+	}
 	row_label(k, r, label)
 	t := (v - lo) / (hi - lo) if hi > lo else 0
 	active := r.hot || r.focused || k.drag == r.id
@@ -76,12 +91,41 @@ slider :: proc(k: ^Kit, label: string, value: ^$T, lo, hi, step: f32, format: st
 	if t > 0 do rrect(k.ui, x0, cy - 1.5, (x1 - x0) * t, 3, 1.5, ACCENT_HOT if active else ACCENT)
 	circle(k.ui, x0 + (x1 - x0) * t, cy, 6 if active else 5, TEXT)
 	when intrinsics.type_is_integer(T) {
-		shown := fmt.tprintf(format, int(math.round(v)))
+		shown := fmt.tprintf(format, int(math.round(f32(value^))))
 	} else {
-		shown := fmt.tprintf(format, v)
+		shown := fmt.tprintf(format, f32(value^))
 	}
-	text_mid(k, BODY, shown, ctrl_x(r) + cw - width_of(k.ui, BODY, shown), cy, TEXT)
+	// as it is typed, taken once it is a number in the range, so a number on its way
+	// there ("1" of "144") doesn't snap the value to the range. Begun, its text is all
+	// selected: what is typed replaces it.
+	was_typing := k.edit.key == value
+	typed, edited := field_box(k, r.id, r.focused, box_x, ctrl_y(r), SLIDER_BOX_W, value, shown, 12, "", false)
+	if !was_typing && k.edit.key == value do k.edit.select_all = true
+	if edited {
+		if n, ok := leading_number(typed); ok && n >= lo && n <= hi {
+			slider_set(value, n)
+			changed = true
+		}
+	}
 	return
+}
+
+@(private = "file")
+slider_set :: proc(value: ^$T, v: f32) {
+	when intrinsics.type_is_integer(T) {
+		value^ = T(math.round(v))
+	} else {
+		value^ = T(math.round(v * 100) / 100) // as the cvar kept it, to two places
+	}
+}
+
+// The number a typed text begins with, past any spaces: "144 FPS" is 144.
+@(private = "file")
+leading_number :: proc(text: string) -> (f32, bool) {
+	s := strings.trim_space(text)
+	end := 0
+	for end < len(s) && ((s[end] >= '0' && s[end] <= '9') || s[end] == '.' || (end == 0 && s[end] == '-')) do end += 1
+	return strconv.parse_f32(s[:end])
 }
 
 // ---------------------------------------------------------------------------------

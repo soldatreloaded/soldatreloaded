@@ -18,7 +18,7 @@ page_options :: proc(menu: ^Menu) {
 	ui.toggle(k, "Distant battle sounds", &config.sound.battle_effects)
 	ui.toggle(k, "Deafening blasts", &config.sound.explosion_effects)
 	ui.section(k, "MOUSE")
-	ui.slider(k, "Sensitivity", &config.controls.sensitivity, 0.1, 5.0, 0.1, "%.1f")
+	ui.slider(k, "Sensitivity", &config.controls.sensitivity, 0.1, 5.0, 0.1, "%.2f")
 	ui.color_row(k, "Menu cursor colour", &config.graphics.cursor_color)
 	ui.slider(k, "Menu cursor size", &config.graphics.cursor_size, 50, 200, 10, "%d%%")
 	ui.color_row(k, "Crosshair colour", &config.graphics.crosshair_color)
