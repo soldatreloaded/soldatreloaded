@@ -1,28 +1,21 @@
 # Scripting
 
-The server runs a Lua script (Lua 5.4), named by `sv_script`: `scripts/main.lua` by
-default, read once as the server starts, if the file is there. It, and every script it
-`require`s, hands the server functions to call when things happen (`server.on`), and
-calls the server back through the `server` table. Requests to the web go through `http`,
-with `json` for their bodies.
+The server runs a Lua script (Lua 5.4), named by `server.script` in server.config.json:
+`scripts/main.lua` by default, read once as the server starts, if the file is there.
+It, and every script it `require`s, hands the server functions to call when things
+happen (`server.on`), and calls the server back through the `server` table. Requests to
+the web go through `http`, with `json` for their bodies.
 
-`scripts/main.lua` is the server owner's: a game's updater brings a newer one only while it
-is as the game made it; the server's package ships one too, and a server makes it on its first
-start where it has been taken out. The game's examples are in `scripts/examples/`, kept
-current by every update: a greeter, the players' figures (/stats, /top), a chat filter, admin commands among friends,
-the game run from the chat as gathers run it (`!p`, `!up` with a count of 3, 2, 1, `!r`,
-`!map ash`), and a report of each round to a webhook. Each returns a function that sets it
-up, so
-`main.lua` takes up as many as it likes, each with its settings:
+`scripts/main.lua` is the server owner's, and none comes with the server: its package's
+`scripts/` holds no script yet, and a server with no `main.lua` plays without one. A
+script may `require` any file beside `main.lua`, so scripts of your own go there too. A
+script that returns a function to set it up lets `main.lua` take it up with settings of
+its own:
 
 ```lua
-require("examples.greeter")({welcome = "Welcome, %s."})
-require("examples.round_webhook")({url = "https://discord.com/api/webhooks/..."})
+require("greeter")({welcome = "Welcome, %s."})
+require("rounds")({url = "https://discord.com/api/webhooks/..."})
 ```
-
-Their lines are in `main.lua`, commented out. A script may `require` any file beside
-`main.lua`, so scripts of your own go there too. An example changed in place is undone by
-the next update: to change one, copy it beside `main.lua` under a name of your own.
 
 The script runs on the server's thread, between ticks, so nothing it does races the
 game, and anything slow it does stalls the game: a request is sent from a thread of its
@@ -60,9 +53,8 @@ still define it, is called after the handlers handed in.
 | `second` | | once a second | |
 
 `stats` holds `why` (`"limit"`, `"nextmap"` or `"vote"`), `map`, `round`, `time_left`
-in seconds, `scores` (`{alpha = n, bravo = n}`), `winner` (a team's name in capture the
-flag, the top scorer's slot in a deathmatch, or `nil`) and `players`, a list of player
-tables.
+in seconds, `scores` (`{alpha = n, bravo = n}`), `winner` (`"alpha"` or `"bravo"`, or
+`nil` for a draw) and `players`, a list of player tables.
 
 A player table has `slot`, `name`, `team` (`"none"`, `"alpha"`, `"bravo"`,
 `"charlie"`, `"delta"` or `"spectator"`), `kills`, `deaths`, `flags`, `ping`, `health`,
@@ -76,12 +68,12 @@ players are known by on the wire; a slot is reused once its player has left.
 | `server.say(text [, color])` | a line to everyone, in the script colour, or `color`: `"RRGGBB"` or `{r, g, b}` |
 | `server.say_to(slot, text [, color])` | the same to one player |
 | `server.print(text)` | a line on the server's console only |
-| `server.command(text)` | a console command, as if typed: `"say hello"`, `"addbot1"`, `"nextmap"`, `"sv_password x"` (the password to join, read live) |
+| `server.command(text)` | a console command, as if typed: `"say hello"`, `"addbot1"`, `"nextmap"`, `"banip 1.2.3.4 60"`. Only the console's own commands (`apps/server/console.odin`): the settings are server.config.json's, and none is changed from here |
 | `server.pause()`, `server.unpause()` | the game stands still, nobody moving and the clock stopped, or goes on; `true` if that changed anything |
 | `server.paused()` | whether it stands |
 | `server.next_map([map])` | the round ends now; on `map` if given, else the rotation's next: `true`, or `false` (and nothing changes) for a map the server hasn't got, which it couldn't load |
-| `server.maps()` | the server's list of maps, the one its votes and map window pick from: the rotation (`maps` in server.config.json, or `sv_maps` given on the command line), or every map it has when there is none |
-| `server.map()`, `server.round()`, `server.mode()` | the map, the round from 1, `"ctf"` or `"dm"` |
+| `server.maps()` | the server's list of maps, the one its votes and map window pick from: the rotation (`maps` in server.config.json), or every map it has when there is none |
+| `server.map()`, `server.round()` | the map; the round, from 1 |
 | `server.tick()`, `server.time_left()` | the world's tick; the seconds left in the round |
 | `server.scores()` | `{alpha = n, bravo = n}` |
 | `server.players()` | every player's table, in slot order |
@@ -112,12 +104,11 @@ held in a table), and `json.array(t)` marks an empty table as an array.
 
 ## An example
 
-Two scripts side by side: `main.lua` takes up the game's greeter and a script of its own,
-`scripts/rounds.lua`, and each hears the joins.
+Two scripts side by side: `main.lua` answers /stats itself and takes up a script of its
+own, `scripts/rounds.lua`, which counts the joins and reports each round to a webhook.
 
 ```lua
 -- scripts/main.lua
-require("examples.greeter")({welcome = "Welcome, %s. Say /stats for your figures."})
 require("rounds")({url = "https://discord.com/api/webhooks/..."})
 
 server.on("command", function(slot, text)
