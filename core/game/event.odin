@@ -138,10 +138,11 @@ Blood :: struct {
 }
 
 Explosion :: struct {
-	owner:  Soldier_Id,
-	weapon: res.Weapon,
-	pos:    utils.Vec2,
-	radius: f32,
+	owner:    Soldier_Id,
+	weapon:   res.Weapon,
+	pos:      utils.Vec2,
+	velocity: utils.Vec2, // the grenade's or rocket's as it went off, which throws the dirt back
+	radius:   f32,
 }
 
 Thing_Hit :: struct {

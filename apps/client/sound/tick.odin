@@ -88,7 +88,8 @@ bullet_sounds :: proc(s: ^Sound, game: ^sim.Game, followed: Maybe(sim.Soldier_Id
 	}
 }
 
-// What the sparks sounded like: casings and clips landing, a body burning.
+// What the sparks sounded like: casings and clips landing, a body burning, a blast's
+// spark striking the map.
 @(private = "file")
 noise_sounds :: proc(s: ^Sound, noise: draw.Spark_Noise) {
 	switch noise.kind {
@@ -97,6 +98,7 @@ noise_sounds :: proc(s: ^Sound, noise: draw.Spark_Noise) {
 	case .Clip:        play_at(s, "clipfall.wav", noise.pos)
 	case .On_Fire:     play_at(s, "onfire.wav", noise.pos)
 	case .Fire_Crack:  play_at(s, "firecrack.wav", noise.pos)
+	case .Hiss:        play_at(s, "ts.wav", noise.pos)
 	}
 }
 

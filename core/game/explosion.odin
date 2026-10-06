@@ -36,7 +36,7 @@ explode :: proc(
 	bullet := &world.bullets[id]
 	radius := explosion_radius(kind)
 	shot_end_tell(authority, bullet, bullet.pos, kind, out) // where it went off, for the clients' own flights of it
-	emit(out, Explosion{owner = bullet.owner, weapon = explosion_weapon(kind), pos = bullet.pos, radius = radius})
+	emit(out, Explosion{owner = bullet.owner, weapon = explosion_weapon(kind), pos = bullet.pos, velocity = bullet.velocity, radius = radius})
 
 	for &soldier, i in world.soldiers {
 		if !soldier.active || soldier.team == .Spectator do continue

@@ -48,6 +48,7 @@ Spark_Noise_Kind :: enum u8 {
 	Clip,        // a clip landing
 	On_Fire,     // a burning body
 	Fire_Crack,  // and its crackle
+	Hiss,        // a blast's flying spark striking the map
 }
 
 Spark :: struct {
@@ -59,6 +60,7 @@ Spark :: struct {
 	old_life:  f32,
 	color:     utils.Rgba, // the spawn spark's shirt, the jet flame's colour
 	weapon:    res.Weapon, // a casing's or a clip's
+	piece:     u8,         // a clod's, of the four
 	landings:  u8,
 }
 
@@ -72,6 +74,7 @@ Spark_Kind :: enum u8 {
 	Frag_Explosion,
 	Spawn,
 	Fire_Chip,
+	Grey_Chip, // a cooled one
 	Explosion_Smoke,
 	Mini_Smoke,
 	Big_Smoke,
@@ -88,10 +91,17 @@ Spark_Kind :: enum u8 {
 	Rain, // the weather, falling from above the view
 	Sand,
 	Snow,
+	// what a blast throws out (ExplosionHit): clods of dirt, big and small, flying sparks
+	// that hiss off what they strike, and little flames
+	Dirt,
+	Small_Dirt,
+	Fire_Spark,
+	Blast_Flame,
 }
 
 Spark_Art :: struct {
 	images:  [Spark_Image]Sprite,
+	clods:   [4]Sprite,
 	explode: [EXPLOSION_FRAMES]Sprite,
 	smoke:   [SMOKE_FRAMES]Sprite,
 	shells:  [res.Weapon]Sprite, // the weapons' own casings; the plain one for the rest
@@ -117,6 +127,7 @@ Spark_Image :: enum {
 	Rain,
 	Sand,
 	Snow,
+	Fire_Spark,
 }
 
 @(private = "file", rodata)
@@ -137,6 +148,7 @@ IMAGE_FILES := [Spark_Image]string {
 	.Rain         = "rain.png",
 	.Sand         = "sand.png",
 	.Snow         = "snow.png",
+	.Fire_Spark   = "lilfire.png",
 }
 
 // The casings, by the weapon that ejects one; the rest eject none. The shotgun's and the
@@ -173,6 +185,7 @@ sparks_load :: proc(source: Source) -> (art: Spark_Art) {
 	for file, image in IMAGE_FILES {
 		art.images[image] = sprite_load(source, concat("sparks-gfx/", file), key)
 	}
+	for &clod, i in art.clods do clod = sprite_load(source, frame_path("sparks-gfx/odlamek", i), key)
 	for &frame, i in art.explode do frame = sprite_load(source, frame_path("sparks-gfx/explosion/explode", i), key)
 	for &frame, i in art.smoke do frame = sprite_load(source, frame_path("sparks-gfx/explosion/smoke", i), key)
 	for file, weapon in SHELL_FILES {
@@ -227,10 +240,17 @@ spark_step :: proc(sparks: ^Sparks, spark: ^Spark, polymap: ^res.Poly_Map) {
 		spark.pos += spark.vel
 		spark.vel *= SPARK_DAMPING
 	}
-	if spark_collides(spark.kind) && spark_bounce(spark, polymap) && spark_lands(spark.kind) {
-		spark_land(sparks, spark)
-		if spark.kind == .None do return
+	if spark_collides(spark.kind) {
+		if push, struck := spark_bounce(spark, polymap); struck {
+			if spark.kind == .Fire_Spark do spark_strike(sparks, spark, push)
+			if spark_lands(spark.kind) {
+				spark_land(sparks, spark)
+				if spark.kind == .None do return
+			}
+		}
 	}
+	// a blast's flying spark sheds a chip of fire now and then (Sparks.pas iskry)
+	if spark.kind == .Fire_Spark && below(sparks, 8) == 0 do spark_add(sparks, .Fire_Chip, spark.pos, {}, 35)
 	spark.life -= 1
 	if spark.life <= 0 do spark.kind = .None
 }
@@ -240,8 +260,8 @@ spark_step :: proc(sparks: ^Sparks, spark: ^Spark, polymap: ^res.Poly_Map) {
 @(private = "file")
 spark_moves :: proc(kind: Spark_Kind) -> bool {
 	#partial switch kind {
-	case .Smoke, .Chip, .Little_Blood, .Blood, .Fire_Chip, .Mini_Smoke, .Little_Smoke, .Shell, .Clip, .Jet_Fire, .Spit,
-	     .Match, .Cigar, .Piss, .Rain, .Sand, .Snow:
+	case .Smoke, .Chip, .Little_Blood, .Blood, .Fire_Chip, .Grey_Chip, .Mini_Smoke, .Little_Smoke, .Shell, .Clip, .Jet_Fire,
+	     .Spit, .Match, .Cigar, .Piss, .Rain, .Sand, .Snow, .Dirt, .Small_Dirt, .Fire_Spark, .Blast_Flame:
 		return true
 	}
 	return false
@@ -250,7 +270,7 @@ spark_moves :: proc(kind: Spark_Kind) -> bool {
 @(private = "file")
 spark_collides :: proc(kind: Spark_Kind) -> bool {
 	#partial switch kind {
-	case .Little_Blood, .Blood, .Shell, .Clip, .Jet_Fire, .Spit, .Match, .Cigar, .Piss:
+	case .Little_Blood, .Blood, .Shell, .Clip, .Jet_Fire, .Spit, .Match, .Cigar, .Piss, .Dirt, .Fire_Spark, .Blast_Flame:
 		return true
 	}
 	return false
@@ -267,10 +287,11 @@ spark_lands :: proc(kind: Spark_Kind) -> bool {
 }
 
 // Off the map's polygons as TSpark.CheckMapCollision bounces it, from a point a little
-// behind and above it. True if it touched the map this tick.
+// behind and above it (SPARK_PROBE). True if it touched the map this tick, with the push
+// out of it that the bounce took off its speed.
 @(private = "file")
-spark_bounce :: proc(spark: ^Spark, polymap: ^res.Poly_Map) -> bool {
-	probe := spark.pos + {-8, -1}
+spark_bounce :: proc(spark: ^Spark, polymap: ^res.Poly_Map) -> (push: utils.Vec2, struck: bool) {
+	probe := spark.pos + SPARK_PROBE
 	for index in res.polygons_near(polymap, probe) {
 		polygon := &polymap.polygons[index]
 		#partial switch polygon.type {
@@ -279,11 +300,26 @@ spark_bounce :: proc(spark: ^Spark, polymap: ^res.Poly_Map) -> bool {
 		}
 		if !res.point_in_polygon_edges(probe, polygon) do continue
 		normal, distance, _ := res.closest_edge(polygon, probe)
-		spark.vel -= utils.normalize(normal) * distance
+		push = utils.normalize(normal) * distance
+		spark.vel -= push
 		spark.vel *= SPARK_BOUNCE
-		return true
+		return push, true
 	}
-	return false
+	return {}, false
+}
+
+SPARK_PROBE :: utils.Vec2{-8, -1}
+
+// A blast's flying spark striking the map: one time in two, a chip flies off it, hot or
+// cooled, and it hisses.
+@(private = "file")
+spark_strike :: proc(sparks: ^Sparks, spark: ^Spark, push: utils.Vec2) {
+	off := push * 2.5
+	off.x += -0.5 + f32(below(sparks, 11)) / 10
+	off.y = -off.y
+	if below(sparks, 2) != 0 do return
+	spark_add(sparks, .Fire_Chip if below(sparks, 2) == 0 else .Grey_Chip, spark.pos + SPARK_PROBE, off, 35)
+	spark_noise(sparks, .Hiss, spark.pos)
 }
 
 // A landing counted, and heard: a casing on its first, third and fifth (a shotgun's on
@@ -336,6 +372,13 @@ draw_spark :: proc(art: ^Spark_Art, spark: ^Spark, p: utils.Vec2, l: f32) {
 	case .Little_Smoke: spark_sprite(images[.Little_Smoke], p, 1, 0, l * 3)
 	case .Chip:         spark_sprite(images[.Chip], p, 1, 0, l * 3 + 10)
 	case .Fire_Chip:    spark_sprite(images[.Chip], p, 1, 0, l * 3 + 154, {255, 254, 53, 255})
+	case .Grey_Chip:    spark_sprite(images[.Chip], p, 1, 0, l * 3 + 154, {170, 170, 170, 255})
+	case .Fire_Spark:   spark_sprite(images[.Fire_Spark], p, 1, 0, l)
+	case .Dirt:         spark_sprite(art.clods[spark.piece], p, 1, l * 8 * DEG, math.trunc(l + 10))
+	case .Small_Dirt:   spark_sprite(art.clods[spark.piece], p, 0.7, 0, math.trunc(l * 2) + 15)
+	case .Blast_Flame:
+		scale := l / 35
+		spark_sprite(images[.Flame], p - {0, 1 / scale}, scale, 0, l * 2 + 185)
 	case .Little_Blood: spark_sprite(images[.Little_Blood], p, 0.75, l * 10 * DEG, l * 2 + 65)
 	case .Blood:        spark_sprite(images[.Blood], p, 0.33 + 10 / l if l > 10 else 1, l * 2 * DEG, l * 2 + 85)
 	case .Mini_Smoke:   spark_sprite(images[.Mini_Smoke], p - {3, 3}, 1, 0, l * 2.5)

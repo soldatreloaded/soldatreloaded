@@ -79,7 +79,7 @@ sparks_event :: proc(sparks: ^Sparks, game: ^sim.Game, event: sim.Event) {
 	case sim.Collider_Hit: wall_hit(sparks, e.pos, e.velocity)
 	case sim.Thing_Hit:    spark_add(sparks, .Smoke, e.pos, e.velocity * (-0.02 * (0.4 + random(sparks) * 0.4)), 70)
 	case sim.Blood:        if !e.bloodless do blood(sparks, e.pos, e.velocity)
-	case sim.Explosion:    explosion(sparks, e.pos, e.weapon)
+	case sim.Explosion:    explosion(sparks, e)
 	case sim.Fired:        fired(sparks, game, e)
 	case sim.Antic:        antic(sparks, e)
 	case sim.Polygon_Effect:
@@ -133,13 +133,53 @@ blood :: proc(sparks: ^Sparks, pos, vel: utils.Vec2) {
 	}
 }
 
-// A blast: the fireball, its smoke, and the big smoke over it.
+// A blast: the fireball, its smoke, and the big smoke over it; then what it throws out
+// (ExplosionHit), back the way the grenade or rocket came, from a step behind where it
+// went off: clods of dirt, big and small, flying sparks, and little flames scattered
+// about. A frag grenade's throws fewer, harder, than an M79's or a rocket's.
 @(private = "file")
-explosion :: proc(sparks: ^Sparks, pos: utils.Vec2, weapon: res.Weapon) {
-	m79 := weapon == .M79
-	spark_add(sparks, .Big_Smoke, pos, {}, 255 if m79 else 190)
-	spark_add(sparks, .Explosion_Smoke, pos, {}, SMOKE_FRAMES * 4 + 10)
-	spark_add(sparks, .M79_Explosion if m79 else .Frag_Explosion, pos, {}, EXPLOSION_FRAMES * 3)
+explosion :: proc(sparks: ^Sparks, e: sim.Explosion) {
+	m79 := e.weapon == .M79
+	spark_add(sparks, .Big_Smoke, e.pos, {}, 255 if m79 else 190)
+	spark_add(sparks, .Explosion_Smoke, e.pos, {}, SMOKE_FRAMES * 4 + 10)
+	spark_add(sparks, .M79_Explosion if m79 else .Frag_Explosion, e.pos, {}, EXPLOSION_FRAMES * 3)
+
+	frag := e.weapon == .Frag_Grenade
+	at := e.pos - e.velocity
+	back: f32 = -0.2 if frag else -0.15
+	for _ in 0 ..< (6 if frag else 7) {
+		vel := thrown(sparks, e.velocity * back)
+		for piece in 0 ..< 4 {
+			if below(sparks, 4) != 0 do continue
+			if clod := spark_add(sparks, .Dirt, at, vel, 180 + f32(below(sparks, 50))); clod != nil do clod.piece = u8(piece)
+		}
+	}
+	for _ in 0 ..< (7 if frag else 5) {
+		vel := thrown(sparks, e.velocity * back)
+		for piece in 0 ..< 4 {
+			if below(sparks, 4 if frag else 3) != 0 do continue
+			if clod := spark_add(sparks, .Small_Dirt, at, vel, 120); clod != nil do clod.piece = u8(piece)
+		}
+	}
+	for _ in 0 ..< (3 if frag else 4) {
+		vel := thrown(sparks, e.velocity * -0.3)
+		for _ in 0 ..< 3 {
+			if below(sparks, 23 if frag else 22) == 0 do spark_add(sparks, .Fire_Spark, at, vel, 120)
+		}
+	}
+	// each flame a step on from the last, wandering
+	wander := 25 if frag else 20
+	for _ in 0 ..< (3 if frag else 4) {
+		at += {f32(below(sparks, 2 * wander) - wander), f32(below(sparks, 2 * wander) - wander)}
+		spark_add(sparks, .Blast_Flame, at, thrown(sparks, e.velocity * (-0.05 if frag else -0.1)), 35)
+	}
+}
+
+// Thrown back as `back`, and scattered: up to 3.5 either way across, and from 3.5 up to
+// 3 down.
+@(private = "file")
+thrown :: proc(sparks: ^Sparks, back: utils.Vec2) -> utils.Vec2 {
+	return {-back.x - 3.5 + f32(below(sparks, 70)) / 10, back.y - 3.5 + f32(below(sparks, 65)) / 10}
 }
 
 // A shot: the casing out of the breech, sideways to the aim and tumbling, and a puff of
@@ -310,7 +350,7 @@ random :: proc(sparks: ^Sparks) -> f32 {
 	return sim.rng_float(&sparks.rng)
 }
 
-@(private = "file")
+@(private = "package")
 below :: proc(sparks: ^Sparks, n: int) -> int {
 	return sim.rng_below(&sparks.rng, n)
 }
