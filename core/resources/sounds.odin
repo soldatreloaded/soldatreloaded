@@ -2,13 +2,19 @@ package resources
 
 import "core:log"
 import "core:mem"
+import "core:path/filepath"
 import "core:strings"
 
 import "../utils"
 
-// The game's sounds: .wav files in a mod's sfx/, decoded to stereo float frames at the
-// rate they were recorded at. Converting them to the audio device's rate, placing and
-// mixing them is the client's. Sounds are loaded the first time they are asked for.
+// The game's sounds: files in a mod's sfx/, decoded to stereo float frames at the rate
+// they were recorded at. Converting them to the audio device's rate, placing and mixing
+// them is the client's. Sounds are loaded the first time they are asked for.
+//
+// A sound is asked for as the original names it ("radio/efcup.wav"), and found whatever
+// its case: a .wav, else an .mp3 or an .ogg of the same name, the mod's before Classic's.
+// A .wav is decoded here; the others by the decoder the client gives (Sounds.decode),
+// which has one for them.
 
 // A sound decoded: each frame a left and a right sample, -1 to 1.
 Sound :: struct {
@@ -22,7 +28,16 @@ Sounds :: struct {
 	mod:       Mod,
 	by_name:   map[string]Sound,
 	allocator: mem.Allocator,
+	decode:    Sound_Decoder, // what isn't a .wav; nil to leave it unheard
 }
+
+// A sound file's bytes that aren't a .wav's, by its extension (".mp3"), decoded with
+// `allocator`. False if they can't be.
+Sound_Decoder :: #type proc(extension: string, data: []byte, allocator: mem.Allocator) -> (Sound, bool)
+
+// The extensions a sound may have, in the order they are looked for.
+@(private = "file", rodata)
+SOUND_EXTENSIONS := [?]string{".wav", ".mp3", ".ogg"}
 
 Wav_Error :: enum {
 	None,
@@ -245,9 +260,18 @@ adpcm_frame :: proc(states: [2]$T, channels, which: int) -> (frame: [2]f32) {
 // ---------------------------------------------------------------------------------
 // Loading
 
-// A .wav file. False, with the reason logged, if it can't be read or decoded.
-sound_load :: proc(path: string, allocator := context.allocator) -> (sound: Sound, ok: bool) {
+// A sound file: a .wav, or what `decode` takes. False, with the reason logged, if it
+// can't be read or decoded.
+sound_load :: proc(path: string, allocator := context.allocator, decode: Sound_Decoder = nil) -> (sound: Sound, ok: bool) {
 	data := utils.read_file(path, context.temp_allocator) or_return
+	extension := strings.to_lower(filepath.ext(path), context.temp_allocator)
+	if extension != ".wav" {
+		if decode != nil {
+			if sound, ok = decode(extension, data, allocator); ok do return
+		}
+		log.errorf("cannot decode the sound %s", path)
+		return {}, false
+	}
 	err: Wav_Error
 	sound, err = sound_decode(data, allocator)
 	if err != nil {
@@ -257,20 +281,44 @@ sound_load :: proc(path: string, allocator := context.allocator) -> (sound: Soun
 	return sound, true
 }
 
+// Where the sound the original names `name` ("radio/efcup.wav") is: in the mod's sfx/,
+// else Classic's, whatever its case, as a .wav, else an .mp3 or an .ogg. False if none
+// is anywhere.
+sound_file :: proc(mod: Mod, name: string) -> (path: string, found: bool) {
+	slash := strings.last_index_byte(name, '/')
+	folder := utils.temp_path("sfx", name[:slash]) if slash >= 0 else "sfx"
+	stem := filepath.stem(name[slash + 1:])
+	for root in ([2]string{mod.dir, mod.fallback}) {
+		if root == "" do continue
+		dir := utils.temp_path(root, folder)
+		for extension in SOUND_EXTENSIONS {
+			file := strings.concatenate({stem, extension}, context.temp_allocator)
+			if path, found = utils.find_file_any_case(dir, file, extension, context.temp_allocator); found do return
+		}
+	}
+	return
+}
+
 sound_destroy :: proc(sound: ^Sound, allocator := context.allocator) {
 	delete(sound.frames, allocator)
 	sound^ = {}
 }
 
-sounds_make :: proc(mod: Mod, allocator := context.allocator) -> Sounds {
-	return {mod = mod, by_name = make(map[string]Sound, allocator), allocator = allocator}
+sounds_make :: proc(mod: Mod, decode: Sound_Decoder = nil, allocator := context.allocator) -> Sounds {
+	return {mod = mod, by_name = make(map[string]Sound, allocator), allocator = allocator, decode = decode}
 }
 
-// A sound by its file name in sfx/ ("shotgun.wav"), loaded the first time it is asked
-// for. Empty, with no frames, if it can't be loaded.
+// A sound by its file name in sfx/ ("shotgun.wav"), found as sound_file finds it, and
+// loaded the first time it is asked for. Empty, with no frames, if it can't be found or
+// loaded; logged, once.
 sounds_get :: proc(sounds: ^Sounds, name: string) -> ^Sound {
 	if name not_in sounds.by_name {
-		sound, _ := sound_load(mod_file(sounds.mod, utils.temp_path("sfx", name)), sounds.allocator)
+		sound: Sound
+		if path, found := sound_file(sounds.mod, name); found {
+			sound, _ = sound_load(path, sounds.allocator, sounds.decode)
+		} else {
+			log.errorf("no sound %s in sfx/, as a .wav, .mp3 or .ogg", name)
+		}
 		sounds.by_name[strings.clone(name, sounds.allocator)] = sound
 	}
 	return &sounds.by_name[name]

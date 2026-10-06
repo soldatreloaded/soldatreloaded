@@ -34,6 +34,8 @@ package sound
 // client: audio/audio.c.
 
 import "core:log"
+import "core:mem"
+import "core:strings"
 
 import rl "vendor:raylib"
 
@@ -68,12 +70,26 @@ Sound :: struct {
 sound_init :: proc(s: ^Sound, mod: res.Mod) {
 	s^ = {
 		ready   = rl.IsAudioDeviceReady(),
-		bank    = res.sounds_make(mod),
+		bank    = res.sounds_make(mod, decode_compressed),
 		samples = make(map[string]Sample),
 		rng     = {0x9E3779B1},
 	}
 	if !s.ready do log.warn("no audio device: the game is silent")
 	rl.SetAudioStreamBufferSizeDefault(LOOP_CHUNK) // the loops' streams, fed a chunk at a time
+}
+
+// A sound that isn't a .wav (a mod's .mp3 or .ogg), decoded by raylib's own decoders,
+// as the bank's frames: stereo floats at the rate it was recorded at.
+@(private = "file")
+decode_compressed :: proc(extension: string, data: []byte, allocator: mem.Allocator) -> (sound: res.Sound, ok: bool) {
+	wave := rl.LoadWaveFromMemory(strings.clone_to_cstring(extension, context.temp_allocator), raw_data(data), i32(len(data)))
+	if wave.data == nil || wave.frameCount == 0 do return
+	defer rl.UnloadWave(wave)
+	rl.WaveFormat(&wave, i32(wave.sampleRate), 32, 2)
+	frames := ([^][2]f32)(wave.data)[:wave.frameCount]
+	sound = {frames = make([][2]f32, len(frames), allocator), sample_rate = int(wave.sampleRate)}
+	copy(sound.frames, frames)
+	return sound, true
 }
 
 sound_destroy :: proc(s: ^Sound) {
