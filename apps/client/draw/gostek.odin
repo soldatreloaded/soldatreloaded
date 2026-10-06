@@ -15,10 +15,12 @@ import "../../../core/utils"
 // health runs low.
 //
 // Its look is the player's: the shirt, the pants, the skin and the hair in their
-// colours, its style (male, female, waifu, rat, furry: each its own folder under
-// gostek-gfx), and its hair, headgear and chain. The hair and the headgear are every
-// style's, each in its own shared folder (hair/, headgear/), one file per style; the rat
-// and the furry wear only army, punk and Mr. T, and no headgear. The chain and the
+// colours, its style (the male, as the original's, in gostek-gfx itself; the female,
+// waifu, rat and furry, which the original hasn't, each in its own folder under it), and
+// its hair, headgear and chain. The hair and the headgear are every style's, in
+// gostek-gfx itself as the original's, one file per style; the rat and the furry wear
+// only army, punk and Mr. T, and no headgear. So an original mod's gostek-gfx dresses
+// the male, his hair and his headgear as it is. The chain and the
 // dreadlocks hang from the points 21 to 24, which the simulation swings. The cigar shows
 // while one is in the mouth, and the helmet or the hat sits in the hand while the brow
 // is wiped or it is taken off.
@@ -73,7 +75,7 @@ Part_Shown :: enum {
 
 @(private = "file", rodata)
 STYLE_DIRS := [res.Gostek]string {
-	.Male   = "male",
+	.Male   = "", // gostek-gfx itself, as the original's
 	.Female = "female",
 	.Waifu  = "waifu",
 	.Rat    = "rat",
@@ -335,13 +337,15 @@ part_shared :: proc(part: Part) -> bool {
 	return part.dir != "" || part.hair != .Army || part.head != .None
 }
 
-// Where a part's image is: its own folder's, or the hair's, the headgear's or the
-// style's under gostek-gfx; the second team's in team2/ under that.
+// Where a part's image is, as the original keeps it (gfx.inc): the male's, the hair and
+// the headgear in gostek-gfx itself; the other styles', which the original hasn't, in a
+// folder each under it; a part of its own folder's (the belt's grenades) there. The
+// second team's in team2/ under that.
 @(private = "file")
 part_path :: proc(part: Part, style: res.Gostek, team2, mirrored: bool) -> string {
 	suffix := "2.png" if mirrored else ".png"
 	if part.dir != "" do return utils.temp_path(part.dir, concat(part.file, suffix))
-	dir := "hair" if part.hair != .Army else "headgear" if part.head != .None else STYLE_DIRS[style]
+	dir := "gostek-gfx" if style == .Male || part_shared(part) else concat("gostek-gfx/", STYLE_DIRS[style])
 	if team2 do dir = concat(dir, "/team2")
-	return utils.temp_path("gostek-gfx", dir, concat(part.file, suffix))
+	return utils.temp_path(dir, concat(part.file, suffix))
 }
