@@ -1,7 +1,8 @@
 package launcher_test
 
-// The launcher (apps/launcher): a release's zip read, stored and deflated; an update
-// weighed from the two manifests and the files on disk. Nothing here reaches GitHub.
+// The launcher (apps/launcher): a release's zip read (core/utils/zip.odin), stored and
+// deflated; an update weighed from the two manifests and the files on disk. Nothing here
+// reaches GitHub.
 //
 //   odin test tests/launcher
 
@@ -18,7 +19,7 @@ FIXTURE :: #load("fixture.zip")
 @(test)
 zip_reads_stored_and_deflated :: proc(t: ^testing.T) {
 	zip := FIXTURE
-	entries, ok := launcher.zip_entries(zip)
+	entries, ok := utils.zip_entries(zip)
 	testing.expect(t, ok && len(entries) == 2, "both files, and the directory left out")
 
 	stored, has_stored := entries["data/stored.txt"]
@@ -26,14 +27,14 @@ zip_reads_stored_and_deflated :: proc(t: ^testing.T) {
 	testing.expect(t, has_stored && stored.method == 0, "a stored file, by its path")
 	testing.expect(t, has_deflated && deflated.method == 8, "and a deflated one")
 
-	text, extracted := launcher.zip_extract(zip, stored)
+	text, extracted := utils.zip_extract(zip, stored)
 	testing.expect(t, extracted && string(text) == "stored as it is\n", "a stored file comes out as it went in")
 
-	text, extracted = launcher.zip_extract(zip, deflated)
+	text, extracted = utils.zip_extract(zip, deflated)
 	testing.expect(t, extracted && len(text) == 1341, "a deflated one at its size")
 	testing.expect_value(t, launcher.sha256(text), "34a5fed655f4f5f780e79b411523e010e9630a22ff406345792b8d4c6662bb7c")
 
-	_, not_zip := launcher.zip_entries(transmute([]byte)string("not a zip at all, and long enough to look"))
+	_, not_zip := utils.zip_entries(transmute([]byte)string("not a zip at all, and long enough to look"))
 	testing.expect(t, !not_zip, "what isn't a zip is said so")
 }
 
