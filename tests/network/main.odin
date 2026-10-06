@@ -318,3 +318,18 @@ streams :: proc(t: ^testing.T) {
 	testing.expect_value(t, int(words.next - 1 - (words.first - 1)) >= fired, true)
 }
 
+
+// The lobby's list: an address and a port a line; what isn't one is passed over, and no
+// more are read than there is room for.
+@(test)
+lobby_list :: proc(t: ^testing.T) {
+	text := "1.2.3.4:23073\r\nnot an address\n256.1.1.1:23073\n10.0.0.1:0\n10.0.0.1:65536\n10.0.0.2\n192.168.1.20:40000\n"
+	list: [8]net.Query_Address
+	count := net.query_parse_list(text, list[:])
+	testing.expect_value(t, count, 2)
+	testing.expect_value(t, utils.short_string_text(&list[0].ip), "1.2.3.4")
+	testing.expect_value(t, list[0].port, u16(23073))
+	testing.expect_value(t, utils.short_string_text(&list[1].ip), "192.168.1.20")
+	testing.expect_value(t, list[1].port, u16(40000))
+	testing.expect_value(t, net.query_parse_list(text, list[:1]), 1)
+}

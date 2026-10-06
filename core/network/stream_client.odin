@@ -17,9 +17,7 @@ import "../utils"
 // tick with no snapshot steps everyone on. The clock itself runs free and is nudged a
 // tick at a time when the frames in hand run consistently over or under.
 //
-// The game doesn't play online yet: until it does, the tests are this end's only
-// caller, and the procedures only a playing client calls (client_stream_smooth, for the
-// picture; client_stream_quiet, for a silent player) have none at all.
+// A playing client's line drives it, and so do the tests.
 
 STREAM_SNAP_DISTANCE :: f32(160) // a correction this far is a placing to the eye: shown at once, not smoothed
 STREAM_INTERP_MAX :: 8           // ticks the view keeps behind the newest snapshot, at most
@@ -71,6 +69,7 @@ Client_Stream :: struct {
 
 // What the client's end has seen of the line, counted: none of it steers the stream.
 Client_Stream_Stats :: struct {
+	arrived:    u32, // snapshots heard and kept: the loss is the ticks the newest moved on by, less these
 	dropped:    u32, // snapshots that couldn't be read
 	stale:      u32, // snapshots of another round
 	late:       u32, // snapshots that came after the view had passed their tick
@@ -200,6 +199,7 @@ client_stream_hear :: proc(c: ^Client_Stream, g: ^game.Game, me: game.Soldier_Id
 	frame^ = {state = m.state, match = m.match, tick = m.tick}
 	c.newest = m.tick
 	c.server_ack = max(c.server_ack, m.client_ack)
+	c.stats.arrived += 1
 	return true
 }
 

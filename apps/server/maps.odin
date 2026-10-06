@@ -44,7 +44,7 @@ map_read :: proc(sv: ^Server) -> ([]u8, bool) {
 
 // The round's map to one peer.
 tell_map :: proc(sv: ^Server, peer: net.Peer) {
-	m := net.Msg_Map{round = sv.round, map_name = sv.map_name, hash = sv.map_hash}
+	m := net.Msg_Map{round = sv.round, map_name = sv.map_name, limit = u16(clamp(sv.game.settings.capture_limit, 0, i32(max(u16)))), hash = sv.map_hash}
 	utils.short_string_set(&m.hostname, sv.options.config.server.hostname)
 	net.net_send_message(peer, .Map, net.msg_map, &m)
 }

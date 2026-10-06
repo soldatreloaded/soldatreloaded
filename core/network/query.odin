@@ -1,5 +1,7 @@
 package network
 
+import "core:strings"
+
 import "../utils"
 
 // The query: a server asked what it is playing, out of band, on its game port, by
@@ -139,4 +141,61 @@ query_read_reply :: proc(data: []u8, nonce: u32) -> (info: Server_Info, ok: bool
 	p = p[7:]
 	ok = get_string(&p, &info.hostname) && get_string(&p, &info.map_name) && len(p) == 0
 	return
+}
+
+// ---------------------------------------------------------------------------------
+// The lobby's list
+
+// A server on the lobby's list: where to ask it.
+Query_Address :: struct {
+	ip:   utils.Short_String(15), // dotted IPv4
+	port: u16,
+}
+
+// The lobby's list as its servers.txt gives it, "1.2.3.4:23073" a line, into `out`: how
+// many, as many as fit. A line that isn't an IPv4 address and a port is passed over.
+query_parse_list :: proc(text: string, out: []Query_Address) -> (count: int) {
+	text := text
+	for raw in strings.split_lines_iterator(&text) {
+		if count == len(out) do break
+		line := strings.trim_right(raw, "\r")
+		colon := strings.last_index_byte(line, ':')
+		if colon < 0 || !is_ipv4(line[:colon]) do continue
+		port, is_port := port_parse(line[colon + 1:])
+		if !is_port do continue
+		out[count] = {ip = utils.short_string(15, line[:colon]), port = port}
+		count += 1
+	}
+	return
+}
+
+// Four numbers to 255, dotted, each of one to three digits.
+@(private = "file")
+is_ipv4 :: proc(s: string) -> bool {
+	rest := s
+	parts := 0
+	for part in strings.split_iterator(&rest, ".") {
+		if len(part) == 0 || len(part) > 3 do return false
+		v := 0
+		for c in part {
+			if c < '0' || c > '9' do return false
+			v = v * 10 + int(c - '0')
+		}
+		if v > 255 do return false
+		parts += 1
+	}
+	return parts == 4
+}
+
+// A port, 1 to 65535, its digits alone.
+@(private = "file")
+port_parse :: proc(s: string) -> (port: u16, ok: bool) {
+	if len(s) == 0 || len(s) > 5 do return
+	v := 0
+	for c in s {
+		if c < '0' || c > '9' do return
+		v = v * 10 + int(c - '0')
+	}
+	if v < 1 || v > 65535 do return
+	return u16(v), true
 }

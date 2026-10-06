@@ -5,6 +5,8 @@ import "core:strings"
 
 import enet "vendor:ENet"
 
+import "../utils"
+
 // The transport: ENet under the messages. Two channels, one unreliable for state and
 // one reliable for news, and which a message takes is its kind's to say (RELIABLE). A
 // Link is one end: a server listening for many, or a client with its one peer. Nothing
@@ -158,6 +160,11 @@ peer_ping :: proc(peer: Peer) -> u16 {
 	return u16(min(peer.roundTripTime, 65535))
 }
 
+// How much its round trip varies, in milliseconds: the line's jitter.
+peer_jitter :: proc(peer: Peer) -> u16 {
+	return u16(min(peer.roundTripTimeVariance, 65535))
+}
+
 // The peer told goodbye once what is queued for it has gone.
 peer_disconnect_later :: proc(peer: Peer) {
 	enet.peer_disconnect_later(peer, 0)
@@ -247,4 +254,54 @@ datagram_receive :: proc(socket: enet.Socket, from: ^enet.Address, buf: []u8) ->
 	buffer := Platform_Buffer{data = raw_data(buf), length = uint(len(buf))}
 	n := enet.socket_receive(socket, from, (^enet.Buffer)(&buffer), 1)
 	return buf[:n] if n > 0 else nil
+}
+
+// ---------------------------------------------------------------------------------
+// Asking servers
+
+// A plain socket of its own, outside any link, for asking servers the query and taking
+// their answers as they come: a server browser's.
+Query_Socket :: struct {
+	socket: enet.Socket,
+	open:   bool,
+}
+
+// Bound to a port of the system's choosing (Windows sends nothing from a socket never
+// bound), and never waited on.
+query_socket_open :: proc(q: ^Query_Socket) -> bool {
+	q^ = {socket = enet.socket_create(.DATAGRAM)}
+	if q.socket == enet.SOCKET_NULL do return false
+	any := enet.Address{host = enet.HOST_ANY}
+	enet.socket_bind(q.socket, &any)
+	enet.socket_set_option(q.socket, .NONBLOCK, 1)
+	q.open = true
+	return true
+}
+
+query_socket_close :: proc(q: ^Query_Socket) {
+	if q.open do enet.socket_destroy(q.socket)
+	q^ = {}
+}
+
+// The request with `nonce` to the server at `to`.
+query_ask :: proc(q: ^Query_Socket, to: Query_Address, nonce: u32) -> bool {
+	if !q.open do return false
+	to := to
+	address := enet.Address{port = to.port}
+	ip := strings.clone_to_cstring(utils.short_string_text(&to.ip), context.temp_allocator)
+	if enet.address_set_host_ip(&address, ip) != 0 do return false
+	request: [QUERY_REQUEST_SIZE]u8
+	return datagram_send(q.socket, &address, query_write_request(request[:], nonce))
+}
+
+// An answer waiting, into `buf`: whom it is from, and its bytes. False when none waits.
+query_take :: proc(q: ^Query_Socket, buf: []u8) -> (from: Query_Address, data: []u8, ok: bool) {
+	if !q.open do return
+	address: enet.Address
+	data = datagram_receive(q.socket, &address, buf)
+	if data == nil do return
+	ip: [16]u8
+	if enet.address_get_host_ip(&address, raw_data(ip[:]), len(ip)) != 0 do return
+	from = {ip = utils.short_string(15, string(cstring(raw_data(ip[:])))), port = address.port}
+	return from, data, true
 }

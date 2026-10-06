@@ -10,7 +10,7 @@ import "../utils"
 // sent over and over, unreliably, a lost one replaced by the next; news goes once, in
 // order. The two streams' messages are stream.odin's.
 
-VERSION :: 2 // of the wire: a client of another can't join
+VERSION :: 3 // of the wire: a client of another can't join
 DEFAULT_PORT :: 23073
 
 Name :: utils.Short_String(24)     // a player's
@@ -116,6 +116,7 @@ Chat_Kind :: enum u8 {
 Msg_Chat :: struct {
 	slot:  Maybe(game.Soldier_Id), // who said it; nil for the server, whose lines are of `kind`
 	team:  bool,                   // a player's, to its team alone
+	taunt: bool,                   // a player's said by a bind (a taunt, a radio call), not typed: a mute lets it through
 	kind:  Chat_Kind,              // the server's; nothing for a player's
 	color: utils.Rgba,             // a script line's own colour, carried for Script alone; alpha 0 for the script colour
 	text:  Text,
@@ -124,6 +125,7 @@ Msg_Chat :: struct {
 msg_chat :: proc(b: ^Buffer, m: ^Msg_Chat) {
 	net_maybe_slot(b, &m.slot)
 	net_bool(b, &m.team)
+	net_bool(b, &m.taunt)
 	net_enum(b, &m.kind)
 	if m.kind == .Script {
 		for &channel in m.color do net_u8(b, &channel)
@@ -138,6 +140,7 @@ Msg_Map :: struct {
 	round:    u16,
 	map_name: Map_Name,
 	hostname: Name,              // the server's, for the scoreboard
+	limit:    u16,               // the captures that win the round, for the HUD
 	hash:     [MAP_HASH_SIZE]u8, // the map's .pms, SHA-256: a copy with another isn't this map; zeros for any
 }
 
@@ -145,6 +148,7 @@ msg_map :: proc(b: ^Buffer, m: ^Msg_Map) {
 	net_u16(b, &m.round)
 	net_string(b, &m.map_name)
 	net_string(b, &m.hostname)
+	net_u16(b, &m.limit)
 	for &byte in m.hash do net_u8(b, &byte)
 }
 
