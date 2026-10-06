@@ -130,7 +130,7 @@ start_sound :: proc(client: ^Client) {
 }
 
 start_menu :: proc(client: ^Client) {
-	client.screen = menu_open(client)
+	screen_switch(client, menu_open(client))
 }
 
 // One frame of the loading screen, saying what is being done, `share` of the way there.
@@ -259,7 +259,8 @@ line_game :: proc(client: ^Client) -> ^sim.Game {
 	return playing.game if is_match && playing.mode != .Offline else nil
 }
 
-// The screen closed and `next` shown in its place, its time starting now.
+// The screen closed and `next` shown in its place, its time starting now, with the
+// system cursor as it wants it.
 screen_switch :: proc(client: ^Client, next: Screen) {
 	switch screen in client.screen {
 	case ^menu.Menu:
@@ -272,6 +273,7 @@ screen_switch :: proc(client: ^Client, next: Screen) {
 	}
 	client.screen = next
 	client.accumulator = 0
+	cursor_follow(next)
 }
 
 // How many ticks this frame owes: a whole tick comes out per tick, and the rest waits
@@ -362,6 +364,24 @@ window_size :: proc(size: [2]i32) {
 	rl.SetWindowSize(size.x, size.y)
 	monitor := rl.GetCurrentMonitor()
 	rl.SetWindowPosition((rl.GetMonitorWidth(monitor) - size.x) / 2, (rl.GetMonitorHeight(monitor) - size.y) / 2)
+}
+
+// The system cursor as `screen` wants it. The menu draws its own pointer where the
+// system's is, so the system's is free but hidden. A match keeps its own cursor, moved
+// by the mouse's motion (input.odin), so the system's is hidden and held in the window:
+// it can't wander onto another display or click outside the game.
+//
+// It is set here, once the screen before is gone, and not by the screens themselves: the
+// next screen is made before the last is closed, so a screen's closing undid what the
+// next had set.
+cursor_follow :: proc(screen: Screen) {
+	switch _ in screen {
+	case ^menu.Menu:
+		rl.EnableCursor() // let go, if a match held it
+		rl.HideCursor()
+	case ^match.Match:
+		rl.DisableCursor()
+	}
 }
 
 config_save :: proc(config: ^res.Client_Config) {

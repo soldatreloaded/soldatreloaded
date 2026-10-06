@@ -10,10 +10,10 @@ package input
 // caller the frame it goes down. A key pressed with a modifier held is bound as
 // "alt+q" where that has a bind, and as "q" where not.
 //
-// The mouse is the original's: the system cursor is held in the window, and the game
-// keeps its own, moved by the mouse's motion times the sensitivity and kept inside the
-// view, in the view's units (480 tall, whatever the window), so it feels the same at any
-// window size.
+// The mouse is the original's: the system cursor is hidden and held in the window (the
+// client holds it while a match is shown), and the game keeps its own, moved by the
+// mouse's motion times the sensitivity and kept inside the view, in the view's units
+// (480 tall, whatever the window), so it feels the same at any window size.
 //
 // Uses: raylib, core/game. From the C client: input/input.c.
 
@@ -56,16 +56,13 @@ BUTTON_COMMANDS := [?]struct {
 	{"+drop", .Drop}, {"+flagthrow", .Flag_Throw},
 }
 
-// The window is the game's: the system cursor hidden and held, and the game's in the
-// middle of a view this size.
+// The game's cursor in the middle of a view this size. The system's is hidden and held
+// by the client while a match is on screen (main's cursor_follow).
 input_start :: proc(input: ^Input, view: [2]f32) {
-	rl.DisableCursor()
 	input^ = {cursor = view / 2, view = view}
 }
 
-// The window is the menus' again.
 input_stop :: proc(input: ^Input) {
-	rl.EnableCursor()
 	input^ = {}
 }
 

@@ -128,7 +128,6 @@ menu_init :: proc(menu: ^Menu, config: ^res.Client_Config, mod: res.Mod, last_ma
 	for info, weapon in sim.weapons_default() do menu.weapon_names[weapon] = info.name
 	offline_init(&menu.offline, last_map)
 	menu.taunts.slot = -1
-	rl.HideCursor() // the menu draws its own
 	go_page(menu, .Servers)
 }
 
@@ -139,7 +138,6 @@ menu_destroy :: proc(menu: ^Menu) {
 	delete(menu.taunts.text)
 	draw.preview_destroy(&menu.preview)
 	hud.art_destroy(&menu.art)
-	rl.ShowCursor()
 	menu^ = {}
 }
 
