@@ -12,7 +12,7 @@ import "../../../core/utils"
 // A sprite: one of the mod's images with its size in the world, drawn as a turned,
 // scaled quad. The soldiers, the bullets, the things and the sparks are all sprites,
 // their images packed into one atlas as they load (atlas.odin), so they draw in one go.
-// How big an image is in the world is the mod's to say, in mod.json's `scale` (the
+// How big an image is in the world is the mod's to say, in mod.ini's [SCALE] (the
 // original's ScaleData): its pixels over its scale. From the C client's render/sprite.c
 // and render/scale_data.c.
 
@@ -77,7 +77,7 @@ sprite_book_load :: proc(book: ^Sprite_Book, dir, name: string) -> Sprite {
 	return sprite_find({book.mod, &book.scales, &book.atlas, nil}, dir, name)
 }
 
-// mod.json's `scale` (res.Mod_Config); everything at the default without one. A scale
+// mod.ini's [SCALE] (res.Mod_Config); everything at the default without one. A scale
 // that isn't above 0 is passed over.
 scales_load :: proc(mod: res.Mod) -> (scales: Scales) {
 	config := res.mod_config_load(mod, context.temp_allocator)

@@ -29,16 +29,19 @@ Gostek_Art :: struct {
 	// by style, part, team (the second's image) and mirrored; a part every style wears
 	// the same (part_shared) is the male's alone
 	parts:   [res.Gostek][len(PARTS)][2][2]Sprite,
+	centers: [len(PARTS)][2]f32, // where each part is pinned, as the mod's mod.ini has it
 	weapons: [res.Weapon][2]Sprite, // [mirrored]
 	flashes: [res.Weapon]Sprite,
+	held:    [res.Weapon]Weapon_Anchors, // and where each weapon is
 }
 
 @(private = "file")
 Part :: struct {
+	id:      string, // the original's for it, by which mod.ini's [GOSTEK] pins it; none for ours alone
 	file:    string,
 	dir:     string, // the folder under the mod it is read from; the style's when empty
 	p1, p2:  int,    // the points it is pinned on and turned toward, the original's 1-based numbering
-	center:  [2]f32,
+	center:  [2]f32, // where it is pinned, 0 to 1 across its image, unless the mod says otherwise
 	flex:    f32,    // over 0: it stretches along its length, by the length over this, to half again at most
 	flip:    bool,   // it has a mirrored image, "<file>2", for facing left
 	team:    bool,   // it has the second team's image, under team2/
@@ -87,68 +90,68 @@ STYLE_DIRS := [res.Gostek]string {
 PARTS := [?]Part {
 	// the helmet or the hat in the left hand, while the brow is wiped or it comes off:
 	// behind everything, as the original draws them
-	{file = "helm", p1 = 15, p2 = 19, center = {0, 0.5}, flip = true, team = true, color = .Shirt, head = .Helmet, grabbed = true},
-	{file = "kap", p1 = 15, p2 = 19, center = {0.1, 0.4}, flip = true, team = true, color = .Shirt, head = .Hat, grabbed = true},
+	{id = "Grabbed_Helmet", file = "helm", p1 = 15, p2 = 19, center = {0, 0.5}, flip = true, team = true, color = .Shirt, head = .Helmet, grabbed = true},
+	{id = "Grabbed_Hat", file = "kap", p1 = 15, p2 = 19, center = {0.1, 0.4}, flip = true, team = true, color = .Shirt, head = .Hat, grabbed = true},
 	{file = "helm3", p1 = 15, p2 = 19, center = {0, 0.5}, flip = true, team = true, color = .Shirt, head = .Waifu, grabbed = true},
-	{file = "udo", p1 = 6, p2 = 3, center = {0.2, 0.5}, flex = 5, flip = true, team = true, color = .Pants},
-	{file = "ranny/udo", p1 = 6, p2 = 3, center = {0.2, 0.5}, flex = 5, flip = true, team = true, shown = .Wounded},
-	{file = "stopa", p1 = 2, p2 = 18, center = {0.35, 0.35}, flip = true, team = true, shown = .Standing},
-	{file = "lecistopa", p1 = 2, p2 = 18, center = {0.35, 0.35}, flip = true, team = true, shown = .Jetting},
-	{file = "noga", p1 = 3, p2 = 2, center = {0.15, 0.55}, flip = true, team = true, color = .Pants},
-	{file = "ranny/noga", p1 = 3, p2 = 2, center = {0.15, 0.55}, flip = true, team = true, shown = .Wounded},
-	{file = "ramie", p1 = 11, p2 = 14, center = {0, 0.5}, flip = true, team = true, color = .Shirt},
-	{file = "ranny/ramie", p1 = 11, p2 = 14, center = {0, 0.5}, flip = true, team = true, shown = .Wounded},
-	{file = "reka", p1 = 14, p2 = 15, center = {0, 0.5}, flex = 5, team = true, color = .Shirt},
-	{file = "ranny/reka", p1 = 14, p2 = 15, center = {0, 0.5}, flex = 5, flip = true, team = true, shown = .Wounded},
-	{file = "dlon", p1 = 15, p2 = 19, center = {0, 0.4}, flip = true, team = true, color = .Skin},
-	{file = "udo", p1 = 5, p2 = 4, center = {0.2, 0.65}, flex = 5, flip = true, team = true, color = .Pants},
-	{file = "ranny/udo", p1 = 5, p2 = 4, center = {0.2, 0.65}, flex = 5, flip = true, team = true, shown = .Wounded},
-	{file = "stopa", p1 = 1, p2 = 17, center = {0.35, 0.35}, flip = true, team = true, shown = .Standing},
-	{file = "lecistopa", p1 = 1, p2 = 17, center = {0.35, 0.35}, flip = true, team = true, shown = .Jetting},
-	{file = "noga", p1 = 4, p2 = 1, center = {0.15, 0.55}, flip = true, team = true, color = .Pants},
-	{file = "ranny/noga", p1 = 4, p2 = 1, center = {0.15, 0.55}, flip = true, team = true, shown = .Wounded},
-	{file = "klata", p1 = 10, p2 = 11, center = {0.1, 0.3}, flip = true, team = true, color = .Shirt},
-	{file = "ranny/klata", p1 = 10, p2 = 11, center = {0.1, 0.3}, flip = true, team = true, shown = .Wounded},
-	{file = "biodro", p1 = 5, p2 = 6, center = {0.25, 0.6}, flip = true, team = true, color = .Shirt},
-	{file = "ranny/biodro", p1 = 5, p2 = 6, center = {0.25, 0.6}, flip = true, team = true, shown = .Wounded},
-	{file = "morda", p1 = 9, p2 = 12, center = {0, 0.5}, flip = true, team = true, color = .Skin},
-	{file = "ranny/morda", p1 = 9, p2 = 12, center = {0, 0.5}, flip = true, team = true, color = .Head_Blood, shown = .Wounded},
+	{id = "Left_Thigh", file = "udo", p1 = 6, p2 = 3, center = {0.2, 0.5}, flex = 5, flip = true, team = true, color = .Pants},
+	{id = "Left_Thigh_Dmg", file = "ranny/udo", p1 = 6, p2 = 3, center = {0.2, 0.5}, flex = 5, flip = true, team = true, shown = .Wounded},
+	{id = "Left_Foot", file = "stopa", p1 = 2, p2 = 18, center = {0.35, 0.35}, flip = true, team = true, shown = .Standing},
+	{id = "Left_Jetfoot", file = "lecistopa", p1 = 2, p2 = 18, center = {0.35, 0.35}, flip = true, team = true, shown = .Jetting},
+	{id = "Left_Lowerleg", file = "noga", p1 = 3, p2 = 2, center = {0.15, 0.55}, flip = true, team = true, color = .Pants},
+	{id = "Left_Lowerleg_Dmg", file = "ranny/noga", p1 = 3, p2 = 2, center = {0.15, 0.55}, flip = true, team = true, shown = .Wounded},
+	{id = "Left_Arm", file = "ramie", p1 = 11, p2 = 14, center = {0, 0.5}, flip = true, team = true, color = .Shirt},
+	{id = "Left_Arm_Dmg", file = "ranny/ramie", p1 = 11, p2 = 14, center = {0, 0.5}, flip = true, team = true, shown = .Wounded},
+	{id = "Left_Forearm", file = "reka", p1 = 14, p2 = 15, center = {0, 0.5}, flex = 5, team = true, color = .Shirt},
+	{id = "Left_Forearm_Dmg", file = "ranny/reka", p1 = 14, p2 = 15, center = {0, 0.5}, flex = 5, flip = true, team = true, shown = .Wounded},
+	{id = "Left_Hand", file = "dlon", p1 = 15, p2 = 19, center = {0, 0.4}, flip = true, team = true, color = .Skin},
+	{id = "Right_Thigh", file = "udo", p1 = 5, p2 = 4, center = {0.2, 0.65}, flex = 5, flip = true, team = true, color = .Pants},
+	{id = "Right_Thigh_Dmg", file = "ranny/udo", p1 = 5, p2 = 4, center = {0.2, 0.65}, flex = 5, flip = true, team = true, shown = .Wounded},
+	{id = "Right_Foot", file = "stopa", p1 = 1, p2 = 17, center = {0.35, 0.35}, flip = true, team = true, shown = .Standing},
+	{id = "Right_Jetfoot", file = "lecistopa", p1 = 1, p2 = 17, center = {0.35, 0.35}, flip = true, team = true, shown = .Jetting},
+	{id = "Right_Lowerleg", file = "noga", p1 = 4, p2 = 1, center = {0.15, 0.55}, flip = true, team = true, color = .Pants},
+	{id = "Right_Lowerleg_Dmg", file = "ranny/noga", p1 = 4, p2 = 1, center = {0.15, 0.55}, flip = true, team = true, shown = .Wounded},
+	{id = "Chest", file = "klata", p1 = 10, p2 = 11, center = {0.1, 0.3}, flip = true, team = true, color = .Shirt},
+	{id = "Chest_Dmg", file = "ranny/klata", p1 = 10, p2 = 11, center = {0.1, 0.3}, flip = true, team = true, shown = .Wounded},
+	{id = "Hip", file = "biodro", p1 = 5, p2 = 6, center = {0.25, 0.6}, flip = true, team = true, color = .Shirt},
+	{id = "Hip_Dmg", file = "ranny/biodro", p1 = 5, p2 = 6, center = {0.25, 0.6}, flip = true, team = true, shown = .Wounded},
+	{id = "Head", file = "morda", p1 = 9, p2 = 12, center = {0, 0.5}, flip = true, team = true, color = .Skin},
+	{id = "Head_Dmg", file = "ranny/morda", p1 = 9, p2 = 12, center = {0, 0.5}, flip = true, team = true, color = .Head_Blood, shown = .Wounded},
 	// The hair, the headgear and the chain, in the original's order. A helmet or a hat
 	// covers every hair style but Mr. T's.
-	{file = "hair3", p1 = 9, p2 = 12, center = {0, 0.5}, flip = true, team = true, color = .Hair, hair = .Mr_T},
-	{file = "helm", p1 = 9, p2 = 12, center = {-0.1, 0.52}, flip = true, team = true, color = .Shirt, head = .Helmet},
-	{file = "kap", p1 = 9, p2 = 12, center = {0, 0.5}, flip = true, team = true, color = .Shirt, head = .Hat},
+	{id = "Mr_T", file = "hair3", p1 = 9, p2 = 12, center = {0, 0.5}, flip = true, team = true, color = .Hair, hair = .Mr_T},
+	{id = "Helmet", file = "helm", p1 = 9, p2 = 12, center = {-0.1, 0.52}, flip = true, team = true, color = .Shirt, head = .Helmet},
+	{id = "Hat", file = "kap", p1 = 9, p2 = 12, center = {0, 0.5}, flip = true, team = true, color = .Shirt, head = .Hat},
 	{file = "helm3", p1 = 9, p2 = 12, center = {0, 0.5}, flip = true, team = true, color = .Shirt, head = .Waifu},
-	{file = "hair1", p1 = 9, p2 = 12, center = {0, 0.5}, flip = true, team = true, color = .Hair, hair = .Dreadlocks},
-	{file = "dred", p1 = 23, p2 = 24, center = {0, 1.22}, team = true, color = .Hair, hair = .Dreadlocks, dread = 1},
-	{file = "dred", p1 = 23, p2 = 24, center = {0.1, 0.5}, team = true, color = .Hair, hair = .Dreadlocks, dread = 2},
-	{file = "dred", p1 = 23, p2 = 24, center = {0.04, -0.3}, team = true, color = .Hair, hair = .Dreadlocks, dread = 3},
-	{file = "dred", p1 = 23, p2 = 24, center = {0, -0.9}, team = true, color = .Hair, hair = .Dreadlocks, dread = 4},
-	{file = "dred", p1 = 23, p2 = 24, center = {-0.2, -1.35}, team = true, color = .Hair, hair = .Dreadlocks, dread = 5},
-	{file = "hair2", p1 = 9, p2 = 12, center = {0, 0.5}, flip = true, team = true, color = .Hair, hair = .Punk},
-	{file = "hair4", p1 = 9, p2 = 12, center = {0, 0.5}, flip = true, team = true, color = .Hair, hair = .Normal},
+	{id = "Hair_Dreadlocks", file = "hair1", p1 = 9, p2 = 12, center = {0, 0.5}, flip = true, team = true, color = .Hair, hair = .Dreadlocks},
+	{id = "Hair_Dreadlock1", file = "dred", p1 = 23, p2 = 24, center = {0, 1.22}, team = true, color = .Hair, hair = .Dreadlocks, dread = 1},
+	{id = "Hair_Dreadlock2", file = "dred", p1 = 23, p2 = 24, center = {0.1, 0.5}, team = true, color = .Hair, hair = .Dreadlocks, dread = 2},
+	{id = "Hair_Dreadlock3", file = "dred", p1 = 23, p2 = 24, center = {0.04, -0.3}, team = true, color = .Hair, hair = .Dreadlocks, dread = 3},
+	{id = "Hair_Dreadlock4", file = "dred", p1 = 23, p2 = 24, center = {0, -0.9}, team = true, color = .Hair, hair = .Dreadlocks, dread = 4},
+	{id = "Hair_Dreadlock5", file = "dred", p1 = 23, p2 = 24, center = {-0.2, -1.35}, team = true, color = .Hair, hair = .Dreadlocks, dread = 5},
+	{id = "Hair_Punk", file = "hair2", p1 = 9, p2 = 12, center = {0, 0.5}, flip = true, team = true, color = .Hair, hair = .Punk},
+	{id = "Hair_Normal", file = "hair4", p1 = 9, p2 = 12, center = {0, 0.5}, flip = true, team = true, color = .Hair, hair = .Normal},
 	// the waifu's: her fringe's bangs sit a little right on everyone, so it is anchored in
 	{file = "hair5", p1 = 9, p2 = 12, center = {0.03, 0.65}, flip = true, team = true, color = .Hair, hair = .Fringe},
 	{file = "hair6", p1 = 9, p2 = 12, center = {0, 0.5}, flip = true, team = true, color = .Hair, hair = .Bob},
-	{file = "lancuch", p1 = 10, p2 = 22, center = {0.1, 0.5}, team = true, chain = .Dog_Tags},
-	{file = "lancuch", p1 = 11, p2 = 22, center = {0.1, 0.5}, team = true, chain = .Dog_Tags},
-	{file = "metal", p1 = 22, p2 = 21, center = {0.5, 0.7}, flip = true, team = true, chain = .Dog_Tags},
-	{file = "zlotylancuch", p1 = 10, p2 = 22, center = {0.1, 0.5}, team = true, chain = .Gold_Chain},
-	{file = "zlotylancuch", p1 = 11, p2 = 22, center = {0.1, 0.5}, team = true, chain = .Gold_Chain},
-	{file = "zloto", p1 = 22, p2 = 21, center = {0.5, 0.5}, flip = true, team = true, chain = .Gold_Chain},
-	{file = "cygaro", p1 = 9, p2 = 12, center = {-0.125, 0.4}, flip = true, team = true, color = .Cigar, shown = .Cigar},
+	{id = "Silver_Lchain", file = "lancuch", p1 = 10, p2 = 22, center = {0.1, 0.5}, team = true, chain = .Dog_Tags},
+	{id = "Silver_Rchain", file = "lancuch", p1 = 11, p2 = 22, center = {0.1, 0.5}, team = true, chain = .Dog_Tags},
+	{id = "Silver_Pendant", file = "metal", p1 = 22, p2 = 21, center = {0.5, 0.7}, flip = true, team = true, chain = .Dog_Tags},
+	{id = "Golden_Lchain", file = "zlotylancuch", p1 = 10, p2 = 22, center = {0.1, 0.5}, team = true, chain = .Gold_Chain},
+	{id = "Golden_Rchain", file = "zlotylancuch", p1 = 11, p2 = 22, center = {0.1, 0.5}, team = true, chain = .Gold_Chain},
+	{id = "Golden_Pendant", file = "zloto", p1 = 22, p2 = 21, center = {0.5, 0.5}, flip = true, team = true, chain = .Gold_Chain},
+	{id = "Cigar", file = "cygaro", p1 = 9, p2 = 12, center = {-0.125, 0.4}, flip = true, team = true, color = .Cigar, shown = .Cigar},
 	// The belt, between the hips. The original pins all five to the same spot, so a
 	// soldier carrying more shows no more; the count is still the original's.
-	{file = "frag-grenade", dir = "weapons-gfx", p1 = 5, p2 = 6, center = {0.5, 0.1}, nade = 1},
-	{file = "frag-grenade", dir = "weapons-gfx", p1 = 5, p2 = 6, center = {0.5, 0.1}, nade = 2},
-	{file = "frag-grenade", dir = "weapons-gfx", p1 = 5, p2 = 6, center = {0.5, 0.1}, nade = 3},
-	{file = "frag-grenade", dir = "weapons-gfx", p1 = 5, p2 = 6, center = {0.5, 0.1}, nade = 4},
-	{file = "frag-grenade", dir = "weapons-gfx", p1 = 5, p2 = 6, center = {0.5, 0.1}, nade = 5},
-	{file = "ramie", p1 = 10, p2 = 13, center = {0, 0.6}, flip = true, team = true, color = .Shirt, grip = true},
-	{file = "ranny/ramie", p1 = 10, p2 = 13, center = {-0.1, 0.5}, flip = true, team = true, shown = .Wounded},
-	{file = "reka", p1 = 13, p2 = 16, center = {0, 0.6}, flex = 5, team = true, color = .Shirt},
-	{file = "ranny/reka", p1 = 13, p2 = 16, center = {0, 0.6}, flex = 5, flip = true, team = true, shown = .Wounded},
-	{file = "dlon", p1 = 16, p2 = 20, center = {0, 0.5}, flip = true, team = true, color = .Skin},
+	{id = "Frag_Grenade1", file = "frag-grenade", dir = "weapons-gfx", p1 = 5, p2 = 6, center = {0.5, 0.1}, nade = 1},
+	{id = "Frag_Grenade2", file = "frag-grenade", dir = "weapons-gfx", p1 = 5, p2 = 6, center = {0.5, 0.1}, nade = 2},
+	{id = "Frag_Grenade3", file = "frag-grenade", dir = "weapons-gfx", p1 = 5, p2 = 6, center = {0.5, 0.1}, nade = 3},
+	{id = "Frag_Grenade4", file = "frag-grenade", dir = "weapons-gfx", p1 = 5, p2 = 6, center = {0.5, 0.1}, nade = 4},
+	{id = "Frag_Grenade5", file = "frag-grenade", dir = "weapons-gfx", p1 = 5, p2 = 6, center = {0.5, 0.1}, nade = 5},
+	{id = "Right_Arm", file = "ramie", p1 = 10, p2 = 13, center = {0, 0.6}, flip = true, team = true, color = .Shirt, grip = true},
+	{id = "Right_Arm_Dmg", file = "ranny/ramie", p1 = 10, p2 = 13, center = {-0.1, 0.5}, flip = true, team = true, shown = .Wounded},
+	{id = "Right_Forearm", file = "reka", p1 = 13, p2 = 16, center = {0, 0.6}, flex = 5, team = true, color = .Shirt},
+	{id = "Right_Forearm_Dmg", file = "ranny/reka", p1 = 13, p2 = 16, center = {0, 0.6}, flex = 5, flip = true, team = true, shown = .Wounded},
+	{id = "Right_Hand", file = "dlon", p1 = 16, p2 = 20, center = {0, 0.5}, flip = true, team = true, color = .Skin},
 }
 
 NADE_ALPHA :: 0.75 // the belt's grenades, as the original draws them (ALPHA_NADES)
@@ -156,6 +159,8 @@ SPAWN_PROTECTED_ALPHA :: 153
 
 // Every style's parts and the weapons' art.
 gostek_load :: proc(art: ^Gostek_Art, source: Source) {
+	config := res.mod_config_load(source.mod, context.temp_allocator)
+	for &part, i in PARTS do art.centers[i] = res.mod_anchor(&config, part.id, part.center)
 	for style in res.Gostek {
 		for &part, i in PARTS {
 			if style != .Male && part_shared(part) do continue
@@ -166,7 +171,7 @@ gostek_load :: proc(art: ^Gostek_Art, source: Source) {
 			}
 		}
 	}
-	weapons_load(source, art)
+	weapons_load(source, art, &config)
 }
 
 // What a soldier wears and does as it is drawn, which says which parts show.
@@ -206,14 +211,15 @@ draw_gostek :: proc(art: ^Gostek_Art, soldier: ^sim.Soldier, figure: ^Figure, sh
 		p1, p2 := points[part.p1 - 1], points[part.p2 - 1]
 		along := p2 - p1
 		angle := math.atan2(along.y, along.x)
-		center := part.center
+		anchor := art.centers[i] // the mod's, else the part's own
+		center := anchor
 		if figure.corpse && part.p2 == 12 {
 			p1 = p2 // a corpse's face hangs from the head, so a cut head rolls off with it
 			center.x = 1
 		}
 		scale := [2]f32{1, 1}
 		if facing_left && part.flip {
-			center.y = 1 - part.center.y
+			center.y = 1 - anchor.y
 		} else if facing_left {
 			scale.y = -1
 		}
@@ -223,7 +229,7 @@ draw_gostek :: proc(art: ^Gostek_Art, soldier: ^sim.Soldier, figure: ^Figure, sh
 			head := points[11] - points[8]
 			turn := math.atan2(head.y, head.x) - math.PI / 2
 			dir: f32 = -1 if facing_left else 1
-			root := [2]f32{-part.center.y * sprite.size.y * dir, part.center.x * sprite.size.x}
+			root := [2]f32{-anchor.y * sprite.size.y * dir, anchor.x * sprite.size.x}
 			c, s := math.cos(turn), math.sin(turn)
 			p1 += {root.x * c - root.y * s, root.x * s + root.y * c}
 			center = {0, 0.5}
