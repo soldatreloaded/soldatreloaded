@@ -1,6 +1,7 @@
 package match
 
 import sa "core:container/small_array"
+import "core:math/rand"
 
 import sim "../../../core/game"
 import "../draw"
@@ -17,9 +18,15 @@ import "../input"
 //
 // And a scoped Barrett shot of mine (the original's bullet Tracking): the camera rides
 // it, five ticks ahead, until it is gone or I stand up (graphics.track_shot).
+//
+// And the original's screen shake, while the camera follows someone: a shot in their
+// view jolts it (mine always, others' with graphics.screen_shake; Sprites.pas Fire), my
+// chainsaw's bite does (Bullets.pas), and a blast in their view wobbles it as it flares
+// (Sparks.pas), less as it dies down.
 
 SPECTATOR_AIM_DIST :: 30 // the free camera's speed, by the cursor's offset from the middle
 TRACK_LEAD :: 5 // ticks of its flight the camera keeps ahead of a tracked shot
+WOBBLE_LIFE :: draw.EXPLOSION_FRAMES * 2.3 // a blast wobbles the camera while it has more life than this
 
 Watch :: struct {
 	follow:       Maybe(sim.Soldier_Id), // the player the camera follows; nil for me
@@ -110,9 +117,12 @@ camera_tick :: proc(match: ^Match) {
 	camera := &match.camera
 	followed := match.me
 	if f, following := w.follow.?; following && match.game.world.soldiers[f].active do followed = f
+	if !w.free do camera_jolt(match, followed) // the tick's shots, before its bullets
 	if shot, tracking := w.tracking.?; tracking {
 		if bullet := my_shot(match, shot); bullet != nil do camera.pos = bullet.pos + bullet.velocity * TRACK_LEAD
 	}
+	_, paused := match.game.round.phase.(sim.Paused) // a paused round's sparks hang, and don't flare on
+	if !w.free && match.mode != .Demo && !paused do camera_wobble(match, followed) // its sparks, after
 	cursor := cursor_aimed(match)
 	if w.free {
 		// still with the cursor in the middle: 10 either way, wider with a wider view
@@ -123,6 +133,58 @@ camera_tick :: proc(match: ^Match) {
 	}
 	soldier := &match.game.world.soldiers[followed]
 	draw.camera_follow(camera, soldier.body.pos, cursor, soldier.aim.distance)
+}
+
+// The tick's shots in view of whom the camera follows, the chainsaw's aside, each jolting
+// it: by up to 3 either way for the heavy guns, 1 for the rest. Then each bite of my
+// chainsaw, wherever it is, by up to 3.
+@(private = "file")
+camera_jolt :: proc(match: ^Match, followed: sim.Soldier_Id) {
+	world := &match.game.world
+	for event in sa.slice(&match.game.output.events) {
+		#partial switch e in event {
+		case sim.Fired:
+			if e.weapon == .Chainsaw || e.weapon == .Frag_Grenade do continue // a grenade is thrown, not fired
+			if e.soldier != match.me && !match.config.graphics.screen_shake do continue
+			if !point_visible(match, world.soldiers[e.soldier].body.pos, followed) do continue
+			#partial switch e.weapon {
+			case .Minimi, .Spas12, .Barrett, .Minigun: camera_shake(match, 3)
+			case:                                      camera_shake(match, 1)
+			}
+		case sim.Hit:
+			if e.shooter == match.me && e.weapon == .Chainsaw do camera_shake(match, 3)
+		}
+	}
+}
+
+// The camera moved by a whole number from -by to by, each way.
+@(private = "file")
+camera_shake :: proc(match: ^Match, by: int) {
+	match.camera.pos += {f32(rand.int_max(2 * by + 1) - by), f32(rand.int_max(2 * by + 1) - by)}
+}
+
+// Each blast in view of whom the camera follows, while it flares: the camera moved by up
+// to a sixth of its life, the original's way (one more to the right than to the left,
+// and one less down than up).
+@(private = "file")
+camera_wobble :: proc(match: ^Match, followed: sim.Soldier_Id) {
+	for &spark in match.sparks.pool {
+		if spark.kind != .M79_Explosion && spark.kind != .Frag_Explosion do continue
+		// the life it had as the tick began, as the original's is tested before it ticks down
+		if spark.old_life <= WOBBLE_LIFE || !point_visible(match, spark.pos, followed) do continue
+		wobble := int(spark.old_life) / 6 // 6 at least, past WOBBLE_LIFE
+		match.camera.pos += {f32(rand.int_max(2 * wobble + 1) - wobble), f32(rand.int_max(2 * wobble) - wobble)}
+	}
+}
+
+// Whether `point` is within a view's size of the middle between the soldier and their
+// aim (PointVisible).
+@(private = "file")
+point_visible :: proc(match: ^Match, point: [2]f32, id: sim.Soldier_Id) -> bool {
+	s := &match.game.world.soldiers[id]
+	middle := s.body.pos - (s.body.pos - s.controls.aim) / 2
+	view := match.camera.view
+	return abs(point.x - middle.x) < view.x && abs(point.y - middle.y) < view.y
 }
 
 // The cursor the camera leads toward: a demo's recorder's own while the camera is on the

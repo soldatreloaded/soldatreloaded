@@ -31,6 +31,7 @@ page_options :: proc(menu: ^Menu) {
 	ui.enum_select(k, "Kill log position", &config.interface.kill_log_position, KILL_LOG_PLACES[:])
 	ui.toggle(k, "Minimap", &config.interface.minimap)
 	ui.toggle(k, "Follow scoped shot", &config.graphics.track_shot)
+	ui.toggle(k, "Others' fire shakes the screen", &config.graphics.screen_shake)
 	ui.toggle(k, "Show on Discord", &config.interface.discord)
 	ui.section(k, "NETWORK")
 	ui.slider(k, "Smoothing", &config.network.smooth, 0, 500, 25, "%d ms")
