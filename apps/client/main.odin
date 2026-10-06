@@ -2,8 +2,10 @@ package main
 
 // The client: one screen at a time, the main menu or a game, each its own package.
 // The loop reads input, updates the screen, draws it, and switches screens when the
-// screen asks. It also loads the configs at the start and saves them at the end, keeps
-// the window as the config has it as that changes, and keeps what outlives the screens:
+// screen asks. Before the first, while the client starts, it shows the loading screen
+// (menu/loading.odin). It also loads the configs at the start and saves them at the
+// end, keeps the window as the config has it as that changes, and keeps what outlives
+// the screens:
 // the sound, which a match plays into; the line to a server, which the menu opens and a
 // match plays on, polled here each frame; and the server browser's list.
 // Discord presence (interface.discord, the C client's net/discord.c) comes later, pumped
@@ -74,10 +76,11 @@ main :: proc() {
 	client.last_map = strings.clone(menu.FIRST_MAP)
 	if !online.line_init(&client.line) do log.error("ENet wouldn't start: there is no playing online")
 	window_open(&client.window, &client.config.graphics)
-	rl.InitAudioDevice()
-	sound.sound_init(&client.sound, client.mod)
-	ui.ui_init(&client.ui, client.mod)
-	client.screen = menu_open(&client)
+	ui.ui_init(&client.ui, client.mod) // first: the loading screen is written in its faces
+	for step, i in START_STEPS {
+		loading_show(&client, step.doing, f32(i) / len(START_STEPS))
+		step.run(&client)
+	}
 
 	for client.screen != nil && !rl.WindowShouldClose() {
 		window_follow(&client.window, &client.config.graphics)
@@ -104,6 +107,44 @@ main :: proc() {
 	res.mod_destroy(&client.mod)
 	res.client_config_destroy(client.config)
 }
+
+// ---------------------------------------------------------------------------------
+// Starting
+
+// What starting takes once the window is open, in order: the steps slow enough to be
+// waited on, each shown on the loading screen as it runs.
+Start_Step :: struct {
+	doing: string, // what the loading screen says while it runs
+	run:   proc(client: ^Client),
+}
+
+@(rodata)
+START_STEPS := [?]Start_Step {
+	{"Starting the sound", start_sound}, // the audio device alone takes a second
+	{"Loading the menu", start_menu},
+}
+
+start_sound :: proc(client: ^Client) {
+	rl.InitAudioDevice()
+	sound.sound_init(&client.sound, client.mod)
+}
+
+start_menu :: proc(client: ^Client) {
+	client.screen = menu_open(client)
+}
+
+// One frame of the loading screen, saying what is being done, `share` of the way there.
+// The window holds it while the step that follows runs.
+loading_show :: proc(client: ^Client, doing: string, share: f32) {
+	ui.ui_begin(&client.ui)
+	rl.BeginDrawing()
+	menu.loading_draw(&client.ui, doing, share)
+	rl.EndDrawing()
+	free_all(context.temp_allocator)
+}
+
+// ---------------------------------------------------------------------------------
+// The screens
 
 // The line first, with what it brings going into the game on screen; then the screen's
 // frame, and the screen it asks for in its place. The menu doesn't tick; a match is

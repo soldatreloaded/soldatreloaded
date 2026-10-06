@@ -24,6 +24,7 @@ package menu
 //   controls.odin  the keys                           taunts.odin    the taunt editor
 //   binds.odin     the keys and the taunts as the config's binds
 //   options.odin   sound, mouse, interface, network   graphics.odin  the window, the world
+//   loading.odin   the loading screen, before there is a menu
 //
 // Uses: ui, draw (the player's preview), hud (the pointer), demo (the listing), online (the
 // line and the browser). From
@@ -399,7 +400,7 @@ rail_button :: proc(k: ^ui.Kit, x, y, w, h: f32, caption: string, focused: bool)
 
 // The name, written: SOLDAT in the stencil face, and RELOADED under it in the accent,
 // its letters spaced out to the same width. The height it took.
-@(private = "file")
+@(private = "package")
 logo :: proc(k: ^ui.Kit, x, y, width: f32) -> f32 {
 	u := k.ui
 	name := ui.LOGO // as large as the rail allows
@@ -439,7 +440,7 @@ EMBERS :: 70
 // What is behind the menu: night falling to steel, a warm glow low on the left and a
 // cool one high on the right, the edges darkened, and embers rising slowly through it,
 // each flickering and fading as it goes. All of it from the clock alone: nothing kept.
-@(private = "file")
+@(private = "package")
 background :: proc(u: ^ui.Ui, time: f64) {
 	W, t := u.width, f32(time)
 	ui.shade(u, 0, 0, W, VIEW_H, {18, 24, 38, 255}, {10, 12, 18, 255}, false)
