@@ -214,7 +214,9 @@ voice_start :: proc(s: ^Sound, v: int, sample: Sample, gain, pan: f32) {
 		voice.alias_of = sample.sound.buffer
 	}
 	voice_place(voice, gain, pan)
-	rl.PlaySound(voice.alias)
+	// the stream itself, as raylib's PlaySound plays it: a call to PlaySound by name would
+	// be linked, on Windows, to Winmm.lib's PlaySound, which ENet links in before raylib
+	rl.PlayAudioStream(voice.alias.stream)
 }
 
 @(private = "file")
