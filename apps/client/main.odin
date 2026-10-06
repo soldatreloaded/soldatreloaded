@@ -7,9 +7,8 @@ package main
 // end, keeps the window as the config has it as that changes, and keeps what outlives
 // the screens:
 // the sound, which a match plays into; the line to a server, which the menu opens and a
-// match plays on, polled here each frame; and the server browser's list.
-// Discord presence (interface.discord, the C client's net/discord.c) comes later, pumped
-// from this loop.
+// match plays on, polled here each frame; the server browser's list; and what Discord
+// shows I'm playing (online/discord.odin), pumped each frame.
 //
 //   menu    the main menu                        match   being in a game
 //   draw    the world, drawn                     hud     what is drawn over it
@@ -23,9 +22,11 @@ package main
 //
 //   cd assets && odin run ../apps/client
 
+import "core:fmt"
 import "core:log"
 import "core:mem/virtual"
 import "core:strings"
+import "core:time"
 
 import rl "vendor:raylib"
 
@@ -45,17 +46,28 @@ TICK_SECONDS :: 1.0 / sim.TICK_RATE
 MAX_FRAME :: 0.25 // seconds: a stall never turns into a burst of ticks
 
 Client :: struct {
-	config:      ^res.Client_Config,
-	mod:         res.Mod,
-	ui:          ui.Ui,
-	sound:       sound.Sound,
-	window:      Window, // as it was last made
-	screen:      Screen,
-	accumulator: f64, // seconds not yet ticked
-	line:        online.Line, // the line to a server, or a demo's
-	browser:     online.Browser, // the server browser's list
-	catalog:     online.Catalog, // the mods' catalogue, and the mod being installed from it
-	last_map:    string, // Offline Play's last, which the menu offers again
+	config:        ^res.Client_Config,
+	mod:           res.Mod,
+	ui:            ui.Ui,
+	sound:         sound.Sound,
+	window:        Window, // as it was last made
+	screen:        Screen,
+	accumulator:   f64, // seconds not yet ticked
+	line:          online.Line, // the line to a server, or a demo's
+	browser:       online.Browser, // the server browser's list
+	catalog:       online.Catalog, // the mods' catalogue, and the mod being installed from it
+	last_map:      string, // Offline Play's last, which the menu offers again
+	discord:       online.Discord, // the pipe to the Discord app here
+	showing:       Maybe(Showing), // what Discord was last shown (discord_update), none before the first
+	showing_since: i64, // and since when, Unix seconds
+}
+
+// What Discord shows I'm doing.
+Showing :: enum {
+	Menu,
+	Offline,
+	Online,
+	Demo,
 }
 
 // What the window shows; none once the client is closing. Each screen is large (a match
@@ -88,7 +100,7 @@ main :: proc() {
 		sound.sound_configure(&client.sound, client.config)
 		update(&client, rl.GetFrameTime())
 		sound.sound_update(&client.sound)
-		// Discord presence will be pumped here, while client.config.interface.discord
+		discord_update(&client)
 		shot := rl.IsKeyPressed(.F12) // raylib takes a screenshot as the frame ends
 		rl.BeginDrawing()
 		draw(&client)
@@ -98,6 +110,7 @@ main :: proc() {
 	}
 
 	screen_switch(&client, nil)
+	online.discord_close(&client.discord)
 	online.browser_close(&client.browser)
 	online.catalog_close(&client.catalog)
 	online.line_shutdown(&client.line)
@@ -312,6 +325,47 @@ ticks_owed :: proc(client: ^Client, dt: f32) -> int {
 // last tick toward it.
 tick_fraction :: proc(client: ^Client) -> f32 {
 	return f32(client.accumulator / TICK_SECONDS)
+}
+
+// ---------------------------------------------------------------------------------
+// Discord
+
+// What Discord shows: the menu, Offline Play or a server's game with its map, or a demo;
+// the time counted from when that began, not from each map.
+discord_update :: proc(client: ^Client) {
+	showing := Showing.Menu
+	playing, is_match := client.screen.(^match.Match)
+	if is_match {
+		switch playing.mode {
+		case .Offline: showing = .Offline
+		case .Online:  showing = .Online
+		case .Demo:    showing = .Demo
+		}
+	}
+	if client.showing != showing {
+		client.showing = showing
+		client.showing_since = time.time_to_unix(time.now())
+	}
+	a := online.Discord_Activity {
+		since = client.showing_since,
+	}
+	map_name := utils.short_string_text(&client.line.map_name)
+	switch showing {
+	case .Menu:
+		utils.short_string_set(&a.details, "In the menus")
+	case .Offline:
+		utils.short_string_set(&a.details, fmt.tprintf("On %s", playing.map_name))
+		utils.short_string_set(&a.state, "Offline Play")
+	case .Online:
+		hostname := utils.short_string_text(&client.line.hostname)
+		utils.short_string_set(&a.details, fmt.tprintf("On %s", map_name))
+		utils.short_string_set(&a.state, hostname if hostname != "" else "Online")
+	case .Demo:
+		utils.short_string_set(&a.details, "Watching a demo")
+		utils.short_string_set(&a.state, fmt.tprintf("On %s", map_name))
+	}
+	online.discord_set(&client.discord, a)
+	online.discord_pump(&client.discord, rl.GetTime(), client.config.interface.discord)
 }
 
 // ---------------------------------------------------------------------------------

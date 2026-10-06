@@ -13,9 +13,10 @@ package online
 //   fetch.odin    the round's map: found here by its hash, or fetched from the server
 //   hwid.odin     this machine's hardware ID, for the server's bans
 //   browser.odin  the server browser's list: the lobby's servers, each one asked
+//   discord.odin  what I'm playing, said to the Discord app here for my profile
 //
 // Uses: core/network, core/game, core/http. From the C client: net/client_net.c,
-// net/hwid.c, net/browser.c.
+// net/hwid.c, net/browser.c, net/discord.c.
 
 import sa "core:container/small_array"
 import "core:fmt"
