@@ -32,6 +32,9 @@ import sa "core:container/small_array"
 import "core:fmt"
 import "core:strings"
 
+import rl "vendor:raylib"
+import "vendor:raylib/rlgl"
+
 import ai "../../../core/bots"
 import sim "../../../core/game"
 import res "../../../core/resources"
@@ -237,12 +240,23 @@ match_update :: proc(match: ^Match, config: ^res.Client_Config, sounds: ^sound.S
 	return match.request
 }
 
+// The world and the HUD in the view's area of the window, bars beside it if the window's
+// shape is past the original's limits.
 match_draw :: proc(match: ^Match, u: ^ui.Ui, config: ^res.Client_Config) {
+	area := draw.view_area()
+	ui.ui_fit(u, area)
 	sky := draw.sky_of(&match.game.polymap, &config.graphics)
-	draw.minimap_fit(&match.minimap, &match.art, &match.game.polymap, u.scale, sky)
+	draw.minimap_fit(&match.minimap, &match.art, &match.game.polymap, u.scale, sky) // into its own texture: before the scissor
+	rl.ClearBackground(rl.BLACK)
+	rl.BeginScissorMode(i32(area.x), i32(area.y), i32(area.width), i32(area.height))
+	defer rl.EndScissorMode()
 	draw.draw_world(&match.art, match.game, &match.frame, &match.sparks, match.seen, &config.graphics)
 	data := hud_data(match, config)
+	rlgl.PushMatrix() // the HUD's units are from the view's top-left
+	rlgl.Translatef(area.x, area.y, 0)
 	hud.hud_draw(u, &match.hud, &data, &match.minimap)
+	rlgl.DrawRenderBatchActive()
+	rlgl.PopMatrix()
 }
 
 // What every match has, whatever plays it: the sparks, the HUD, the window's mode to go
