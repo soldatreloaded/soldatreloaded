@@ -24,6 +24,7 @@ package main
 //   cd assets && odin run ../apps/client
 
 import "core:log"
+import "core:mem/virtual"
 import "core:strings"
 
 import rl "vendor:raylib"
@@ -39,7 +40,6 @@ import "sound"
 import "ui"
 
 CONFIG_PATH :: "client.config.json"
-MODS_DIR :: "mods"
 
 TICK_SECONDS :: 1.0 / sim.TICK_RATE
 MAX_FRAME :: 0.25 // seconds: a stall never turns into a burst of ticks
@@ -70,7 +70,7 @@ main :: proc() {
 
 	client: Client
 	client.config = res.client_config_load(CONFIG_PATH)
-	client.mod = res.mod_make(MODS_DIR, client.config.graphics.mod)
+	client.mod = res.mod_make(res.MODS_DIR, client.config.graphics.mod)
 	client.last_map = strings.clone(menu.FIRST_MAP)
 	if !online.line_init(&client.line) do log.error("ENet wouldn't start: there is no playing online")
 	window_open(&client.window, &client.config.graphics)
@@ -168,6 +168,8 @@ update :: proc(client: ^Client, dt: f32) {
 			demo_play(client, request.name)
 		case menu.Refresh:
 			online.browser_refresh(&client.browser, client.config.network.lobby)
+		case menu.Use_Mod:
+			mod_use(client, request.name)
 		case menu.Quit:
 			screen_switch(client, nil)
 		}
@@ -212,6 +214,23 @@ menu_open :: proc(client: ^Client) -> Screen {
 	m := new(menu.Menu)
 	menu.menu_init(m, client.config, client.mod, client.last_map, &client.line, &client.browser)
 	return m
+}
+
+// The mod `name` used from now on, and kept in the config: the faces, the sounds and
+// the menu's art loaded again from it, and the menu opened anew on its Mods page. A
+// match loads its own art as it starts.
+mod_use :: proc(client: ^Client, name: string) {
+	graphics := &client.config.graphics
+	graphics.mod = strings.clone("" if name == res.MOD_DEFAULT else name, virtual.arena_allocator(&client.config.arena))
+	res.mod_destroy(&client.mod)
+	client.mod = res.mod_make(res.MODS_DIR, graphics.mod)
+	ui.ui_destroy(&client.ui)
+	ui.ui_init(&client.ui, client.mod)
+	sound.sound_destroy(&client.sound)
+	sound.sound_init(&client.sound, client.mod)
+	m := menu_open(client)
+	menu.go_page(m.(^menu.Menu), .Mods)
+	screen_switch(client, m)
 }
 
 // The match over, whatever played it: its line closed, and the main menu back, on the

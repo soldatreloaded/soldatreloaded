@@ -57,6 +57,7 @@ Page :: enum {
 	Taunts,
 	Options,
 	Graphics,
+	Mods,
 }
 
 Menu :: struct {
@@ -75,6 +76,7 @@ Menu :: struct {
 	join:         Join,
 	offline:      Offline,
 	demos:        Demos,
+	mods:         Mods,
 	taunts:       Taunt_Editor,
 }
 
@@ -85,6 +87,7 @@ Request :: union {
 	Disconnect,
 	Play_Demo,
 	Refresh,
+	Use_Mod,
 	Quit,
 }
 
@@ -109,6 +112,12 @@ Play_Demo :: struct {
 
 // The lobby asked for its servers again.
 Refresh :: struct {}
+
+// The mod `name`, of mods/, used from now on: what the game looks and sounds like
+// loaded again from it.
+Use_Mod :: struct {
+	name: string,
+}
 
 Quit :: struct {}
 
@@ -135,6 +144,7 @@ menu_init :: proc(menu: ^Menu, config: ^res.Client_Config, mod: res.Mod, last_ma
 menu_destroy :: proc(menu: ^Menu) {
 	offline_destroy(&menu.offline)
 	demos_destroy(&menu.demos)
+	mods_destroy(&menu.mods)
 	delete(menu.servers.search)
 	delete(menu.taunts.text)
 	draw.preview_destroy(&menu.preview)
@@ -182,6 +192,7 @@ menu_draw :: proc(menu: ^Menu, u: ^ui.Ui) {
 	case .Taunts:   page_taunts(menu)
 	case .Options:  k.w = min(w, 520); page_options(menu)
 	case .Graphics: k.w = min(w, 520); page_graphics(menu)
+	case .Mods:     k.w = min(w, 520); page_mods(menu)
 	}
 	k.x, k.w = x, w
 	if note := PAGE_NOTES[menu.page]; note != "" do footer_text(menu, x, w, note, ui.MUTED) // a settings page: where its changes go
@@ -229,6 +240,7 @@ PAGE_NAMES := [Page]string {
 	.Taunts   = "Taunts",
 	.Options  = "Options",
 	.Graphics = "Graphics",
+	.Mods     = "Mods",
 }
 
 @(rodata)
@@ -242,6 +254,7 @@ PAGE_LINES := [Page]string {
 	.Taunts   = "What a key says: a message to everyone or the team, or your own words as a radio call.",
 	.Options  = "Sound, the mouse, the interface and the connection.",
 	.Graphics = "The window, and what is drawn of the world.",
+	.Mods     = "How the game looks and sounds: its own, or a mod of it in mods/.",
 }
 
 // What the footer says on the pages with nothing of their own to say there.
@@ -286,6 +299,7 @@ set_text :: proc(s: ^string, text: string) {
 
 go_page :: proc(menu: ^Menu, page: Page) {
 	if page == .Demos && menu.page != .Demos do menu.demos.listed = false // demos/ as it is now
+	if page == .Mods && menu.page != .Mods do menu.mods.listed = false // mods/ as it is now
 	menu.page = page
 	menu.side = int(page)
 	ui.kit_reset_page(&menu.kit)
@@ -353,7 +367,7 @@ rail :: proc(menu: ^Menu) {
 		name:        string,
 		first, last: Page,
 	}
-	groups := [?]Group{{"PLAY", .Servers, .Demos}, {"SETTINGS", .Player, .Graphics}}
+	groups := [?]Group{{"PLAY", .Servers, .Demos}, {"SETTINGS", .Player, .Mods}}
 	for group in groups {
 		// the group's label: small, faint and set apart, so it reads as a heading and not
 		// as one more item
