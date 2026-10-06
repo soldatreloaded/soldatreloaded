@@ -53,7 +53,8 @@ mods_list :: proc(mods_dir: string, allocator := context.allocator) -> []Mod_Lis
 	listings := make([dynamic]Mod_Listing, allocator)
 	append(&listings, Mod_Listing{strings.clone(MOD_CLASSIC, allocator), true})
 	for name in folders(mods_dir) {
-		if mod_builtin(name) || reserved(name) do continue
+		// a hidden folder isn't a mod: a mod being installed is unpacked into one
+		if mod_builtin(name) || reserved(name) || strings.has_prefix(name, ".") do continue
 		append(&listings, Mod_Listing{strings.clone(name, allocator), false})
 	}
 	return listings[:]
@@ -112,16 +113,14 @@ mod_name_problem :: proc(mods_dir, name: string) -> string {
 	return ""
 }
 
-// A new mod of the player's, `name`: a copy of Classic to change. Why not, if it can't be
-// made; a copy only part made is taken away again.
+// A new mod of the player's, `name`: an empty folder, which wears Classic until files
+// are put in it to change it. Why not, if it can't be made.
 mod_create :: proc(mods_dir, name: string) -> (problem: string) {
 	if problem = mod_name_problem(mods_dir, name); problem != "" do return
 	dir := utils.temp_path(mods_dir, name)
-	classic := utils.temp_path(mods_dir, MOD_CLASSIC)
-	if err := os.copy_directory_all(dir, classic); err != nil {
-		log.errorf("cannot copy %s to %s: %v", classic, dir, err)
-		os.remove_all(dir)
-		return "Classic couldn't be copied."
+	if err := os.make_directory_all(dir); err != nil {
+		log.errorf("cannot make %s: %v", dir, err)
+		return "Its folder couldn't be made."
 	}
 	return
 }

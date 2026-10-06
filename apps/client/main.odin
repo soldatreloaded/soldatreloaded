@@ -54,6 +54,7 @@ Client :: struct {
 	accumulator: f64, // seconds not yet ticked
 	line:        online.Line, // the line to a server, or a demo's
 	browser:     online.Browser, // the server browser's list
+	catalog:     online.Catalog, // the mods' catalogue, and the mod being installed from it
 	last_map:    string, // Offline Play's last, which the menu offers again
 }
 
@@ -95,6 +96,7 @@ main :: proc() {
 
 	screen_switch(&client, nil)
 	online.browser_close(&client.browser)
+	online.catalog_close(&client.catalog)
 	online.line_shutdown(&client.line)
 	ui.ui_destroy(&client.ui)
 	sound.sound_destroy(&client.sound)
@@ -152,6 +154,7 @@ update :: proc(client: ^Client, dt: f32) {
 	switch screen in client.screen {
 	case ^menu.Menu:
 		online.browser_pump(&client.browser)
+		online.catalog_pump(&client.catalog)
 		switch request in menu.menu_update(screen) {
 		case menu.Play:
 			playing := new(match.Match)
@@ -212,7 +215,7 @@ draw :: proc(client: ^Client) {
 // The main menu, its Offline Play on the map played last.
 menu_open :: proc(client: ^Client) -> Screen {
 	m := new(menu.Menu)
-	menu.menu_init(m, client.config, client.mod, client.last_map, &client.line, &client.browser)
+	menu.menu_init(m, client.config, client.mod, client.last_map, &client.line, &client.browser, &client.catalog)
 	return m
 }
 

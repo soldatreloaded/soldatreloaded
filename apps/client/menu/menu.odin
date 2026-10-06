@@ -64,6 +64,7 @@ Menu :: struct {
 	config:       ^res.Client_Config,
 	line:         ^online.Line,     // the client's line, as it joins
 	browser:      ^online.Browser, // and its server list
+	catalog:      ^online.Catalog, // the mods' catalogue
 	kit:          ui.Kit,
 	page:         Page,
 	side:         int, // the rail's item with the keys: the pages, then Quit
@@ -126,11 +127,13 @@ FIRST_MAP :: "ctf_Ash"
 
 // The menu over `config`, its Offline Play on `last_map`: the map played last, or
 // FIRST_MAP. It shows how the client's line `n` joins, and the `browser`'s list, which
-// it asks for anew as it opens, as the C client's does.
-menu_init :: proc(menu: ^Menu, config: ^res.Client_Config, mod: res.Mod, last_map: string, n: ^online.Line, browser: ^online.Browser) {
+// it asks for anew as it opens, as the C client's does. The Mods page lists, and
+// installs from, the mods' `catalog`.
+menu_init :: proc(menu: ^Menu, config: ^res.Client_Config, mod: res.Mod, last_map: string, n: ^online.Line, browser: ^online.Browser, catalog: ^online.Catalog) {
 	menu.config = config
 	menu.line = n
 	menu.browser = browser
+	menu.catalog = catalog
 	if browser.state != .Fetching && browser.state != .Querying do menu.request = Refresh{}
 	ui.kit_init(&menu.kit)
 	hud.art_load(&menu.art, mod)

@@ -105,12 +105,12 @@ and how the programs sit on it.
 
 `assets/mods/classic/` is how the game looks and sounds, and ships with it. A
 player's own mod is a folder in `mods/`, holding only what it changes from Classic, from
-one sound to every image, laid out as an OpenSoldat mod is; the Mods page makes one (a
-copy of Classic), uses one at once, and deletes one. Its `mod.ini` sets how big its
-images are in the world and where the soldier's parts are pinned, and its `txt/font.ini`
-the HUD's fonts. Players' mods are shared at
+one sound to every image, laid out as an OpenSoldat mod is; the Mods page makes one (an
+empty folder, and says what to put in it), uses one at once, and deletes one. Its
+`mod.ini` sets how big its images are in the world and where the soldier's parts are
+pinned, and its `txt/font.ini` the HUD's fonts. Players' mods are shared at
 [soldatreloaded-mods](https://github.com/soldatreloaded/soldatreloaded-mods), which says
-how to add one.
+how to add one; the Mods page lists them, and installs or updates one in a click.
 
 A server is scripted in Lua: [docs/scripting.md](docs/scripting.md) is the API, and
 `assets/scripts/` is where its scripts live.

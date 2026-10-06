@@ -141,11 +141,12 @@ Sound_Settings :: struct {
 }
 
 Network_Settings :: struct {
-	server:   string, // the server the main menu joins, host:port
-	password: string, // the password the main menu joins with; empty for none
-	lobby:    string, // the lobby the server browser asks for its list
-	smooth:   i32,    // milliseconds a correction of another player is smoothed over; 0 snaps
-	interp:   i32,    // ticks the others are shown behind the newest snapshot, at least, so jitter doesn't show; raised by itself while snapshots come late
+	server:     string, // the server the main menu joins, host:port
+	password:   string, // the password the main menu joins with; empty for none
+	lobby:      string, // the lobby the server browser asks for its list
+	mods_index: string, // the mods' catalogue the Mods page lists, a mods.json
+	smooth:     i32,    // milliseconds a correction of another player is smoothed over; 0 snaps
+	interp:     i32,    // ticks the others are shown behind the newest snapshot, at least, so jitter doesn't show; raised by itself while snapshots come late
 }
 
 Demo_Settings :: struct {
@@ -184,6 +185,7 @@ Mute_Settings :: struct {
 }
 
 LOBBY_URL :: "https://soldatreloaded-lobby.fly.dev"
+MODS_INDEX_URL :: "https://github.com/soldatreloaded/soldatreloaded-mods/releases/download/index/mods.json"
 
 @(rodata)
 DEFAULT_CLIENT_CONFIG := Client_Config {
@@ -228,7 +230,7 @@ DEFAULT_CLIENT_CONFIG := Client_Config {
 		discord         = true,
 	},
 	sound = {volume = 18},
-	network = {server = "127.0.0.1:23073", lobby = LOBBY_URL, smooth = 100},
+	network = {server = "127.0.0.1:23073", lobby = LOBBY_URL, mods_index = MODS_INDEX_URL, smooth = 100},
 	offline = {time_limit = 15, capture_limit = 10, bots = {difficulty = 100, chat = true}},
 	radio = {
 		call_1 = {"Enemy flagger", {"up!", "middle!", "down!"}},
