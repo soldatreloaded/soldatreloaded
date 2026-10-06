@@ -1,10 +1,11 @@
 package http
 
 // HTTPS through libcurl (vendor:curl), for every program that makes a request: the
-// server's lobby and its scripts, and the launcher. Curl is started once, and each
-// request's handle is made to trust what it should (secure): on Windows curl trusts what
-// the system trusts; on Linux it is built on mbedTLS, which knows no certificates of its
-// own, so it is given the distribution's bundle (ca_bundle_*.odin).
+// server's lobby and its scripts, the launcher, and the client's server list and mods'
+// catalogue. Curl is started once, and each request's handle is made to trust what it
+// should (secure): on Windows curl trusts what the system trusts; on Linux it is built
+// on mbedTLS, which knows no certificates of its own, so it is given the distribution's
+// bundle (ca_bundle_*.odin).
 //
 // A program with more to ask than `get` (a method, a body, a thread of its own) makes
 // its own handle, and calls start and secure on it as get does.
@@ -33,14 +34,16 @@ secure :: proc(handle: ^curl.CURL) {
 }
 
 // The body at `url`, following redirects, made with `allocator`. False for no answer,
-// or an answer with an error status. `agent` is what the request says it is.
-get :: proc(url: string, agent: cstring, allocator := context.allocator) -> (body: []byte, ok: bool) {
+// or an answer with an error status. `agent` is what the request says it is. With
+// `progress`, the bytes received so far are stored there as they come (atomically, for
+// another thread to read).
+get :: proc(url: string, agent: cstring, allocator := context.allocator, progress: ^int = nil) -> (body: []byte, ok: bool) {
 	start()
 	handle := curl.easy_init()
 	if handle == nil do return nil, false
 	defer curl.easy_cleanup(handle)
 
-	received := make([dynamic]byte, allocator)
+	received := Received{bytes = make([dynamic]byte, allocator), progress = progress}
 	curl.easy_setopt(handle, .URL, strings.clone_to_cstring(url, context.temp_allocator))
 	curl.easy_setopt(handle, .USERAGENT, agent)
 	curl.easy_setopt(handle, .FOLLOWLOCATION, c.long(1))
@@ -56,15 +59,23 @@ get :: proc(url: string, agent: cstring, allocator := context.allocator) -> (bod
 	secure(handle)
 
 	if curl.easy_perform(handle) != .E_OK {
-		delete(received)
+		delete(received.bytes)
 		return nil, false
 	}
-	return received[:], true
+	return received.bytes[:], true
+}
+
+@(private = "file")
+Received :: struct {
+	bytes:    [dynamic]byte,
+	progress: ^int,
 }
 
 @(private = "file")
 receive :: proc "c" (data: [^]byte, one: c.size_t, n: c.size_t, user: rawptr) -> c.size_t {
 	context = runtime.default_context() // the append uses the array's own allocator
-	append((^[dynamic]byte)(user), ..data[:n])
+	r := (^Received)(user)
+	append(&r.bytes, ..data[:n])
+	if r.progress != nil do sync.atomic_store(r.progress, len(r.bytes))
 	return n
 }

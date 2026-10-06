@@ -19,6 +19,7 @@ import "core:os"
 import "core:path/filepath"
 
 import res "../../core/resources"
+import "../../core/utils"
 
 when ODIN_OS == .Windows {
 	LAUNCHER :: "soldatreloaded-launcher.exe"
@@ -57,13 +58,13 @@ on_disk :: proc(file: res.Manifest_File) -> bool {
 
 // The files to fetch, out of the release's zip. The reason it couldn't, or "".
 apply_fetch :: proc(plan: Plan, archive: []byte) -> string {
-	entries, readable := zip_entries(archive)
+	entries, readable := utils.zip_entries(archive)
 	if !readable do return "the release's zip couldn't be read"
 
 	for file in plan.fetch {
 		entry, found := entries[file.path]
 		if !found do return fmt.tprintf("%s isn't in the release's zip", file.path)
-		data, extracted := zip_extract(archive, entry)
+		data, extracted := utils.zip_extract(archive, entry)
 		if !extracted || sha256(data) != file.sha256 do return fmt.tprintf("%s came out of the zip damaged", file.path)
 		if !install_file(file.path, data) do return fmt.tprintf("%s couldn't be written", file.path)
 	}

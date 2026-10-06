@@ -1,9 +1,9 @@
-package launcher
+package utils
 
-// The files out of a release's zip, as zip and 7-Zip write them: stored or deflated, no
-// encryption, no ZIP64 (a release is far from 4 GB). A zip ends with its central
-// directory, a record for each file saying where it is; the directory's own place is in
-// the record that ends the zip.
+// The files out of a zip (a release's, for the launcher; a mod's, for the client), as zip
+// and 7-Zip write them: stored or deflated, no encryption, no ZIP64 (neither is near
+// 4 GB). A zip ends with its central directory, a record for each file saying where it
+// is; the directory's own place is in the record that ends the zip.
 //
 //   [local header][data] [local header][data] ... [central directory] [end record]
 

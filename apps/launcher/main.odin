@@ -17,8 +17,7 @@ package launcher
 //
 //   release.odin   the newest release, its manifest and its zip, from GitHub
 //   update.odin    what an update brings and deletes, and doing it
-//   zip.odin       the files out of a release's zip
-//   (downloads go through core/http)
+//   (downloads go through core/http, and the zip is read by core/utils's zip.odin)
 
 import "core:fmt"
 import "core:os"
