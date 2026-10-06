@@ -38,11 +38,12 @@ game_init :: proc(game: ^Game, settings: Game_Settings, authority: bool) -> bool
 	return true
 }
 
-// A new round on maps/<map_name>.pms: the last round's map let go, the world empty but for
+// A new round on <data_dir>/maps/<map_name>.pms (the data's, or a client's downloads):
+// the last round's map let go, the world empty but for
 // the map's things, the round's clock full. False, with the reason logged, if the map
 // can't be loaded; the last round is left as it was.
-game_start_round :: proc(game: ^Game, map_name: string, seed: u64) -> bool {
-	polymap := res.map_load(DATA_DIR, map_name) or_return
+game_start_round :: proc(game: ^Game, map_name: string, seed: u64, data_dir := DATA_DIR) -> bool {
+	polymap := res.map_load(data_dir, map_name) or_return
 	res.map_destroy(&game.polymap)
 	game.polymap = polymap
 
