@@ -304,7 +304,10 @@ client_config_save :: proc(config: ^Client_Config, path: string) -> bool {
 }
 
 client_config_destroy :: proc(config: ^Client_Config) {
-	virtual.arena_destroy(&config.arena) // the config itself is in it
+	// the config itself is in the arena, so it is destroyed from a copy: destroying it in
+	// place would write to the arena after its memory is gone
+	arena := config.arena
+	virtual.arena_destroy(&arena)
 }
 
 // The config at its defaults, in its own arena.
