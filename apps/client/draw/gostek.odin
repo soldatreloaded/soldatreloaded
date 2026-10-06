@@ -251,9 +251,10 @@ outfit_of :: proc(soldier: ^sim.Soldier, corpse: bool) -> (outfit: Outfit) {
 	outfit.jetting = !corpse && soldier_jetting(soldier)
 	outfit.wounds = wound_alpha(soldier.vitals.health)
 	outfit.cigar = soldier.antics.cigar == 5 || soldier.antics.cigar == 10
-	// what is carried, less the one already in the hand while a throw runs
+	// what is carried, less the one already in the hand while a throw runs; none, if the
+	// throw is an empty one (a part without a grenade is the 0th: never hidden)
 	body := soldier.pose.body
-	outfit.grenades = int(soldier.arsenal.grenades) - (1 if body.id == .Throw else 0)
+	outfit.grenades = max(0, int(soldier.arsenal.grenades) - (1 if body.id == .Throw else 0))
 	// the headgear: in the hand past the fourth frame of a wipe or a take-off; the hair
 	// shows under none but Mr. T's, and once it is off. The rat and the furry never wear
 	// any, whatever an old config says.
