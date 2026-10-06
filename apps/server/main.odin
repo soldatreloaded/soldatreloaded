@@ -8,10 +8,13 @@ package server
 // It runs from the install's root (assets/ in this repository), as the client does, and
 // keeps its files there:
 //
-//   server.config.json   how it hosts, the rotation, the weapons, the admins, bans and
+//   server.config.mjson  how it hosts, the rotation, the bots, the admins, bans and
 //                        mutes (core/resources/server_config.odin),
 //                        written whole as it starts, so it shows every setting, and as
 //                        the bans and mutes change
+//   weapons.ini          the weapons' numbers, as Soldat's weapons.ini has them
+//                        (core/resources/weapons.odin); made as it starts if it isn't
+//                        there, each number commented out
 //   scripts/main.lua     the script, as the config names it (app_script.odin)
 //
 //   server [-map:<name>] [-port:<port>]
@@ -33,19 +36,21 @@ import res "../../core/resources"
 import "lobby"
 
 // The files, at the install's root, where the server runs: assets/ in this repository.
-SERVER_CONFIG :: "server.config.json"
+SERVER_CONFIG :: "server.config.mjson"
+OLD_SERVER_CONFIG :: "server.config.json" // the JSON config of before, read once if the MJSON isn't there
+WEAPONS_INI :: "weapons.ini"
 
 SLEEP :: time.Millisecond // between passes of the loop, so it never spins flat out
 
 Arguments :: struct {
 	map_name: string `args:"name=map" usage:"the first round's map; else the rotation's first"`,
-	port:     u16 `usage:"the UDP port to listen on, over server.config.json's"`,
+	port:     u16 `usage:"the UDP port to listen on, over server.config.mjson's"`,
 }
 
 App :: struct {
 	sv:      Server,
 	config:  ^res.Server_Config,
-	weapons: res.Weapon_Settings, // the weapons as they stand: the config's, and the `weapon` lines since
+	weapons: res.Weapon_Table, // the weapons as they stand: weapons.ini's, and the `weapon` lines since
 	lobby:   lobby.Lobby,
 	script:  Script, // held by its address while open
 	quit:    bool,
@@ -93,10 +98,10 @@ on_interrupt :: proc "c" (_: i32) {
 // The config, the network, and the game hosted on them.
 @(private = "file")
 start :: proc(app: ^App, args: Arguments) -> bool {
-	app.config = res.server_config_load(SERVER_CONFIG)
+	app.config = res.server_config_load(SERVER_CONFIG, OLD_SERVER_CONFIG)
 	// its file whole, as it stands; the command line is the server's (Options), not the file's
 	if !res.server_config_save(app.config, SERVER_CONFIG) do log.errorf("could not write %s", SERVER_CONFIG)
-	app.weapons = app.config.weapons
+	app.weapons = weapons_load(WEAPONS_INI)
 
 	if !net.net_init() {
 		log.error("ENet wouldn't start")
@@ -108,6 +113,7 @@ start :: proc(app: ^App, args: Arguments) -> bool {
 		data_dir    = game.DATA_DIR,
 		first_map   = args.map_name,
 		port        = args.port,
+		weapons     = app.weapons,
 	}
 	if !server_init(&app.sv, options) {
 		net.net_shutdown()
@@ -127,6 +133,24 @@ stop :: proc(app: ^App) {
 	res.server_config_destroy(app.config)
 }
 
+
+// The weapons the server plays by: GatherWM's, and `path` over them. The file made, each
+// number commented out, if it isn't there.
+@(private = "file")
+weapons_load :: proc(path: string) -> res.Weapon_Table {
+	weapons := res.GATHER_WEAPONS
+	if !os.exists(path) {
+		if err := os.write_entire_file(path, transmute([]byte)res.weapons_ini_template()); err != nil do log.errorf("could not write %s: %v", path, err)
+		return weapons
+	}
+	name, read := res.weapons_ini_read(path, &weapons)
+	if !read {
+		log.errorf("could not read %s: the weapons are GatherWM's", path)
+	} else if weapons != res.GATHER_WEAPONS {
+		log.infof("weapons mod %s", name if name != "" else path)
+	}
+	return weapons
+}
 
 @(private = "file")
 lobby_settings :: proc(app: ^App) -> lobby.Settings {

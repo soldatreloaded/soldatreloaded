@@ -1,6 +1,5 @@
 package server
 
-import "core:encoding/json"
 import "core:log"
 import "core:strings"
 import "core:thread"
@@ -14,9 +13,10 @@ import res "../../core/resources"
 //   nextmap                      end the round and begin the next
 //   addbot [name]                a bot on the emptier side; addbot1, addbot2 on alpha, bravo
 //   pause / unpause              the game stands where it is, or goes on
-//   weapon <json>                weapons' numbers, as server.config.json's `weapons` has them;
-//                                taken at once (not saved), and everyone on is told
-//   weaponlist                   every weapon's numbers, as the config writes them
+//   weapon <weapon> <Key>=<n>... a weapon's numbers, as weapons.ini has them: weapon Desert
+//                                Eagles Damage=1.7 FireInterval=20; taken at once (not
+//                                saved), and everyone on is told
+//   weaponlist                   every weapon's numbers, as weapons.ini writes them
 //   kick, ban, banip, banhw, unban, mute, unmute, map, bans, mutes, admins
 //                                the admin commands (admin.odin)
 //   script_reload, lua <code>    the script (app_script.odin)
@@ -50,27 +50,49 @@ console_execute :: proc(app: ^App, typed: string) {
 	}
 }
 
-// weapon <json>: weapons' numbers as server.config.json's `weapons` has them, as much as
-// is to change: weapon {"desert_eagles": {"damage": 1.7, "fire_interval": 20}}. A name
-// the config doesn't have is passed over, as the config passes it over.
+// weapon <weapon> <Key>=<n>...: a weapon's numbers as weapons.ini has them, the weapon by
+// its section's name and each number by its key, in any case: weapon Desert Eagles
+// Damage=1.7 FireInterval=20. Nothing changes unless all of it is right.
 @(private = "file")
 weapon_command :: proc(app: ^App, text: string) {
-	weapons := app.weapons
-	if err := json.unmarshal_string(text, &weapons, allocator = context.temp_allocator); err != nil {
-		log.infof("weapon: %v; usage: weapon {{\"desert_eagles\": {{\"damage\": 1.7}}}}, weaponlist shows them all", err)
+	USAGE :: "usage: weapon <weapon> <Key>=<n>..., as weapons.ini has them (weapon Desert Eagles Damage=1.7); weaponlist shows them all"
+	words := strings.fields(text, context.temp_allocator)
+	first_key := len(words)
+	for word, i in words {
+		if strings.contains_rune(word, '=') {
+			first_key = i
+			break
+		}
+	}
+	section := strings.join(words[:first_key], " ", context.temp_allocator)
+	weapon, known := res.weapon_by_section(section).?
+	if !known || first_key == len(words) {
+		if section != "" && !known do log.infof("weapon: no weapon %s", section)
+		log.info(USAGE)
 		return
 	}
-	app.weapons = weapons
-	server_weapons_changed(&app.sv, res.weapon_table(app.weapons))
-	log.info("weapons changed, and everyone told")
+	stats := app.weapons[weapon]
+	for word in words[first_key:] {
+		eq := strings.index_byte(word, '=')
+		if eq < 0 {
+			log.infof("weapon: %s isn't Key=number; %s", word, USAGE)
+			return
+		}
+		field, has := res.weapon_ini_field(word[:eq])
+		if !has || !res.weapon_stat_set(&stats, field, word[eq + 1:]) {
+			log.infof("weapon: %s isn't a number of %s's; %s", word, section, USAGE)
+			return
+		}
+	}
+	app.weapons[weapon] = stats
+	server_weapons_changed(&app.sv, app.weapons)
+	log.infof("%s changed, and everyone told", res.WEAPON_INI_SECTIONS[weapon])
 }
 
-// weaponlist: every weapon's numbers, as the config writes them.
+// weaponlist: every weapon's numbers, as weapons.ini writes them.
 @(private = "file")
 weapon_list :: proc(app: ^App) {
-	text, err := json.marshal(app.weapons, {pretty = true, use_spaces = true, spaces = 2}, context.temp_allocator)
-	if err != nil do return
-	log.info(string(text))
+	log.info(res.weapons_ini_text(&app.weapons, commented = false))
 }
 
 // A thread of its own, left to run until the program ends.

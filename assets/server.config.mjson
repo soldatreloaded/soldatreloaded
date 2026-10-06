@@ -1,0 +1,69 @@
+// Soldat Reloaded's server: how it hosts, the rotation, the bots, the lobby, and the
+// admins, bans and mutes. The weapons' numbers are weapons.ini's, beside this file.
+//
+// The server writes this file whole as it starts, and as its bans and mutes change: each
+// setting keeps the comment above it, but a comment of your own doesn't last. A setting
+// left out keeps its default. A file that can't be read is left as it is, and the server
+// plays by the defaults.
+
+server: {
+  // the game's name, on the scoreboard and in the server browser
+  hostname: "Soldat Reloaded server"
+  // the UDP port to listen on
+  port: 23073
+  // the address to listen on; empty for every one
+  ip: ""
+  // the password to join; empty for none
+  password: ""
+  // the password a player says with /login to be an admin until they leave; empty for none
+  admin_password: ""
+  // minutes a round lasts
+  time_limit: 15
+  // the captures that win a round
+  capture_limit: 10
+  // the percentage of players whose yes passes a vote
+  vote_percent: 60
+  // the Lua script the server runs, if the file is there (docs/scripting.md)
+  script: "scripts/main.lua"
+}
+
+// the rotation, played in turn; none plays every map under data/maps, the map again each round
+maps: []
+
+// the bots the server fills the game with
+bots: {
+  // bots on alpha
+  alpha: 0
+  // bots on bravo
+  bravo: 0
+  // 300 stupid, 200 poor, 100 normal, 50 hard, 10 impossible
+  difficulty: 100
+  // whether the bots talk
+  chat: true
+}
+
+network: {
+  // messages in a second from one player that count as flooding (a client sends sixty)
+  flooding_packets: 120
+  // flood warnings before the player is kicked and barred for a quarter of an hour
+  flood_warnings: 4
+}
+
+// whether, and how, the server lists itself for the game's server browser
+lobby: {
+  // the server lists itself with the lobby
+  public: false
+  // the lobby it lists itself with
+  url: "https://soldatreloaded-lobby.fly.dev"
+  // the IPv4 address the lobby lists; empty for the one the server reaches it from
+  ip: ""
+}
+
+// who may run the admin commands, by address, with the name they were known by; the server only reads these
+admins: []
+
+// who is kept out, by address or hardware ID or both, until expires (Unix time; 0 never); the server writes these as players are banned and unbanned
+bans: []
+
+// whose chat reaches nobody, by address or hardware ID or both; the server writes these as players are muted and unmuted
+mutes: []

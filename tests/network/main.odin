@@ -218,7 +218,7 @@ messages :: proc(t: ^testing.T) {
 	testing.expect_value(t, heard_chat, chat)
 
 	// a whole weapons mod goes in one message, within a packet, and comes back whole
-	weapons := net.Msg_Weapons{weapons = res.weapon_table(res.GATHER_WEAPONS)}
+	weapons := net.Msg_Weapons{weapons = res.GATHER_WEAPONS}
 	for &stats, w in weapons.weapons {
 		stats.damage = f32(w) * 10 + 0.5
 		stats.fire_interval = i32(w) + 1

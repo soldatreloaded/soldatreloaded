@@ -6,7 +6,7 @@ import "core:strings"
 import "../utils"
 
 // The bots a game can fill itself with: a file each under data/bots, <name>.json, written
-// as the configs are (config.odin): its look as a player's is in client.config.json, its
+// as the configs are (config.odin): its look as a player's is in client.config.mjson, its
 // weapons by name in lower case ("minimi"). A key the file doesn't hold keeps its
 // default. What one says.
 

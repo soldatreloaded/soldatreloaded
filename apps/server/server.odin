@@ -57,6 +57,7 @@ Options :: struct {
 	data_dir:    string, // maps/, anims/, objects/, bots/; game.DATA_DIR as a rule
 	first_map:   string, // the first round's; "" for the rotation's first
 	port:        u16,    // the port to listen on, over the config's; 0 for the config's
+	weapons:     res.Weapon_Table, // the weapons' numbers the game plays by: weapons.ini's over GatherWM's
 }
 
 // What a server script hangs on the server (server_set_hooks): it hears a line of chat
@@ -115,7 +116,7 @@ Server :: struct {
 server_init :: proc(sv: ^Server, options: Options) -> bool {
 	config := options.config
 	sv^ = {options = options, rng = {u64(time.now()._nsec) | 1}}
-	sv.settings = settings_from(config)
+	sv.settings = settings_from(config, options.weapons)
 	sv.game = new(game.Game)
 	sv.streams = new([MAX_PLAYERS]net.Server_Stream)
 	if !game.game_init(sv.game, sv.settings, authority = true) {
@@ -173,14 +174,14 @@ server_destroy :: proc(sv: ^Server) {
 	sv^ = {}
 }
 
-// How the game is played, as the config says: its limits and its weapons over the game's
-// own settings.
+// How the game is played: the config's limits, and `weapons`, over the game's own
+// settings.
 @(private = "file")
-settings_from :: proc(config: ^res.Server_Config) -> game.Game_Settings {
+settings_from :: proc(config: ^res.Server_Config, weapons: res.Weapon_Table) -> game.Game_Settings {
 	s := game.DEFAULT_GAME_SETTINGS
 	if config.server.time_limit > 0 do s.time_limit = config.server.time_limit * 60 * game.TICK_RATE
 	if config.server.capture_limit > 0 do s.capture_limit = config.server.capture_limit
-	s.weapons = res.weapon_table(config.weapons)
+	s.weapons = weapons
 	return s
 }
 

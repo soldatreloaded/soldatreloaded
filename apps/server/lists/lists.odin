@@ -12,7 +12,7 @@ import "../../../core/utils"
 // The server's lists: who is banned (until when, as whom, why) and who is muted (their
 // chat goes to nobody), by address and by the machine's hardware ID, so a new address
 // alone lifts neither; and who may run the admin commands, by address. They are kept in
-// server.config.json (`bans`, `mutes`, `admins`; core/resources/server_config.odin):
+// server.config.mjson (`bans`, `mutes`, `admins`; core/resources/server_config.odin):
 // the server writes the config as admins ban and unban, mute and unmute, and only reads
 // the admins, which are the server's owner's to write.
 

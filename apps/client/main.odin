@@ -18,7 +18,7 @@ package main
 //
 // It runs from the install's root, where data/ and mods/ are: assets/ in this
 // repository, the unpacked folder in a release. It keeps its settings there in
-// client.config.json (core/resources/client_config.odin), Offline Play's among them.
+// client.config.mjson (core/resources/client_config.odin), Offline Play's among them.
 //
 //   cd assets && odin run ../apps/client
 
@@ -40,7 +40,8 @@ import "online"
 import "sound"
 import "ui"
 
-CONFIG_PATH :: "client.config.json"
+CONFIG_PATH :: "client.config.mjson"
+OLD_CONFIG_PATH :: "client.config.json" // the JSON config of before, read once if the MJSON isn't there
 
 TICK_SECONDS :: 1.0 / sim.TICK_RATE
 MAX_FRAME :: 0.25 // seconds: a stall never turns into a burst of ticks
@@ -82,7 +83,7 @@ main :: proc() {
 	context.logger = log.create_console_logger(.Info, {.Level, .Time})
 
 	client: Client
-	client.config = res.client_config_load(CONFIG_PATH)
+	client.config = res.client_config_load(CONFIG_PATH, OLD_CONFIG_PATH)
 	client.mod = res.mod_make(res.MODS_DIR, client.config.graphics.mod)
 	client.last_map = strings.clone(menu.FIRST_MAP)
 	if !online.line_init(&client.line) do log.error("ENet wouldn't start: there is no playing online")

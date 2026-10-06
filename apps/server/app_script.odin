@@ -4,7 +4,7 @@ import "core:log"
 
 import "../../core/utils"
 
-// The script beside the server (script.odin): the one server.config.json names, read as the
+// The script beside the server (script.odin): the one server.config.mjson names, read as the
 // server starts, pumped with it, and the console's script_reload and lua. Its path is
 // the install's, from its root where the server runs; a path set by hand that isn't
 // there is said, the default's absence is nothing.

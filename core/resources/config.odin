@@ -7,21 +7,26 @@ import "core:io"
 import "core:log"
 import "core:mem"
 import "core:reflect"
+import "core:slice"
 import "core:strconv"
 import "core:strings"
 
 import "../utils"
 
-// The configs as JSON files (client.config.json, server.config.json): each field of the
-// struct is a key of its name, in the struct's order, a struct field an object of its
-// own, a map's keys sorted. A colour is written "RRGGBB" (a Maybe colour "" for none), an
-// enum by its name in lower case ("top_right") and an f32 as short as it reads back
-// (0.4), as a person would write them; colours and enums are read without regard to
-// case. A field tagged `json:"-"` is not part of the file.
+// The configs as MJSON files (client.config.mjson, server.config.mjson): JSON as a person
+// writes it, with no braces around the whole, no commas at the ends of lines, keys
+// unquoted, and comments, `//` to the line's end or `/* */`. Plain JSON reads as it is.
+// Each field of the struct is a key of its name, in the struct's order, a struct field an
+// object of its own, a map's keys sorted and quoted. A field's `jsoncomment` tag is
+// written above its key, as what the setting does. A colour is written "RRGGBB" (a Maybe
+// colour "" for none), an enum by its name in lower case ("top_right") and an f32 as
+// short as it reads back (0.4), as a person would write them; colours and enums are read
+// without regard to case. A field tagged `json:"-"` is not part of the file.
 //
 // A key the file doesn't hold keeps the setting's default, a key the struct doesn't have
-// is passed over, and a file that isn't JSON, or holds a value a setting can't take, is
-// logged with where it went wrong and read as none: the defaults stand.
+// is passed over, and a file that isn't MJSON, or holds a value a setting can't take, is
+// logged with where it went wrong and read as none: the defaults stand. The file is
+// written whole, from the struct, so a comment of the player's own doesn't last.
 
 Config_Read :: enum {
 	Read,
@@ -37,13 +42,13 @@ config_read :: proc(path: string, config: ^$T, allocator: mem.Allocator) -> Conf
 	if !read do return .Broken
 
 	// Checked whole first: the unmarshaling says where a value is wrong, not where the
-	// text isn't JSON, and with our own unmarshalers registered it doesn't check it.
-	if err, at := not_json(text); err != nil {
-		log.errorf("%s:%d:%d: not JSON (%v); the defaults are used, and the file is left as it is", path, at.line, at.column, err)
+	// text isn't MJSON, and with our own unmarshalers registered it doesn't check it.
+	if err, at := not_json(text, .MJSON); err != nil {
+		log.errorf("%s:%d:%d: not MJSON (%v); the defaults are used, and the file is left as it is", path, at.line, at.column, err)
 		return .Broken
 	}
 
-	switch err in json.unmarshal(text, config, .JSON, allocator) {
+	switch err in json.unmarshal(text, config, .MJSON, allocator) {
 	case nil:
 		return .Read
 	case json.Unsupported_Type_Error:
@@ -60,18 +65,26 @@ config_read :: proc(path: string, config: ^$T, allocator: mem.Allocator) -> Conf
 // is: with the marshalers below registered, the unmarshaling doesn't check it. False if
 // it isn't JSON, or isn't a `T`.
 read_json :: proc(text: []byte, value: ^$T, allocator := context.allocator) -> bool {
-	if err, _ := not_json(text); err != nil do return false
+	if err, _ := not_json(text, .JSON); err != nil do return false
 	return json.unmarshal(text, value, .JSON, allocator) == nil
 }
 
-// Where `text` stops being JSON, if it does.
+// Where `text` stops being `spec`, if it does.
 @(private = "file")
-not_json :: proc(text: []byte) -> (err: json.Error, at: json.Pos) {
+not_json :: proc(text: []byte, spec: json.Specification) -> (err: json.Error, at: json.Pos) {
 	// All of it in the temp allocator, the context's too: on an error the parser frees
 	// what it has made with the context's allocator rather than its own.
 	context.allocator = context.temp_allocator
-	parser := json.make_parser(text, .JSON, parse_integers = true)
-	_, err = json.parse_value(&parser)
+	parser := json.make_parser(text, spec, parse_integers = true)
+	// MJSON's whole may go without its braces: then it starts at its first key, as the
+	// package reads it
+	if spec == .MJSON && (parser.curr_token.kind == .Ident || parser.curr_token.kind == .String) {
+		_, err = json.parse_object_body(&parser, .EOF)
+	} else {
+		_, err = json.parse_value(&parser)
+		// MJSON takes the line's end after the closing brace for a comma
+		if err == nil && spec == .MJSON && parser.curr_token.kind == .Comma do json.advance_token(&parser)
+	}
 	if err == nil && parser.curr_token.kind != .EOF do err = .Unexpected_Token // something after the value
 	return err, parser.curr_token.pos
 }
@@ -89,22 +102,45 @@ wanted :: proc(id: typeid) -> string {
 	return fmt.tprintf("a %v", id)
 }
 
-// `config` written to `path` whole, pretty-printed. False, with the reason logged, if it
+// `config` written to `path` whole (config_text). False, with the reason logged, if it
 // can't be written.
-config_write :: proc(path: string, config: ^$T) -> bool {
+config_write :: proc(path: string, config: ^$T, header: string) -> bool {
+	text, ok := config_text(config, header)
+	if !ok {
+		log.errorf("could not write %s", path)
+		return false
+	}
+	return utils.write_file(path, transmute([]byte)text)
+}
+
+// `config` as its file: `header` (lines of comment, each begun with `//`), then each key
+// with its comment above it, a blank line before each of the top level's.
+config_text :: proc(config: ^$T, header: string, allocator := context.temp_allocator) -> (text: string, ok: bool) {
 	options := json.Marshal_Options {
+		spec             = .MJSON,
 		pretty           = true,
 		use_spaces       = true,
 		spaces           = 2,
 		sort_maps_by_key = true,
 	}
-	b := strings.builder_make(context.temp_allocator)
-	if err := json.marshal_to_builder(&b, config^, &options); err != nil {
-		log.errorf("could not write %s: %v", path, err)
-		return false
+	body := strings.builder_make(context.temp_allocator)
+	if err := json.marshal_to_builder(&body, config^, &options); err != nil {
+		log.errorf("config: %v", err)
+		return "", false
 	}
-	strings.write_byte(&b, '\n')
-	return utils.write_file(path, b.buf[:])
+	b := strings.builder_make(allocator)
+	strings.write_string(&b, header)
+	// the top level's keys, and the comments above them, start at the line's start
+	after_comment := false
+	rest := strings.to_string(body)
+	for line in strings.split_lines_iterator(&rest) {
+		top := line != "" && line[0] != ' ' && line[0] != '}' && line[0] != ']'
+		if top && !after_comment do strings.write_byte(&b, '\n')
+		after_comment = top && strings.has_prefix(line, "//")
+		strings.write_string(&b, line)
+		strings.write_byte(&b, '\n')
+	}
+	return strings.to_string(b), true
 }
 
 // ---------------------------------------------------------------------------------
@@ -124,6 +160,7 @@ config_marshalers_init :: proc "contextless" () {
 		register(id, marshal_enum, unmarshal_enum)
 	}
 	register(f32, marshal_f32) // read as the package reads it
+	register(map[string]string, marshal_string_map) // read as the package reads it
 	for id in ([?]typeid{[]string, []Admin_Entry, []Ban_Entry, []Mute_Entry}) {
 		register(id, marshal_list) // read as the package reads it
 	}
@@ -159,6 +196,28 @@ marshal_list :: proc(w: io.Writer, v: any, opt: ^json.Marshal_Options) -> json.M
 		json.marshal_to_writer(w, reflect.index(v, i), opt) or_return
 	}
 	return json.opt_write_end(w, opt, ']')
+}
+
+// A map as the package writes one, sorted, but its keys quoted whatever the spec: MJSON
+// writes a key bare, and a bind's key ("alt+q") isn't one MJSON reads bare.
+@(private = "file")
+marshal_string_map :: proc(w: io.Writer, v: any, opt: ^json.Marshal_Options) -> json.Marshal_Error {
+	m := (^map[string]string)(v.data)^
+	if len(m) == 0 {
+		_, err := io.write_string(w, "{}")
+		return err
+	}
+	keys := make([dynamic]string, 0, len(m), context.temp_allocator)
+	for key in m do append(&keys, key)
+	slice.sort(keys[:])
+	json.opt_write_start(w, opt, '{') or_return
+	for key, i in keys {
+		json.opt_write_iteration(w, opt, i == 0) or_return
+		io.write_quoted_string(w, key) or_return
+		io.write_string(w, ": ") or_return
+		json.marshal_to_writer(w, m[key], opt) or_return
+	}
+	return json.opt_write_end(w, opt, '}')
 }
 
 @(private = "file")

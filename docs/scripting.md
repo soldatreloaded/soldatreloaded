@@ -1,6 +1,6 @@
 # Scripting
 
-The server runs a Lua script (Lua 5.4), named by `server.script` in server.config.json:
+The server runs a Lua script (Lua 5.4), named by `server.script` in server.config.mjson:
 `scripts/main.lua` by default, read once as the server starts, if the file is there.
 It, and every script it `require`s, hands the server functions to call when things
 happen (`server.on`), and calls the server back through the `server` table. Requests to
@@ -68,11 +68,11 @@ players are known by on the wire; a slot is reused once its player has left.
 | `server.say(text [, color])` | a line to everyone, in the script colour, or `color`: `"RRGGBB"` or `{r, g, b}` |
 | `server.say_to(slot, text [, color])` | the same to one player |
 | `server.print(text)` | a line on the server's console only |
-| `server.command(text)` | a console command, as if typed: `"say hello"`, `"addbot1"`, `"nextmap"`, `"banip 1.2.3.4 60"`. Only the console's own commands (`apps/server/console.odin`): the settings are server.config.json's, and none is changed from here |
+| `server.command(text)` | a console command, as if typed: `"say hello"`, `"addbot1"`, `"nextmap"`, `"banip 1.2.3.4 60"`. Only the console's own commands (`apps/server/console.odin`): the settings are server.config.mjson's, and none is changed from here |
 | `server.pause()`, `server.unpause()` | the game stands still, nobody moving and the clock stopped, or goes on; `true` if that changed anything |
 | `server.paused()` | whether it stands |
 | `server.next_map([map])` | the round ends now; on `map` if given, else the rotation's next: `true`, or `false` (and nothing changes) for a map the server hasn't got, which it couldn't load |
-| `server.maps()` | the server's list of maps, the one its votes and map window pick from: the rotation (`maps` in server.config.json), or every map it has when there is none |
+| `server.maps()` | the server's list of maps, the one its votes and map window pick from: the rotation (`maps` in server.config.mjson), or every map it has when there is none |
 | `server.map()`, `server.round()` | the map; the round, from 1 |
 | `server.tick()`, `server.time_left()` | the world's tick; the seconds left in the round |
 | `server.scores()` | `{alpha = n, bravo = n}` |

@@ -50,8 +50,9 @@ cd assets && odin run ../apps/server
 ```
 
 The client and the server each make their config beside them the first time they run,
-with every setting at its default: `client.config.json` and `server.config.json`. The
-server takes `-map:<name>` and `-port:<port>` over its config, and commands typed at its
+with every setting at its default: `client.config.mjson` and `server.config.mjson`, each
+setting with a comment saying what it does. The server's weapons are `weapons.ini`, as
+Soldat's are. `assets/` holds the server's two at their defaults. The server takes `-map:<name>` and `-port:<port>` over its config, and commands typed at its
 console (`apps/server/console.odin` lists them).
 
 ## Tests
@@ -66,7 +67,7 @@ odin test tests/network
 odin test tests/server -define:ODIN_TEST_THREADS=1
 ```
 
-The other suites run the same way: `tests/bots`, `tests/lists`, `tests/lobby`,
+The other suites run the same way: `tests/bots`, `tests/configs`, `tests/lists`, `tests/lobby`,
 `tests/script` and `tests/client`. The server's and the client's tests use real sockets
 on the loopback, so they run one at a time.
 

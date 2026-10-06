@@ -21,7 +21,7 @@ Credits named in the upstream `Credits.md`:
 ## What here is not from base
 
 The fonts sit in `fonts/` without being part of that content, and they are not
-under CC BY 4.0. (The game's own configs, `*.config.json` at the install's root, under
+under CC BY 4.0. (The game's own configs, `*.config.mjson` at the install's root, under
 the MIT licence in the game's `license.md`, sit apart from this directory.) Each is
 licensed under the SIL Open Font License, Version 1.1, whose full text is in
 [OFL.txt](OFL.txt); a modified version of a font may not be distributed under its

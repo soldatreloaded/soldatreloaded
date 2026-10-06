@@ -264,11 +264,11 @@ PAGE_LINES := [Page]string {
 // What the footer says on the pages with nothing of their own to say there.
 @(rodata)
 PAGE_NOTES := #partial [Page]string {
-	.Taunts   = "Saved in client.config.json as the game closes.",
-	.Controls = "Changes take effect at once, and are saved in client.config.json when the game closes.",
-	.Player   = "Changes take effect at once, and are saved in client.config.json when the game closes.",
-	.Options  = "Changes take effect at once, and are saved in client.config.json when the game closes.",
-	.Graphics = "Changes take effect at once, and are saved in client.config.json when the game closes.",
+	.Taunts   = "Saved in client.config.mjson as the game closes.",
+	.Controls = "Changes take effect at once, and are saved in client.config.mjson when the game closes.",
+	.Player   = "Changes take effect at once, and are saved in client.config.mjson when the game closes.",
+	.Options  = "Changes take effect at once, and are saved in client.config.mjson when the game closes.",
+	.Graphics = "Changes take effect at once, and are saved in client.config.mjson when the game closes.",
 }
 
 // The footer's line: what the page says of where it stands.

@@ -111,7 +111,7 @@ always at the same addresses
 | `soldatreloaded-windows.zip` | `soldatreloaded.exe`, `soldatreloaded-launcher.exe`, `data/`, `mods/classic/`, `manifest.json` |
 | `soldatreloaded-linux.zip` | `soldatreloaded`, `soldatreloaded-launcher`, `data/`, `mods/classic/`, `manifest.json` |
 | `manifest.windows.json`, `manifest.linux.json` | every file of the game's install on that platform (below) |
-| `soldatreloaded-server.zip` | `soldatreloaded-server`, `data/`, `scripts/`, for Linux |
+| `soldatreloaded-server.zip` | `soldatreloaded-server`, `data/`, `scripts/`, `server.config.mjson`, `weapons.ini`, for Linux |
 
 Each holds `license.md` and `version.txt` too. Players start the launcher, which brings
 the install up to the newest release and starts the game. The game has no use for the
@@ -127,10 +127,12 @@ setup action builds what Odin doesn't have as a static library from pinned sourc
 programs would look for any of them, or for the Visual C++ runtime, on a player's
 machine.
 
-No config ships. The game and the server each make theirs at the install's root, with
-the defaults, where it is missing (`client.config.json`, `server.config.json`); a
-server's bans, mutes and weapons live in its config. So unpacking a release over an
-install leaves them as they are.
+The game ships no config: it makes `client.config.mjson` at the install's root, with the
+defaults, where it is missing, so the launcher's updates leave it as it is. The server
+ships its `server.config.mjson` and `weapons.ini` at their defaults (`assets/`, kept so by
+`tests/configs`), so a host sees every setting, explained, before the first start. A
+server's bans and mutes live in its config: a host updating by hand keeps their own two
+files rather than the package's.
 
 `.github/actions/package` is where a package is made: what goes in it, and the manifest.
 

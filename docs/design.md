@@ -50,7 +50,8 @@ the unpacked folder in a release:
 data/        what the game plays by: maps, animations, skeletons, objects, bots
 mods/        what it looks and sounds like: classic/, the game's own, and the player's beside it
 scripts/     the server's Lua
-*.config.json   the configs, made with their defaults where they are missing
+*.config.mjson  the configs, made with their defaults where they are missing
+weapons.ini     the server's weapons' numbers, as Soldat's are, made commented out where missing
 manifest.json   the release the install was last brought up to, which the launcher keeps
 ```
 
@@ -67,13 +68,20 @@ laid out as OpenSoldat's are, so one of theirs works as it is: its `mod.ini` say
 its images are in the world and where the soldier's parts are pinned, and its
 `txt/font.ini` what the HUD is written in.
 
-**The configs are JSON, and the struct is the file.** `client.config.json` and
-`server.config.json` are `Client_Config` and `Server_Config`: each field a key, read over
+**The configs are MJSON, and the struct is the file.** `client.config.mjson` and
+`server.config.mjson` are `Client_Config` and `Server_Config`: each field a key, read over
 the defaults, so a key the file lacks keeps its default and a file that isn't there is
-made whole. A server keeps everything in its one file: how it hosts, the rotation, the
-bots, the weapons' numbers, the admins, bans and mutes. Bot profiles (`data/bots/*.json`)
-and mods' `mod.json` are written the same way, by the same code
-(`core/resources/config.odin`). Colours are `"RRGGBB"`, enums their names in lower case.
+made whole. MJSON is JSON as a person writes it: no braces around the whole, no commas,
+keys bare, and comments. Each setting's comment in the file is its field's `jsoncomment`
+tag, so the comment lives beside the field and the file explains itself; the file is
+written whole from the struct, so a player's own comment doesn't last. A config of before,
+`*.config.json`, is read once where the MJSON isn't there. A server keeps how it hosts,
+the rotation, the bots, the admins, bans and mutes in its config, and its weapons'
+numbers in `weapons.ini` beside it, as Soldat's has them, so a weapons mod made for
+Soldat or OpenSoldat stands as it is. `assets/server.config.mjson` and `assets/weapons.ini`
+are the files the server makes with its defaults (`tests/configs` keeps them so). Bot
+profiles (`data/bots/*.json`) are read by the same code (`core/resources/config.odin`).
+Colours are `"RRGGBB"`, enums their names in lower case.
 
 ## The simulation
 

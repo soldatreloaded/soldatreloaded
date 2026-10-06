@@ -1,7 +1,7 @@
 package lists_test
 
 // The server's lists (apps/server/lists): bans and mutes by address and hardware ID, admins by
-// address, kept in server.config.json (`bans`, `mutes`, `admins`) and read back the
+// address, kept in server.config.mjson (`bans`, `mutes`, `admins`) and read back the
 // same; a ban lifts at its time; an entry naming nobody is passed over. The configs go
 // under the OS's temp directory.
 //
@@ -73,7 +73,7 @@ addresses_and_hwids :: proc(t: ^testing.T) {
 config_round_trip :: proc(t: ^testing.T) {
 	dir := scratch(t, "round_trip")
 	defer os.remove_all(dir)
-	path := utils.temp_path(dir, "server.config.json")
+	path := utils.temp_path(dir, "server.config.mjson")
 	write(path, `{"server": {"hostname": "Kept"}, "admins": [{"address": "10.0.0.7", "name": "Boss"}]}`)
 
 	a, _ := lists.address_parse("1.2.3.4")
@@ -102,7 +102,7 @@ config_round_trip :: proc(t: ^testing.T) {
 	testing.expect(t, len(config.bans) == 2 && major_kept && major_entry.expires == 0 && major_entry.name == "Major" && major_entry.reason == "Cheating \"a lot\"", "a ban is put back in the config")
 	testing.expect(t, len(config.mutes) == 1 && config.mutes[0].address == "5.6.7.8" && config.mutes[0].name == "Minor", "and a mute")
 	text, _ := utils.read_file(path, context.temp_allocator)
-	testing.expect(t, strings.contains(string(text), `"bans"`) && strings.contains(string(text), `"Spam"`), "and the config is saved as they change")
+	testing.expect(t, strings.contains(string(text), `bans:`) && strings.contains(string(text), `"Spam"`), "and the config is saved as they change")
 
 	again_config := res.server_config_load(path)
 	defer res.server_config_destroy(again_config)
@@ -133,7 +133,7 @@ config_round_trip :: proc(t: ^testing.T) {
 by_the_machine :: proc(t: ^testing.T) {
 	dir := scratch(t, "machine")
 	defer os.remove_all(dir)
-	path := utils.temp_path(dir, "server.config.json")
+	path := utils.temp_path(dir, "server.config.mjson")
 	a, _ := lists.address_parse("1.2.3.4")
 	b, _ := lists.address_parse("5.6.7.8")
 	c, _ := lists.address_parse("10.0.0.7")
@@ -217,7 +217,7 @@ in_memory_alone :: proc(t: ^testing.T) {
 	// a config with no path: read from, never written
 	dir := scratch(t, "memory")
 	defer os.remove_all(dir)
-	path := utils.temp_path(dir, "server.config.json")
+	path := utils.temp_path(dir, "server.config.mjson")
 	config := res.server_config_load(path)
 	defer res.server_config_destroy(config)
 	before, _ := utils.read_file(path, context.temp_allocator)
@@ -233,7 +233,7 @@ in_memory_alone :: proc(t: ^testing.T) {
 entries_naming_nobody :: proc(t: ^testing.T) {
 	dir := scratch(t, "nobody")
 	defer os.remove_all(dir)
-	path := utils.temp_path(dir, "server.config.json")
+	path := utils.temp_path(dir, "server.config.mjson")
 	write(path, `{
 		"bans": [
 			{"address": "", "hwid": "0A1B2C3D4E5", "expires": 0, "name": "Ghost", "reason": "no address"},
@@ -265,7 +265,7 @@ entries_naming_nobody :: proc(t: ^testing.T) {
 broken_config_kept :: proc(t: ^testing.T) {
 	dir := scratch(t, "broken")
 	defer os.remove_all(dir)
-	path := utils.temp_path(dir, "server.config.json")
+	path := utils.temp_path(dir, "server.config.mjson")
 	broken := `{"bans": [ not json`
 	write(path, broken)
 	a, _ := lists.address_parse("1.2.3.4")

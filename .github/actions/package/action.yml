@@ -86,6 +86,7 @@ runs:
           cp -r assets/mods/classic "$stage/mods/" # the game's own look and sound; a player's mods sit beside it
         else
           cp -r assets/scripts "$stage/"
+          cp assets/server.config.mjson assets/weapons.ini "$stage/" # its config and weapons at their defaults, each setting explained
         fi
         cp license.md "$stage/"
         printf '%s\n' "$VERSION" > "$stage/version.txt"
