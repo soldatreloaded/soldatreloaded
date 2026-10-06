@@ -88,6 +88,7 @@ Graphics_Settings :: struct {
 	max_fps:           i32,               // the frames drawn a second at most, while fps_limit is on
 	scenery:           bool,              // the scenery behind the map; false leaves it out, the middle and front scenery stay
 	trails:            bool,              // the streaks behind the bullets, grenades and rockets
+	smooth_polygons:   bool,              // the map's polygons with plain edges, without the edge texture along their outsides
 	weather:           bool,              // the map's weather: its rain, sandstorm or snow, and the wind
 	force_sky:         bool,              // the sky in forced_sky_top and forced_sky_bottom on every map instead of the map's own
 	forced_sky_top:    utils.Rgba,        // the forced sky's colour at the top, RRGGBB
