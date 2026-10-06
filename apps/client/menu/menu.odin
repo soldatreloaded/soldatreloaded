@@ -46,6 +46,7 @@ import "../online"
 import "../ui"
 
 VERSION :: #config(SOLDATRELOADED_VERSION, "dev") // the release build sets it
+VERSION_LABEL :: "dev build" when VERSION == "dev" else "v" + VERSION // as the rail shows it
 
 Page :: enum {
 	Servers,
@@ -399,7 +400,7 @@ rail :: proc(menu: ^Menu) {
 
 	// the bottom, from the bottom up: the version, and Quit
 	vy := VIEW_H - 14 - ui.height_of(u, ui.TINY)
-	ui.text_at(k, ui.TINY, "v" + VERSION, x, vy, ui.FAINT)
+	ui.text_at(k, ui.TINY, VERSION_LABEL, x, vy, ui.FAINT)
 	bw, by := f32(RAIL_W - 2 * RAIL_PAD), vy - 10 - ui.CTRL_H
 	if rail_button(k, RAIL_PAD, by, bw, ui.CTRL_H, "Quit", focus_rail && menu.side == RAIL_COUNT - 1) do menu.request = Quit{}
 }
