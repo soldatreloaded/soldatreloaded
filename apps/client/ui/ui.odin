@@ -5,7 +5,7 @@ package ui
 //
 // Everything is laid out in units of a view 480 tall, as the game's own view is,
 // whatever the window: the width follows the window, so a screen looks the same at any
-// size.
+// size. A match's view is held within the original's shapes, between bars (ui_fit).
 //
 // The widgets are the C client's main menu's, and immediate as its are: a screen lays
 // its page out anew each frame in one pass of a Kit, each widget drawing itself and
@@ -55,6 +55,7 @@ Ui :: struct {
 	fonts:   [Face]Font,
 	scale:   f32,        // window pixels to a unit
 	width:   f32,        // the view's width, in units
+	origin:  rl.Vector2, // the view's top-left in the window, in pixels: a match's sits between bars
 	mouse:   rl.Vector2, // in units
 	clicked: bool,       // the left button went down this frame
 	wheel:   f32,        // notches turned this frame, away from you positive
@@ -73,11 +74,18 @@ ui_destroy :: proc(ui: ^Ui) {
 // At the start of each frame, before any screen is updated: the window's size and the
 // mouse.
 ui_begin :: proc(ui: ^Ui) {
-	ui.scale = f32(rl.GetScreenHeight()) / VIEW_HEIGHT
-	ui.width = f32(rl.GetScreenWidth()) / ui.scale
-	ui.mouse = rl.GetMousePosition() / ui.scale
+	ui_fit(ui, {0, 0, f32(rl.GetScreenWidth()), f32(rl.GetScreenHeight())})
 	ui.clicked = rl.IsMouseButtonPressed(.LEFT)
 	ui.wheel = rl.GetMouseWheelMove()
+}
+
+// The view laid over `area` of the window, in pixels, and not the whole of it. What is
+// drawn in it is drawn from its top-left: the caller moves the drawing there.
+ui_fit :: proc(ui: ^Ui, area: rl.Rectangle) {
+	ui.scale = area.height / VIEW_HEIGHT
+	ui.width = area.width / ui.scale
+	ui.origin = {area.x, area.y}
+	ui.mouse = (rl.GetMousePosition() - ui.origin) / ui.scale
 }
 
 // A rectangle in units, in window pixels.

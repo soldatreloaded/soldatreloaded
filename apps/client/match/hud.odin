@@ -86,8 +86,8 @@ hud_data :: proc(match: ^Match, config: ^res.Client_Config) -> (data: hud.Hud_Da
 	data.loadout = me.loadout
 	for info, weapon in game.resources.weapons do data.weapon_names[weapon] = info.name
 
-	data.camera = match.camera.pos
-	data.view = match.camera.view
+	data.camera = match.seen.pos
+	data.view = match.seen.view
 	data.cursor = cursor_shown(match)
 	data.under_cursor, data.friend = under_cursor(match, &names)
 	data.follow = match.watch.follow

@@ -1,10 +1,12 @@
 package match
 
 import sa "core:container/small_array"
+import "core:math/rand"
 
 import sim "../../../core/game"
 import "../draw"
 import "../hud"
+import "../input"
 
 // The camera while I watch (LocalInput.pas, "change camera when dead"): as I die it stays
 // on my body; joining as a spectator, with no body, it goes to the first player up. Then,
@@ -15,10 +17,16 @@ import "../hud"
 // any time: fire and jet go round the players and its recorder, jump is the free camera.
 //
 // And a scoped Barrett shot of mine (the original's bullet Tracking): the camera rides
-// it, five ticks ahead, until it is gone, or I stand up or die (graphics.track_shot).
+// it, five ticks ahead, until it is gone or I stand up (graphics.track_shot).
+//
+// And the original's screen shake, while the camera follows someone: a shot in their
+// view jolts it (mine always, others' with graphics.screen_shake; Sprites.pas Fire), my
+// chainsaw's bite does (Bullets.pas), and a blast in their view wobbles it as it flares
+// (Sparks.pas), less as it dies down.
 
 SPECTATOR_AIM_DIST :: 30 // the free camera's speed, by the cursor's offset from the middle
 TRACK_LEAD :: 5 // ticks of its flight the camera keeps ahead of a tracked shot
+WOBBLE_LIFE :: draw.EXPLOSION_FRAMES * 2.3 // a blast wobbles the camera while it has more life than this
 
 Watch :: struct {
 	follow:       Maybe(sim.Soldier_Id), // the player the camera follows; nil for me
@@ -47,12 +55,13 @@ watch_tick :: proc(match: ^Match, mine: sim.Command) {
 		if !w.was_watching {
 			w.follow, w.free = nil, false
 			if me.team == .Spectator && !camera_next(match, false) do camera_free(match)
-		} else if .Weapons not_in match.hud.menus.open {
+		} else if .Weapons not_in match.hud.menus.open && pressed & {.Jump, .Fire, .Jet} != {} {
 			if .Jump in pressed {
 				camera_free(match)
-			} else if pressed & {.Fire, .Jet} != {} && !camera_next(match, .Jet in pressed) {
+			} else if !camera_next(match, .Jet in pressed) {
 				camera_free(match)
 			}
+			input.input_centre(&match.input) // the original's cursor goes back to the middle on a switch
 		}
 	case:
 		w.follow, w.free = nil, false
@@ -81,7 +90,7 @@ scoped_now :: proc(match: ^Match) -> bool {
 }
 
 // After the tick: a Barrett shot of mine this tick, scoped before it, is followed, the
-// newest if there are several; until it is gone, or I stand up or die.
+// newest if there are several; until it is gone or I stand up.
 track_shot :: proc(match: ^Match, scoped: bool) {
 	w := &match.watch
 	if scoped && match.config.graphics.track_shot {
@@ -94,41 +103,107 @@ track_shot :: proc(match: ^Match, scoped: bool) {
 	shot, tracking := w.tracking.?
 	if !tracking do return
 	me := &match.game.world.soldiers[match.me]
-	if !match.config.graphics.track_shot || !me.active || me.vitals.dead || me.controls.stance == .Stand || my_shot(match, shot) == nil {
+	if !match.config.graphics.track_shot || !me.active || me.controls.stance == .Stand || my_shot(match, shot) == nil {
 		w.tracking = nil
 	}
 }
 
-// The camera after the frame's ticks: on the shot it rides, pushed by the cursor while
-// free, or chasing whom it follows and leading toward the cursor, as the original's.
-camera_move :: proc(match: ^Match, alpha, dt: f32) {
+// The camera's move at the end of a tick (UpdateFrame.pas): put ahead of the shot it
+// rides, if it rides one (Bullets.pas, before the move); then pushed by the cursor while
+// free, or chasing whom it follows where the tick left them and leading toward the
+// cursor.
+camera_tick :: proc(match: ^Match) {
 	w := &match.watch
 	camera := &match.camera
 	followed := match.me
 	if f, following := w.follow.?; following && match.game.world.soldiers[f].active do followed = f
+	if !w.free do camera_jolt(match, followed) // the tick's shots, before its bullets
 	if shot, tracking := w.tracking.?; tracking {
-		if bullet := my_shot(match, shot); bullet != nil {
-			camera.pos = bullet.old_pos + (bullet.pos - bullet.old_pos) * alpha + bullet.velocity * TRACK_LEAD
-			return
-		}
+		if bullet := my_shot(match, shot); bullet != nil do camera.pos = bullet.pos + bullet.velocity * TRACK_LEAD
 	}
+	_, paused := match.game.round.phase.(sim.Paused) // a paused round's sparks hang, and don't flare on
+	if !w.free && match.mode != .Demo && !paused do camera_wobble(match, followed) // its sparks, after
+	cursor := cursor_aimed(match)
 	if w.free {
-		off := match.input.cursor - camera.view / 2
-		if abs(off.x) > 10 || abs(off.y) > 10 do camera.pos += off * (dt * sim.TICK_RATE / SPECTATOR_AIM_DIST)
+		// still with the cursor in the middle: 10 either way, wider with a wider view
+		ratio := camera.view.x / 640
+		middle := cursor.x > 310 * ratio && cursor.x < 330 * ratio && cursor.y > 230 && cursor.y < 250
+		if !middle do camera.pos += (cursor - camera.view / 2) / SPECTATOR_AIM_DIST
 		return
 	}
-	aim := match.game.world.soldiers[followed].aim.distance
-	draw.camera_follow(camera, match.frame.figures[followed].pos, cursor_shown(match), aim, dt)
+	soldier := &match.game.world.soldiers[followed]
+	draw.camera_follow(camera, soldier.body.pos, cursor, soldier.aim.distance)
 }
 
-// The cursor as drawn, which the camera leads toward: a demo's recorder's own while the
-// camera is on the recorder and no menu wants mine.
-cursor_shown :: proc(match: ^Match) -> [2]f32 {
-	w := &match.watch
-	if match.mode == .Demo && w.follow == nil && !w.free && !hud.menus_any_open(&match.hud.menus) {
-		return match.playback.tick.cursor
+// The tick's shots in view of whom the camera follows, the chainsaw's aside, each jolting
+// it: by up to 3 either way for the heavy guns, 1 for the rest. Then each bite of my
+// chainsaw, wherever it is, by up to 3.
+@(private = "file")
+camera_jolt :: proc(match: ^Match, followed: sim.Soldier_Id) {
+	world := &match.game.world
+	for event in sa.slice(&match.game.output.events) {
+		#partial switch e in event {
+		case sim.Fired:
+			if e.weapon == .Chainsaw || e.weapon == .Frag_Grenade do continue // a grenade is thrown, not fired
+			if e.soldier != match.me && !match.config.graphics.screen_shake do continue
+			if !point_visible(match, world.soldiers[e.soldier].body.pos, followed) do continue
+			#partial switch e.weapon {
+			case .Minimi, .Spas12, .Barrett, .Minigun: camera_shake(match, 3)
+			case:                                      camera_shake(match, 1)
+			}
+		case sim.Hit:
+			if e.shooter == match.me && e.weapon == .Chainsaw do camera_shake(match, 3)
+		}
 	}
+}
+
+// The camera moved by a whole number from -by to by, each way.
+@(private = "file")
+camera_shake :: proc(match: ^Match, by: int) {
+	match.camera.pos += {f32(rand.int_max(2 * by + 1) - by), f32(rand.int_max(2 * by + 1) - by)}
+}
+
+// Each blast in view of whom the camera follows, while it flares: the camera moved by up
+// to a sixth of its life, the original's way (one more to the right than to the left,
+// and one less down than up).
+@(private = "file")
+camera_wobble :: proc(match: ^Match, followed: sim.Soldier_Id) {
+	for &spark in match.sparks.pool {
+		if spark.kind != .M79_Explosion && spark.kind != .Frag_Explosion do continue
+		// the life it had as the tick began, as the original's is tested before it ticks down
+		if spark.old_life <= WOBBLE_LIFE || !point_visible(match, spark.pos, followed) do continue
+		wobble := int(spark.old_life) / 6 // 6 at least, past WOBBLE_LIFE
+		match.camera.pos += {f32(rand.int_max(2 * wobble + 1) - wobble), f32(rand.int_max(2 * wobble) - wobble)}
+	}
+}
+
+// Whether `point` is within a view's size of the middle between the soldier and their
+// aim (PointVisible).
+@(private = "file")
+point_visible :: proc(match: ^Match, point: [2]f32, id: sim.Soldier_Id) -> bool {
+	s := &match.game.world.soldiers[id]
+	middle := s.body.pos - (s.body.pos - s.controls.aim) / 2
+	view := match.camera.view
+	return abs(point.x - middle.x) < view.x && abs(point.y - middle.y) < view.y
+}
+
+// The cursor the camera leads toward: a demo's recorder's own while the camera is on the
+// recorder and no menu wants mine.
+cursor_aimed :: proc(match: ^Match) -> [2]f32 {
+	if recorders_cursor(match) do return match.playback.tick.cursor
 	return match.input.cursor
+}
+
+// The cursor as drawn: as cursor_aimed, but mine between the last tick's start and now.
+cursor_shown :: proc(match: ^Match) -> [2]f32 {
+	if recorders_cursor(match) do return match.playback.tick.cursor
+	return input.input_cursor_between(&match.input, match.frame.alpha)
+}
+
+@(private = "file")
+recorders_cursor :: proc(match: ^Match) -> bool {
+	w := &match.watch
+	return match.mode == .Demo && w.follow == nil && !w.free && !hud.menus_any_open(&match.hud.menus)
 }
 
 // The next player to watch, from the one watched: alive, no spectator, and a teammate

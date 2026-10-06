@@ -32,6 +32,9 @@ import sa "core:container/small_array"
 import "core:fmt"
 import "core:strings"
 
+import rl "vendor:raylib"
+import "vendor:raylib/rlgl"
+
 import ai "../../../core/bots"
 import sim "../../../core/game"
 import res "../../../core/resources"
@@ -63,8 +66,9 @@ Match :: struct {
 	bot_counts: res.Bot_Settings, // how many bots, on which teams
 	mod:        res.Mod, // the art of each next map is the mod's
 	art:        draw.Art,
-	camera:     draw.Camera,
-	sparks:     draw.Sparks,
+	camera:     draw.Camera, // as the ticks move it
+	seen:       draw.Camera, // as the frame draws it: between the last two ticks'
+	sparks:    draw.Sparks,
 	minimap:    draw.Minimap,
 	before:     draw.Snapshot, // the world a tick ago, which a frame blends from
 	frame:      draw.Frame,    // what is drawn: the world between its last two ticks
@@ -232,16 +236,27 @@ match_update :: proc(match: ^Match, config: ^res.Client_Config, sounds: ^sound.S
 		offsets = &stream.blend
 	}
 	draw.frame_build(&match.frame, &match.before, match.game, alpha, offsets)
-	camera_move(match, alpha, dt)
+	match.seen = draw.camera_between(match.camera, alpha)
 	return match.request
 }
 
+// The world and the HUD in the view's area of the window, bars beside it if the window's
+// shape is past the original's limits.
 match_draw :: proc(match: ^Match, u: ^ui.Ui, config: ^res.Client_Config) {
+	area := draw.view_area()
+	ui.ui_fit(u, area)
 	sky := draw.sky_of(&match.game.polymap, &config.graphics)
-	draw.minimap_fit(&match.minimap, &match.art, &match.game.polymap, u.scale, sky)
-	draw.draw_world(&match.art, match.game, &match.frame, &match.sparks, match.camera, &config.graphics)
+	draw.minimap_fit(&match.minimap, &match.art, &match.game.polymap, u.scale, sky) // into its own texture: before the scissor
+	rl.ClearBackground(rl.BLACK)
+	rl.BeginScissorMode(i32(area.x), i32(area.y), i32(area.width), i32(area.height))
+	defer rl.EndScissorMode()
+	draw.draw_world(&match.art, match.game, &match.frame, &match.sparks, match.seen, &config.graphics)
 	data := hud_data(match, config)
+	rlgl.PushMatrix() // the HUD's units are from the view's top-left
+	rlgl.Translatef(area.x, area.y, 0)
 	hud.hud_draw(u, &match.hud, &data, &match.minimap)
+	rlgl.DrawRenderBatchActive()
+	rlgl.PopMatrix()
 }
 
 // What every match has, whatever plays it: the sparks, the HUD, the window's mode to go
@@ -259,7 +274,8 @@ match_open :: proc(match: ^Match) {
 @(private = "file")
 view_open :: proc(match: ^Match, sounds: ^sound.Sound) {
 	draw.camera_fit(&match.camera)
-	match.camera.pos = match.game.world.soldiers[match.me].body.pos
+	draw.camera_place(&match.camera, match.game.world.soldiers[match.me].body.pos)
+	match.seen = match.camera
 	input.input_start(&match.input, match.camera.view)
 	shown(match, match.config, sounds)
 }
@@ -288,6 +304,8 @@ keys :: proc(match: ^Match, config: ^res.Client_Config, sounds: ^sound.Sound) {
 // the demo's), then what that made seen and heard.
 @(private = "package")
 tick :: proc(match: ^Match, config: ^res.Client_Config, sounds: ^sound.Sound) {
+	match.camera.prev = match.camera.pos
+	input.input_tick_begin(&match.input)
 	mine: sim.Command
 	switch match.mode {
 	case .Offline:
@@ -302,6 +320,7 @@ tick :: proc(match: ^Match, config: ^res.Client_Config, sounds: ^sound.Sound) {
 	shown(match, config, sounds)
 	if match.mode != .Demo do limbo_tick(match, mine)
 	watch_tick(match, mine)
+	camera_tick(match)
 	chat_tick(match)
 }
 

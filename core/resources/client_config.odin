@@ -98,6 +98,7 @@ Graphics_Settings :: struct {
 	cursor_color:      utils.Rgba,        // the menu cursor's colour, RRGGBB
 	cursor_size:       i32,               // the menu cursor's size, percent
 	track_shot:        bool,              // the camera follows a Barrett shot fired scoped, until you stand up
+	screen_shake:      bool,              // others' shots in view shake the camera too, not only yours (cl_screenshake)
 }
 
 Window_Mode :: enum {
@@ -197,7 +198,7 @@ DEFAULT_CLIENT_CONFIG := Client_Config {
 		primary_weapon   = .M79,
 		secondary_weapon = .Knife,
 	},
-	controls = {sensitivity = 0.4},
+	controls = {sensitivity = 1.0},
 	graphics = {
 		screen_width      = 1600,
 		screen_height     = 900,

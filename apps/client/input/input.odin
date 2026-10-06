@@ -13,7 +13,11 @@ package input
 // The mouse is the original's: the system cursor is hidden and held in the window (the
 // client holds it while a match is shown), and the game keeps its own, moved by the
 // mouse's motion times the sensitivity and kept inside the view, in the view's units
-// (480 tall, whatever the window), so it feels the same at any window size.
+// (480 tall, whatever the window), so it feels the same at any window size. The motion
+// is the mouse's raw counts, as SDL's relative mode gives the original's: raylib turns
+// GLFW's raw motion on with the cursor held, so no acceleration of the system's is in it.
+// It is drawn, as the camera is, `alpha` of the way from where it was at the last tick's
+// start (MousePrev).
 //
 // Uses: raylib, core/game. From the C client: input/input.c.
 
@@ -29,7 +33,8 @@ Input :: struct {
 	held:    sim.Buttons, // the buttons whose keys are down
 	pressed: sim.Buttons, // the one-shot buttons gone down since a tick last took them
 	cursor:  [2]f32,      // the game's own cursor, in view units from the view's top-left
-	view:    [2]f32,      // the view's size it was last kept in, so a resized window keeps its place
+	prev:    [2]f32,      // the cursor as the last tick began
+	view:   [2]f32,      // the view's size it was last kept in, so a resized window keeps its place
 	clicked: bool,        // a menu took the left button's press: it is no bind's until let go
 }
 
@@ -59,7 +64,23 @@ BUTTON_COMMANDS := [?]struct {
 // The game's cursor in the middle of a view this size. The system's is hidden and held
 // by the client while a match is on screen (main's cursor_follow).
 input_start :: proc(input: ^Input, view: [2]f32) {
-	input^ = {cursor = view / 2, view = view}
+	input^ = {cursor = view / 2, prev = view / 2, view = view}
+}
+
+// The game's cursor back in the middle of the view, with nothing to come from, as the
+// original's goes on a new map and on a switch of whom the camera follows.
+input_centre :: proc(input: ^Input) {
+	input.cursor, input.prev = input.view / 2, input.view / 2
+}
+
+// As each tick begins: where the cursor is drawn from until the next.
+input_tick_begin :: proc(input: ^Input) {
+	input.prev = input.cursor
+}
+
+// The cursor as it is drawn, `alpha` of the way from the last tick's start to now.
+input_cursor_between :: proc(input: ^Input, alpha: f32) -> [2]f32 {
+	return input.prev + (input.cursor - input.prev) * alpha
 }
 
 input_stop :: proc(input: ^Input) {
@@ -71,10 +92,15 @@ input_stop :: proc(input: ^Input) {
 // are its own (input_menu_keys), not their binds'. While `typing`, the keys are the
 // chat's: nothing going down reaches a bind, but a key held before is let go of.
 input_poll :: proc(input: ^Input, config: ^res.Client_Config, view: [2]f32, menu, typing: bool) -> (actions: Actions) {
-	if input.view != {} && input.view != view do input.cursor *= view / input.view // the same place in a window resized
+	if input.view != {} && input.view != view { // the same place in a window resized
+		input.cursor *= view / input.view
+		input.prev *= view / input.view
+	}
 	input.view = view
-	motion := rl.GetMouseDelta() * config.controls.sensitivity
-	input.cursor = {clamp(input.cursor.x + motion.x, 0, view.x), clamp(input.cursor.y + motion.y, 0, view.y)}
+	if rl.IsWindowFocused() { // the original's moves only with the window's input focus
+		motion := rl.GetMouseDelta() * config.controls.sensitivity
+		input.cursor = {clamp(input.cursor.x + motion.x, 0, view.x), clamp(input.cursor.y + motion.y, 0, view.y)}
+	}
 
 	if input.clicked && !rl.IsMouseButtonDown(.LEFT) do input.clicked = false
 	was_held := input.held
