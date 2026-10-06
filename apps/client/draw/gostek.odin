@@ -357,20 +357,45 @@ part_path :: proc(part: Part, style: res.Gostek, team2, mirrored: bool) -> strin
 	return utils.temp_path(dir, concat(part.file, suffix))
 }
 
-// Where a style's part is loaded from: the mod's own art for the style, else the mod's
-// male art, else Classic's for the style. So a mod made for the original, which dresses
-// the male alone, dresses every style in its art, rather than leaving the rest Classic's.
+// Where a style's part is loaded from: the mod's own art for the style; else the mod's
+// male art, where the style wears that part as the male does (Classic's art for both is
+// the same); else Classic's for the style. So a mod made for the original, which
+// dresses the male alone, dresses every style too, but leaves each what makes it that
+// style: the female's, rat's and furry's heads, the waifu's whole figure.
 @(private = "file")
 style_part_path :: proc(source: Source, part: Part, style: res.Gostek, team2, mirrored: bool) -> string {
 	path := part_path(part, style, team2, mirrored)
 	if style == .Male || part_shared(part) || mod_has(source, path) do return path
 	male := part_path(part, .Male, team2, mirrored)
-	return male if mod_has(source, male) else path
+	if mod_has(source, male) && classic_same(source, path, male) do return male
+	return path
+}
+
+// Whether Classic's images at `a` and `b` are the same picture: one style's part drawn as
+// another's.
+@(private = "file")
+classic_same :: proc(source: Source, a, b: string) -> bool {
+	classic := res.Mod{fallback = source.mod.fallback}
+	dir_a, name_a := split_path(a)
+	dir_b, name_b := split_path(b)
+	file_a, found_a := res.mod_image(classic, dir_a, name_a, source.listings)
+	file_b, found_b := res.mod_image(classic, dir_b, name_b, source.listings)
+	if !found_a || !found_b do return false
+	data_a, read_a := utils.read_file(file_a, context.temp_allocator)
+	data_b, read_b := utils.read_file(file_b, context.temp_allocator)
+	return read_a && read_b && string(data_a) == string(data_b)
 }
 
 // Whether the mod itself has the image at `path`, relative to it, not just Classic.
 @(private = "file")
 mod_has :: proc(source: Source, path: string) -> bool {
+	dir, name := split_path(path)
+	return res.mod_has_image(source.mod, dir, name, source.listings)
+}
+
+// A path's folder and its file's name.
+@(private = "file")
+split_path :: proc(path: string) -> (dir, name: string) {
 	slash := strings.last_index_byte(path, '/')
-	return res.mod_has_image(source.mod, path[:max(slash, 0)], path[slash + 1:], source.listings)
+	return path[:max(slash, 0)], path[slash + 1:]
 }
