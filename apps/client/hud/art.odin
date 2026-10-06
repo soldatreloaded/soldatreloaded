@@ -186,34 +186,36 @@ with_alpha :: proc(color: rl.Color, alpha: int) -> rl.Color {
 // ---------------------------------------------------------------------------------
 // Lettering
 
-// A face's size and stretch: the original's font styles (gfx/font.c's STYLE_SPECS), all
-// of them in the mod's font. The size is the em, in units: the style's points as
-// pixels (96 to 72) at the view's 480, sized with the window as the view is.
+// One of the original's font styles (its FONT_MENU, FONT_SMALL, …), whose face, size and
+// stretch are the mod's txt/font.ini's (ui.Ui's `hud`), at `scale` times its size. The
+// size is the em, in units: the style's points as pixels (96 to 72) at the view's 480,
+// sized with the window as the view is.
 Lettering :: struct {
-	size:    f32,
-	stretch: f32, // as much wider than the font has it
+	style: ui.Hud_Style,
+	scale: f32,
 }
 
-POINT :: 96.0 / 72.0 // in units
-
-MENU_FONT :: Lettering{12 * POINT, 1.5} // the menus, the HUD's numbers
-SMALL_FONT :: Lettering{9 * POINT, 1.25} // the console, the status, most of the texts
-SMALLEST_FONT :: Lettering{7 * POINT, 1.25}
-WEAPONS_FONT :: Lettering{8 * POINT, 1.25} // the weapon's name, the kill feed
-BIG_FONT :: Lettering{28 * POINT, 1.5} // the big messages
+MENU_FONT :: Lettering{.Menu, 1} // the menus, the HUD's numbers
+SMALL_FONT :: Lettering{.Small, 1} // the console, the status, most of the texts
+SMALLEST_FONT :: Lettering{.Smallest, 1}
+WEAPONS_FONT :: Lettering{.Weapons, 1} // the weapon's name, the kill feed
+BIG_FONT :: Lettering{.Big, 1} // the big messages
 
 SHADOW :: rl.Color{0, 0, 0, 255}
 
 // `str` at `pos`, its line's top there unless `vertical` says otherwise, over its shadow.
 write :: proc(u: ^ui.Ui, str: string, pos: [2]f32, font: Lettering, color: rl.Color, shadow := SHADOW, vertical := ui.Vertical.Top) {
-	ui.text(u, str, pos, font.size, color, font.stretch, shadow, vertical)
+	l := u.hud[font.style]
+	ui.text(u, str, pos, l.size * font.scale, color, l.stretch, shadow, vertical, l.face)
 }
 
 text_width :: proc(u: ^ui.Ui, str: string, font: Lettering) -> f32 {
-	return ui.text_width(u, str, font.size, font.stretch)
+	l := u.hud[font.style]
+	return ui.text_width(u, str, l.size * font.scale, l.stretch, l.face)
 }
 
 // A line's height in `font`: its ascent and descent.
 line_height :: proc(u: ^ui.Ui, font: Lettering) -> f32 {
-	return ui.line_height(u, font.size)
+	l := u.hud[font.style]
+	return ui.line_height(u, l.size * font.scale, l.face)
 }

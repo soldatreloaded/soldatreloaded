@@ -15,9 +15,9 @@ import "../ui"
 // count and my last kill's shot. The original's RenderInterface's texts.
 
 KILL_FEED_LEFT_TEXT :: 45 // a line's start, the kill feed on the left: past the icon
-KILL_ROW :: 10 // font_weaponmenusize and its gap
+KILL_ROW_GAP :: 2 // between the kill feed's lines, past font_weaponmenusize
 KILL_GAP :: 8 // KILLCONSOLE_SEPARATE_HEIGHT: above each killer's line
-CONSOLE_ROW :: 1.5 * 9 // font_consolelineheight times the small font's points
+CONSOLE_LINE_HEIGHT :: 1.5 // font_consolelineheight: a console line, in the small font's points
 BIG_MESSAGE_BASELINE :: 420
 BIG_MESSAGE_WIDTH :: 0.7 // of the view's, at most
 NARROW_WINDOW :: 1024 // pixels: narrower, the kill feed fades behind the scoreboard
@@ -29,7 +29,7 @@ draw_big_message :: proc(u: ^ui.Ui, feed: ^Feed) {
 	text := utils.short_string_text(&big.text)
 	alpha := clamp(3 * int(big.ticks) + 25, 0, int(big.color.a))
 	font := BIG_FONT
-	if w := text_width(u, text, font); w > BIG_MESSAGE_WIDTH * u.width do font.size *= BIG_MESSAGE_WIDTH * u.width / w
+	if w := text_width(u, text, font); w > BIG_MESSAGE_WIDTH * u.width do font.scale *= BIG_MESSAGE_WIDTH * u.width / w
 	a := f32(alpha) / 255
 	shadow := rl.Color{0, 0, 0, u8(a * a * a * a * f32(alpha))}
 	x := (u.width - text_width(u, text, font)) / 2
@@ -62,7 +62,7 @@ draw_kill_icons :: proc(u: ^ui.Ui, art: ^Art, feed: ^Feed, place: res.Kill_Log_P
 	for &kill, row in sa.slice(&feed.kills) {
 		if !kill.icon do continue
 		gap += KILL_GAP
-		at := [2]f32{x, f32(row * KILL_ROW) + top - 1 + gap}
+		at := [2]f32{x, f32(row) * kill_row(u) + top - 1 + gap}
 		picture(u, art.guns[kill.weapon], at, {255, 255, 255, alpha}, {0.8, 0.8})
 	}
 }
@@ -79,7 +79,7 @@ draw_kill_feed :: proc(u: ^ui.Ui, feed: ^Feed, place: res.Kill_Log_Position, top
 		if kill.icon do gap += KILL_GAP
 		font := SMALLEST_FONT if len(text) > 14 else WEAPONS_FONT
 		x := KILL_FEED_LEFT_TEXT if place == .Top_Left else 595 * wide(u) - text_width(u, text, font)
-		at := [2]f32{x, top + f32(row * KILL_ROW) + gap}
+		at := [2]f32{x, top + f32(row) * kill_row(u) + gap}
 		write(u, text, at, font, with_alpha(kill.color, alpha))
 	}
 }
@@ -101,7 +101,7 @@ draw_console :: proc(u: ^ui.Ui, feed: ^Feed, dim, typing: bool, scroll: int) {
 	for &line, i in lines {
 		text := utils.short_string_text(&line.text)
 		font := SMALLEST_FONT if text_width(u, text, SMALL_FONT) > u.width - 10 else SMALL_FONT
-		write(u, text, {5, 1 + f32(i) * CONSOLE_ROW}, font, with_alpha(line.color, 60 if dim else 255))
+		write(u, text, {5, 1 + f32(i) * console_row(u)}, font, with_alpha(line.color, 60 if dim else 255))
 	}
 }
 
@@ -127,4 +127,16 @@ draw_shot :: proc(u: ^ui.Ui, feed: ^Feed, seconds: f64) {
 @(private = "file")
 narrow :: proc(u: ^ui.Ui) -> bool {
 	return u.width * u.scale < NARROW_WINDOW
+}
+
+// A kill feed line's height: its font's size in points, and a gap, as the original's.
+@(private = "file")
+kill_row :: proc(u: ^ui.Ui) -> f32 {
+	return u.hud[.Weapons].size / ui.POINT + KILL_ROW_GAP
+}
+
+// A console line's height: its font's size in points, times font_consolelineheight.
+@(private = "file")
+console_row :: proc(u: ^ui.Ui) -> f32 {
+	return CONSOLE_LINE_HEIGHT * u.hud[.Small].size / ui.POINT
 }

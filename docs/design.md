@@ -48,7 +48,7 @@ the unpacked folder in a release:
 
 ```
 data/        what the game plays by: maps, animations, skeletons, objects, bots
-mods/        what it looks and sounds like: default/, and any others beside it
+mods/        what it looks and sounds like: classic/, the game's own, and the player's beside it
 scripts/     the server's Lua
 *.config.json   the configs, made with their defaults where they are missing
 manifest.json   the release the install was last brought up to, which the launcher keeps
@@ -58,10 +58,14 @@ manifest.json   the release the install was last brought up to, which the launch
 animations and the maps decide what is solid, so a difference here is a different game.
 A server and its clients must agree on it.
 
-**`mods/` is each player's own.** `mods/default/` is the game's look and sound. A player
-may pick one mod more (the client config's `graphics.mod`), and each file is looked for
-in it first and in the default after, so a mod holds only what it changes: a mod can be
-one sound. A mod's `mod.json` says how big its images are in the world.
+**`mods/` is each player's own.** `mods/classic/` is the game's look and sound, which
+ships with it and is kept by the launcher. Beside it, a player's own mods, each a folder
+of `mods/`, which no update touches. A player picks one (the client config's
+`graphics.mod`, on the Mods page), and each file is looked for in it first and in
+Classic after, so a mod holds only what it changes: a mod can be one sound. Mods are
+laid out as OpenSoldat's are, so one of theirs works as it is: its `mod.ini` says how big
+its images are in the world and where the soldier's parts are pinned, and its
+`txt/font.ini` what the HUD is written in.
 
 **The configs are JSON, and the struct is the file.** `client.config.json` and
 `server.config.json` are `Client_Config` and `Server_Config`: each field a key, read over

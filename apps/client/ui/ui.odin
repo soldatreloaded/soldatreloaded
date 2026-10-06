@@ -34,25 +34,44 @@ import res "../../../core/resources"
 VIEW_HEIGHT :: 480
 
 // The mod's faces: Play for what is read, its Bold for emphasis, Russo One (wide,
-// square) for the titles, Black Ops One (a stencil) for the game's name. A face the mod
-// hasn't is drawn in Play.
+// square) for the titles, Black Ops One (a stencil) for the game's name; and the HUD's
+// two, as the mod's txt/font.ini names them. A face the mod hasn't is drawn in Play.
 Face :: enum {
 	Regular,
 	Bold,
 	Display,
 	Logo,
+	Hud_1, // font.ini's Font1: the HUD's menus, big messages and numbers
+	Hud_2, // and its Font2: the console, the kill feed and the rest
 }
 
 @(rodata)
-FACE_FILES := [Face]string {
+FACE_FILES := #partial [Face]string {
 	.Regular = "fonts/play-regular.ttf",
 	.Bold    = "fonts/play-bold.ttf",
 	.Display = "fonts/russo-one.ttf",
 	.Logo    = "fonts/black-ops-one.ttf",
 }
 
+// The HUD's styles of lettering, the original's: each in one of font.ini's two fonts, at
+// its size and stretch.
+Hud_Style :: enum {
+	Menu,     // FontMenuSize, in Font1
+	Big,      // FontBigSize, in Font1
+	Small,    // FontConsoleSize, in Font2
+	Smallest, // FontConsoleSmallSize, in Font2
+	Weapons,  // FontWeaponMenuSize, in Font2
+}
+
+Hud_Lettering :: struct {
+	face:    Face,
+	size:    f32, // the em, in units
+	stretch: f32, // as much wider than the face has it
+}
+
 Ui :: struct {
 	fonts:   [Face]Font,
+	hud:     [Hud_Style]Hud_Lettering,
 	scale:   f32,        // window pixels to a unit
 	width:   f32,        // the view's width, in units
 	origin:  rl.Vector2, // the view's top-left in the window, in pixels: a match's sits between bars
@@ -62,7 +81,19 @@ Ui :: struct {
 }
 
 ui_init :: proc(ui: ^Ui, mod: res.Mod) {
-	for file, face in FACE_FILES do ui.fonts[face] = font_load(mod, file)
+	for file, face in FACE_FILES {
+		if file != "" do ui.fonts[face] = font_load(res.mod_file(mod, file))
+	}
+	fonts := res.font_config_load(mod)
+	ui.fonts[.Hud_1] = font_load(res.font_file(mod, fonts.files[0]))
+	ui.fonts[.Hud_2] = font_load(res.font_file(mod, fonts.files[1]))
+	ui.hud = {
+		.Menu     = {.Hud_1, fonts.menu * POINT, fonts.scales[0]},
+		.Big      = {.Hud_1, fonts.big * POINT, fonts.scales[0]},
+		.Small    = {.Hud_2, fonts.console * POINT, fonts.scales[1]},
+		.Smallest = {.Hud_2, fonts.console_small * POINT, fonts.scales[1]},
+		.Weapons  = {.Hud_2, fonts.weapon_menu * POINT, fonts.scales[1]},
+	}
 	ui_begin(ui)
 }
 

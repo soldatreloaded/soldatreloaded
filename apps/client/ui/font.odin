@@ -7,7 +7,6 @@ import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 import tt "vendor:stb/truetype"
 
-import res "../../../core/resources"
 import "../../../core/utils"
 
 // The lettering, the C client's (gfx/font.c), which is the original's: a face of the
@@ -58,9 +57,9 @@ Page :: struct {
 	row:     i32, // the tallest glyph in the row being filled
 }
 
-// The face in the mod's `file`; none (no data) if it isn't there.
-font_load :: proc(mod: res.Mod, file: string) -> (font: Font) {
-	data, read := utils.read_file(res.mod_file(mod, file))
+// The face in the file at `path`; none (no data) if it isn't there.
+font_load :: proc(path: string) -> (font: Font) {
+	data, read := utils.read_file(path)
 	if !read do return
 	if !tt.InitFont(&font.info, raw_data(data), tt.GetFontOffsetForIndex(raw_data(data), 0)) {
 		delete(data)

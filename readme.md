@@ -103,10 +103,14 @@ and how the programs sit on it.
 
 ## Modding
 
-`assets/mods/default/` is how the game looks and sounds. A mod is a folder beside it
-holding only what it changes, from one sound to every image; name it as `graphics.mod`
-in `client.config.json`, and the game wears it from its next start. Its `mod.json` sets
-how big its images are in the world.
+`assets/mods/classic/` is how the game looks and sounds, and ships with it. A
+player's own mod is a folder in `mods/`, holding only what it changes from Classic, from
+one sound to every image, laid out as an OpenSoldat mod is; the Mods page makes one (a
+copy of Classic), uses one at once, and deletes one. Its `mod.ini` sets how big its
+images are in the world and where the soldier's parts are pinned, and its `txt/font.ini`
+the HUD's fonts. Players' mods are shared at
+[soldatreloaded-mods](https://github.com/soldatreloaded/soldatreloaded-mods), which says
+how to add one.
 
 A server is scripted in Lua: [docs/scripting.md](docs/scripting.md) is the API, and
 `assets/scripts/` is where its scripts live.
@@ -121,8 +125,8 @@ A server is scripted in Lua: [docs/scripting.md](docs/scripting.md) is the API, 
 
 ## Licence
 
-The code is under the MIT licence ([license.md](license.md)). The game's data and the
-default mod's art and sounds are from [OpenSoldat's base
+The code is under the MIT licence ([license.md](license.md)). The game's data and
+Classic's art and sounds are from [OpenSoldat's base
 content](https://github.com/opensoldat/base), under CC BY 4.0, and the menu's fonts under
-the SIL Open Font License; `assets/data/NOTICE.md` and `assets/mods/default/NOTICE.md`
+the SIL Open Font License; `assets/data/NOTICE.md` and `assets/mods/classic/NOTICE.md`
 say what is whose.
