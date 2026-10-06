@@ -7,7 +7,8 @@ import "../../../core/utils"
 // The world drawn between its last two ticks, so it moves smoothly at any frame rate. A
 // frame is `alpha` of the way from the tick before (a Snapshot the match keeps) to the
 // latest (the world as it is): the soldiers' bodies and poses blend, and the corpses'
-// points; the bullets and the things blend between their own last two positions, which
+// points; online, the others are drawn where the line's corrections are still easing to
+// (the stream's blend), so a correction glides in rather than snapping; the bullets and the things blend between their own last two positions, which
 // the simulation keeps; the sparks between theirs. Everything else a frame draws is the
 // latest tick's. I am drawn as everyone is, and the camera follows where I am drawn.
 // From the C client's render/render_state.c.
@@ -40,8 +41,9 @@ snapshot_take :: proc(snapshot: ^Snapshot, world: ^sim.World) {
 	snapshot.corpses = world.corpses
 }
 
-// The frame `alpha` of the way from `before` to the game as it is now.
-frame_build :: proc(frame: ^Frame, before: ^Snapshot, game: ^sim.Game, alpha: f32) {
+// The frame `alpha` of the way from `before` to the game as it is now, each soldier moved
+// by its `offsets`, if any: what a correction still has to show of it.
+frame_build :: proc(frame: ^Frame, before: ^Snapshot, game: ^sim.Game, alpha: f32, offsets: ^[sim.MAX_PLAYERS]utils.Vec2 = nil) {
 	frame.alpha = clamp(alpha, 0, 1)
 	world := &game.world
 	for id in 0 ..< sim.MAX_PLAYERS {
@@ -50,6 +52,7 @@ frame_build :: proc(frame: ^Frame, before: ^Snapshot, game: ^sim.Game, alpha: f3
 			&before.soldiers[id], &world.soldiers[id],
 			&before.corpses[id], &world.corpses[id],
 			frame.alpha,
+			offsets[id] if offsets != nil else {},
 		)
 	}
 }
@@ -65,10 +68,10 @@ between :: proc(a, b: utils.Vec2, t: f32) -> utils.Vec2 {
 // journey, and the step from living to dead shows the latest tick's alone. A dead
 // soldier is its corpse once that has started; until then it holds its last pose.
 @(private = "file")
-figure_between :: proc(animations: ^res.Animations, from, to: ^sim.Soldier, corpse_from, corpse_to: ^sim.Corpse, alpha: f32) -> (figure: Figure) {
+figure_between :: proc(animations: ^res.Animations, from, to: ^sim.Soldier, corpse_from, corpse_to: ^sim.Corpse, alpha: f32, offset: utils.Vec2) -> (figure: Figure) {
 	if !to.active do return
 	continuous := from.active && from.vitals.life == to.vitals.life
-	figure.pos = between(from.body.pos, to.body.pos, alpha) if continuous else to.body.pos
+	figure.pos = (between(from.body.pos, to.body.pos, alpha) if continuous else to.body.pos) + offset
 
 	figure.corpse = to.vitals.dead && corpse_to.active
 	if figure.corpse {
@@ -88,7 +91,7 @@ figure_between :: proc(animations: ^res.Animations, from, to: ^sim.Soldier, corp
 	copy(figure.points[:], joints[:])
 	for k in 0 ..< len(to.pose.swing) {
 		swing := between(from.pose.swing[k], to.pose.swing[k], alpha) if continuous else to.pose.swing[k]
-		figure.points[len(joints) + k] = swing
+		figure.points[len(joints) + k] = swing + offset
 	}
 	return
 }

@@ -1,12 +1,17 @@
 package menu
 
+import "core:fmt"
+
+import "../../../core/utils"
+import "../online"
 import "../ui"
 
-// Join by address: the server's address and its password, and Connect. There is no
-// network yet: Connect says so.
+// Join by address: the server's address and its password, and Connect. While the line
+// joins, the button gives it up, and the footer says how it goes: what the line last
+// said, or how much of the server's map has come.
 
 Join :: struct {
-	connect_asked: bool, // Connect was pressed: the word on it shows beside it
+	connect_asked: bool, // Connect was pressed: what becomes of the line shows beside it
 }
 
 NAME_MAX :: 23     // a player's name, as the wire carries it
@@ -29,7 +34,25 @@ page_join :: proc(menu: ^Menu) {
 
 	k.w = full_w
 	k.scrolling = false
-	pressed, bx := big_button(menu, k.x + k.w, "CONNECT", true, false)
-	if pressed do menu.join.connect_asked = true
-	if menu.join.connect_asked do footer_text(menu, k.x, bx - k.x - 12, NOT_YET_ONLINE, ui.MUTED)
+	bx: f32
+	if menu.line.state == .Off {
+		pressed: bool
+		pressed, bx = big_button(menu, k.x + k.w, "CONNECT", true, false)
+		if pressed {
+			menu.request = Connect{network.server if network.server != "" else "127.0.0.1"}
+			menu.join.connect_asked = true
+		}
+	} else {
+		pressed: bool
+		pressed, bx = big_button(menu, k.x + k.w, "CANCEL", false, false)
+		if pressed do menu.request = Disconnect{}
+	}
+	if menu.join.connect_asked do footer_text(menu, k.x, bx - k.x - 12, line_status(menu), ui.MUTED)
+}
+
+// How the line is doing, in a line: the map coming, or what it last said.
+line_status :: proc(menu: ^Menu) -> string {
+	n := menu.line
+	if n.fetch.on do return fmt.tprintf("Downloading %s... %d%%", utils.short_string_text(&n.fetch.name), int(online.fetch_share(&n.fetch) * 100))
+	return utils.short_string_text(&n.status.text)
 }

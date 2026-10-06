@@ -8,9 +8,9 @@ package menu
 // and a controller's pad all work it.
 //
 // It edits the client's config in place (the player, the keys, the options, Offline
-// Play's match and rotation); it asks the client to start a game, and plays nothing
-// itself. Online play and the demos come later: their pages are drawn and edited, and
-// what would connect or play says it isn't available yet.
+// Play's match and rotation); it asks the client to start a game, to connect to a
+// server, to play a demo or to ask the lobby for its servers again, and plays nothing
+// itself. It reads the line (how the joining goes) and the browser's list, to show them.
 //
 // The menu is immediate, as the C client's: each frame its update gathers the keys and
 // the mouse, and its draw lays the page out anew in one pass of the ui's Kit, every
@@ -25,7 +25,8 @@ package menu
 //   binds.odin     the keys and the taunts as the config's binds
 //   options.odin   sound, mouse, interface, network   graphics.odin  the window, the world
 //
-// Uses: ui, draw (the player's preview), hud (the pointer), demo (the listing). From
+// Uses: ui, draw (the player's preview), hud (the pointer), demo (the listing), online (the
+// line and the browser). From
 // the C client: ui/mainmenu.c, ui/taunts.c.
 
 import "core:math"
@@ -40,6 +41,7 @@ import sim "../../../core/game"
 import res "../../../core/resources"
 import "../draw"
 import "../hud"
+import "../online"
 import "../ui"
 
 VERSION :: #config(SOLDATRELOADED_VERSION, "dev") // the release build sets it
@@ -58,6 +60,8 @@ Page :: enum {
 
 Menu :: struct {
 	config:       ^res.Client_Config,
+	line:         ^online.Line,     // the client's line, as it joins
+	browser:      ^online.Browser, // and its server list
 	kit:          ui.Kit,
 	page:         Page,
 	side:         int, // the rail's item with the keys: the pages, then Quit
@@ -73,11 +77,12 @@ Menu :: struct {
 }
 
 // What the menu asks of the client.
-//
-// Online play and the demos will ask more, once there is a network and a player: to
-// connect to a server (the servers and join pages), and to play a demo. Until then those pages say so where they would ask.
 Request :: union {
 	Play,
+	Connect,
+	Disconnect,
+	Play_Demo,
+	Refresh,
 	Quit,
 }
 
@@ -87,15 +92,35 @@ Play :: struct {
 	maps: []string,
 }
 
+// The line to the server at `address` (host:port), saying the config's name and password.
+Connect :: struct {
+	address: string,
+}
+
+// The line closed, or the joining given up.
+Disconnect :: struct {}
+
+// The demo `name`, from demos/, played.
+Play_Demo :: struct {
+	name: string,
+}
+
+// The lobby asked for its servers again.
+Refresh :: struct {}
+
 Quit :: struct {}
 
 // What the menu offers first, before anything has been played.
 FIRST_MAP :: "ctf_Ash"
 
 // The menu over `config`, its Offline Play on `last_map`: the map played last, or
-// FIRST_MAP.
-menu_init :: proc(menu: ^Menu, config: ^res.Client_Config, mod: res.Mod, last_map: string) {
+// FIRST_MAP. It shows how the client's line `n` joins, and the `browser`'s list, which
+// it asks for anew as it opens, as the C client's does.
+menu_init :: proc(menu: ^Menu, config: ^res.Client_Config, mod: res.Mod, last_map: string, n: ^online.Line, browser: ^online.Browser) {
 	menu.config = config
+	menu.line = n
+	menu.browser = browser
+	if browser.state != .Fetching && browser.state != .Querying do menu.request = Refresh{}
 	ui.kit_init(&menu.kit)
 	hud.art_load(&menu.art, mod)
 	draw.preview_load(&menu.preview, mod)
@@ -227,11 +252,6 @@ PAGE_NOTES := #partial [Page]string {
 	.Options  = "Changes take effect at once, and are saved in client.config.json when the game closes.",
 	.Graphics = "Changes take effect at once, and are saved in client.config.json when the game closes.",
 }
-
-// What can't be done until the game has a network, and demos to play: said where it
-// would be.
-NOT_YET_ONLINE :: "Online play isn't available yet: there is no network in this build."
-NOT_YET_DEMOS :: "Playing demos isn't available yet."
 
 // The footer's line: what the page says of where it stands.
 footer_text :: proc(menu: ^Menu, x, w: f32, text: string, color: rl.Color) {

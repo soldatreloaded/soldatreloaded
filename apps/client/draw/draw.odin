@@ -81,7 +81,8 @@ art_destroy :: proc(art: ^Art) {
 draw_world :: proc(art: ^Art, game: ^sim.Game, frame: ^Frame, sparks: ^Sparks, camera: Camera, graphics: ^res.Graphics_Settings) {
 	polymap := &game.polymap
 	seconds := rl.GetTime() // what pulses goes by it
-	draw_sky_behind(polymap, camera)
+	sky := sky_of(polymap, graphics)
+	draw_sky_behind(sky, camera)
 	rl.BeginMode2D(camera_raylib(camera))
 	rl.BeginBlendMode(.ALPHA_PREMULTIPLY)
 	rlgl.DisableBackfaceCulling() // a map's polygons and a mirrored sprite face either way
@@ -91,7 +92,7 @@ draw_world :: proc(art: ^Art, game: ^sim.Game, frame: ^Frame, sparks: ^Sparks, c
 		rl.EndMode2D()
 	}
 
-	draw_sky(polymap, camera)
+	draw_sky(sky, polymap, camera)
 	draw_polygons(art, polymap, .Background)
 	if graphics.scenery do draw_scenery(art, polymap, .Behind_Map)
 	draw_bullets(&art.bullets, &game.world, frame.alpha, graphics.grenade_color, graphics.trails)

@@ -6,8 +6,21 @@ import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 
 import res "../../../core/resources"
+import "../../../core/utils"
 
 // The map: its sky, its polygons and its scenery. From the C client's render/map_view.c.
+
+// The sky's colours: the map's, or the player's own on every map (graphics.force_sky).
+Sky :: struct {
+	top, bottom: utils.Rgba,
+}
+
+sky_of :: proc(polymap: ^res.Poly_Map, graphics: ^res.Graphics_Settings) -> (sky: Sky) {
+	sky = {polymap.sky_top, polymap.sky_bottom}
+	if graphics.force_sky do sky = {graphics.forced_sky_top, graphics.forced_sky_bottom}
+	sky.top.a, sky.bottom.a = 255, 255 // as the original forces them
+	return
+}
 
 // The polygons drawn behind everything (the map's background ones) or in front of the
 // soldiers (the rest).
@@ -18,19 +31,18 @@ Polygon_Layer :: enum {
 
 // Beyond the sky's gradient: the window cleared to its colour at the camera's side.
 @(private = "package")
-draw_sky_behind :: proc(polymap: ^res.Poly_Map, camera: Camera) {
-	rl.ClearBackground(rl.Color(polymap.sky_bottom if camera.pos.y > 0 else polymap.sky_top))
+draw_sky_behind :: proc(sky: Sky, camera: Camera) {
+	rl.ClearBackground(rl.Color(sky.bottom if camera.pos.y > 0 else sky.top))
 }
 
 // The sky's gradient, anchored in the world from top to bottom, about the origin, as the
 // original's is, and as wide as the view: it scrolls with the camera up and down.
 @(private = "package")
-draw_sky :: proc(polymap: ^res.Poly_Map, camera: Camera) {
+draw_sky :: proc(sky: Sky, polymap: ^res.Poly_Map, camera: Camera) {
 	d := f32(res.MAX_SECTORS) * max(f32(polymap.sector_size), math.ceil(0.5 * VIEW_HEIGHT / f32(res.MAX_SECTORS)))
 	x0 := camera.pos.x - camera.view.x / 2
 	x1 := camera.pos.x + camera.view.x / 2
-	top, bottom := polymap.sky_top, polymap.sky_bottom
-	top.a, bottom.a = 255, 255 // as the original forces them
+	top, bottom := sky.top, sky.bottom
 
 	rlgl.SetTexture(rlgl.GetTextureIdDefault())
 	rlgl.Begin(rlgl.QUADS)

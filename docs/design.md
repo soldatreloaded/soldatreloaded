@@ -16,7 +16,7 @@ what it is and which file does what.
 
 ```
 apps/server    ─► core/network, core/bots, core/http
-apps/client    ─► core/bots                  (and core/network, once it plays online)
+apps/client    ─► core/network, core/bots, core/http
 apps/launcher  ─► core/http, core/resources
 
 core/network   ─► core/game
@@ -107,7 +107,7 @@ authority. Who holds it is what makes each program what it is:
   commands from `core/bots`, and it sends everyone the snapshots and its rulings.
 - **The client offline** (Offline Play) has authority itself, and plays against bots on
   its own settings (the client config's `offline`): the game and the bots, no server.
-- **The client online** will have none: it steps the same world from the server's word.
+- **The client online** has none: it steps the same world from the server's word.
   See netcode.md for how a player's own soldier is never corrected.
 - **The tests and tools** have authority, and drive the world directly.
 
@@ -129,19 +129,21 @@ procedures; scripting.md is its reference.
 ## The client
 
 `apps/client/main.odin` is a loop over one screen at a time, the main menu or a match,
-with what outlives the screens (the window, the configs, the sound) kept around them.
+with what outlives the screens (the window, the configs, the sound, the line to a server
+and the server browser's list) kept around them.
 Each part is a package:
 
 | Package | What it does |
 |---|---|
-| `menu` | The main menu: an immediate-mode UI that edits the configs in place and asks for a game. |
-| `match` | Being in a game: builds my command each tick, steps the world, and hands what happened to the rest. |
+| `menu` | The main menu: an immediate-mode UI that edits the configs in place and asks for a game, a server or a demo. |
+| `match` | Being in a game, offline, online or a demo: builds my command each tick, steps the world, and hands what happened to the rest; the chat, the votes, the radio and watching. |
 | `draw` | The world, drawn. Reads the world and never changes it; sprites are packed into atlases so a frame changes texture a handful of times. |
 | `hud` | What is drawn over the world, from a plain `Hud_Data` the match builds each frame. |
 | `sound` | The game's sounds, placed from where the camera listens, driven by the tick's events. |
 | `input` | Keys and mouse made into a command through the player's binds. |
 | `ui` | Fonts and widgets. |
-| `net`, `demo` | The connection to a server, and recorded games: not written yet, beyond the demos' listing. |
+| `online` | The line to a server: the join, the round's map (fetched when it isn't here), the streams, what the server says; and the server browser's list. |
+| `demo` | Games recorded as they are played, and played back: what the server said, and my own part, tick by tick. |
 
 The rule across them is the C client's: the logic decides, the drawing reads. Nothing
 that draws changes the game, and the HUD and menus turn input into actions the match

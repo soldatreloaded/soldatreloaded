@@ -11,10 +11,12 @@ import "../../../core/utils"
 
 // What the game's rulings and events say to the player, kept from tick to tick: the kill
 // feed, the big message, the console's lines about the flags and the clock, my weapon
-// stats and my last kill's shot. Fed after each tick from what the tick decided and did,
-// so it is the same alone and online, where the rulings come down the wire. From the C
-// client's ui/feed.c and ui/consoles.c: the original's KillConsole, BigMessage and
-// MainConsole.
+// stats and my last kill's shot. The match says the rest into the console (console_add):
+// chat, the line's word, the answers to commands; the big console keeps them all, to be
+// shown in its place while a line is typed. Fed after each tick from what the tick
+// decided and did, so it is the same alone and online, where the rulings come down the
+// wire. From the C client's ui/feed.c and ui/consoles.c: the original's KillConsole,
+// BigMessage and MainConsole.
 //
 // The kill feed and the console scroll as the original's: a line's arrival holds them
 // still for a while, then their oldest line goes, one at a time, until the next comes.
@@ -23,6 +25,8 @@ KILL_LINES :: 50 // interface.kill_log_length, at most (the original's range)
 KILL_SCROLL_TICKS :: 240
 KILL_LINE_WAIT :: 70
 MAX_CONSOLE_LINES :: 16
+BIG_CONSOLE_LINES :: 256 // the big console keeps the scrollback (CONSOLE_MAX_MESSAGES)
+BIG_CONSOLE_SHOWN :: 30  // and shows what fits 85% of the view while a line is typed
 CONSOLE_SCROLL_TICKS :: 150
 CONSOLE_LINE_WAIT :: 150
 KILL_MESSAGE_TICKS :: 4 * 60 // KILLMESSAGEWAIT
@@ -31,13 +35,15 @@ SCORE_MESSAGE_TICKS :: 7 * 60 // CAPTURECTFMESSAGEWAIT
 MULTIKILL_TICKS :: 180 // MULTIKILLINTERVAL: kills this close together count up
 HEAD_PART :: 12 // the skeleton's head: a kill there is a headshot
 
-Line_Text :: utils.Short_String(80)
+LINE_TEXT :: 160 // a line's bytes at most: a name and a whole line of chat
+Line_Text :: utils.Short_String(LINE_TEXT)
 
 Feed :: struct {
 	kills:          sa.Small_Array(KILL_LINES, Kill_Line), // newest last
 	kill_scroll:    i32,
 	console:        sa.Small_Array(MAX_CONSOLE_LINES, Console_Line), // newest last
 	console_scroll: i32,
+	scrollback:     sa.Small_Array(BIG_CONSOLE_LINES, Console_Line), // the same lines kept long, newest last: the big console
 	console_length: int, // the lines it shows, as the config has it
 	kill_length:    int, // the kill feed's lines kept, as the config has it (0 for none); set before each tick
 	big:            Big_Message,
@@ -85,6 +91,20 @@ DIED_COLOR :: rl.Color{0xC5, 0x30, 0x25, 0xFF} // my deaths
 SUICIDE_COLOR :: rl.Color{0xD3, 0xB7, 0x27, 0xEB}
 PICKUP_COLOR :: rl.Color{0x77, 0xD3, 0x34, 0xFF} // a flag dropped
 TIE_COLOR :: rl.Color{245, 245, 245, 255}
+
+// The console's colours for what is said in it (Constants.pas *_MESSAGE_COLOR).
+CHAT_COLOR :: rl.Color{0xEF, 0xFE, 0xEA, 0xEE}
+TEAM_CHAT_COLOR :: rl.Color{0xFE, 0xDA, 0x7C, 0xEE} // and a radio call's
+SPECTATOR_CHAT_COLOR :: rl.Color{0xDF, 0x7A, 0xB0, 0xF5}
+SERVER_COLOR :: rl.Color{0xFB, 0xDA, 0x22, 0xF9} // the server's own chat
+ENTER_COLOR :: rl.Color{0xC3, 0xC3, 0xC3, 0xF1} // who came and went, and the console's own lines
+ALPHA_JOIN_COLOR :: rl.Color{0xE1, 0x53, 0x53, 0xFF} // who came to alpha and left it
+BRAVO_JOIN_COLOR :: rl.Color{0x53, 0x53, 0xE1, 0xFF}
+SPECTATOR_JOIN_COLOR :: rl.Color{0x53, 0xDF, 0x53, 0xFF}
+CLIENT_COLOR :: rl.Color{0xFC, 0xD8, 0x22, 0xF9} // the line's word, my own settings' answers, who was cut off
+WARNING_COLOR :: rl.Color{0xE3, 0x69, 0x52, 0xEE} // the line lost, a thing that went wrong
+VOTE_COLOR :: rl.Color{0xDD, 0xEE, 0x99, 0xEE}
+SCRIPT_COLOR :: rl.Color{0x7F, 0xD6, 0xFF, 0xF9} // a server script's, when it picks no colour of its own
 
 // The original's multikill words, from the second kill in a row.
 @(private = "file", rodata)
@@ -169,10 +189,23 @@ feed_tick :: proc(feed: ^Feed, game: ^sim.Game, names: ^[sim.MAX_PLAYERS]string,
 
 // A line of my own in the console: the client's word, not the game's.
 console_say :: proc(feed: ^Feed, color: rl.Color, format: string, args: ..any) {
+	console_add(feed, color, fmt.tprintf(format, ..args))
+}
+
+// A line into the console as it is, chat among them, and into the big console behind it.
+console_add :: proc(feed: ^Feed, color: rl.Color, text: string) {
+	line := Console_Line{text = utils.short_string(LINE_TEXT, text), color = color}
 	length := max(feed.console_length, 1)
 	for sa.len(feed.console) >= min(length, MAX_CONSOLE_LINES) do sa.ordered_remove(&feed.console, 0)
-	sa.append(&feed.console, Console_Line{text = line_text(format, ..args), color = color})
+	sa.append(&feed.console, line)
 	feed.console_scroll = -CONSOLE_LINE_WAIT
+	if sa.len(feed.scrollback) == BIG_CONSOLE_LINES do sa.ordered_remove(&feed.scrollback, 0)
+	sa.append(&feed.scrollback, line)
+}
+
+// How far back the big console can be paged.
+console_scroll_max :: proc(feed: ^Feed) -> int {
+	return max(sa.len(feed.scrollback) - BIG_CONSOLE_SHOWN, 0)
 }
 
 // The clocks: the big message runs down, the feeds scroll when it is time, my readouts
@@ -251,7 +284,7 @@ kill_line :: proc(feed: ^Feed, text: string, color: rl.Color, weapon: res.Weapon
 	length := min(feed.kill_length, KILL_LINES)
 	for sa.len(feed.kills) > 0 && sa.len(feed.kills) >= length do kill_scroll(feed)
 	if length <= 0 do return // no kill feed (interface.kill_log_length 0)
-	sa.append(&feed.kills, Kill_Line{text = utils.short_string(80, text), color = color, weapon = weapon, icon = icon})
+	sa.append(&feed.kills, Kill_Line{text = utils.short_string(LINE_TEXT, text), color = color, weapon = weapon, icon = icon})
 	feed.kill_scroll = -KILL_LINE_WAIT
 }
 
@@ -260,14 +293,14 @@ kill_scroll :: proc(feed: ^Feed) {
 	if sa.len(feed.kills) > 0 do sa.ordered_remove(&feed.kills, 0)
 }
 
-@(private = "file")
+// The big words in the middle, for `ticks`.
 big_say :: proc(feed: ^Feed, color: rl.Color, ticks: i32, format: string, args: ..any) {
 	feed.big = {text = line_text(format, ..args), color = color, ticks = ticks}
 }
 
 @(private = "file")
 line_text :: proc(format: string, args: ..any) -> Line_Text {
-	return utils.short_string(80, fmt.tprintf(format, ..args))
+	return utils.short_string(LINE_TEXT, fmt.tprintf(format, ..args))
 }
 
 // ---------------------------------------------------------------------------------

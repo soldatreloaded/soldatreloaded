@@ -59,9 +59,12 @@ draw_kill_icons :: proc(u: ^ui.Ui, art: ^Art, feed: ^Feed, place: res.Kill_Log_P
 	}
 }
 
-// Its lines, right-aligned (or from the left, past the icons), smaller when long.
-draw_kill_feed :: proc(u: ^ui.Ui, feed: ^Feed, place: res.Kill_Log_Position, dim: bool) {
-	alpha := 80 if dim && narrow(u) else 245
+// Its lines, right-aligned (or from the left, past the icons), smaller when long; on a
+// narrow window, faint behind the scoreboard and fainter while a line is typed.
+draw_kill_feed :: proc(u: ^ui.Ui, feed: ^Feed, place: res.Kill_Log_Position, dim, typing: bool) {
+	alpha := 245
+	if narrow(u) && dim do alpha = 80
+	else if narrow(u) && typing do alpha = 180
 	gap: f32 = 0
 	for &kill, row in sa.slice(&feed.kills) {
 		text := utils.short_string_text(&kill.text)
@@ -73,12 +76,21 @@ draw_kill_feed :: proc(u: ^ui.Ui, feed: ^Feed, place: res.Kill_Log_Position, dim
 	}
 }
 
-// The console in the top-left corner; faint behind the scoreboard and the menus, a line
+// The console in the top-left corner, or while a line is `typing` the big console in its
+// place, paged `scroll` lines back; faint behind the scoreboard and the menus, a line
 // smaller where it runs past the view.
-draw_console :: proc(u: ^ui.Ui, feed: ^Feed, dim: bool) {
-	shown := min(sa.len(feed.console), max(feed.console_length, 0))
-	lines := sa.slice(&feed.console)
-	for &line, i in lines[len(lines) - shown:] {
+draw_console :: proc(u: ^ui.Ui, feed: ^Feed, dim, typing: bool, scroll: int) {
+	lines: []Console_Line
+	if typing {
+		all := sa.slice(&feed.scrollback)
+		shown := min(len(all), BIG_CONSOLE_SHOWN)
+		back := clamp(scroll, 0, len(all) - shown)
+		lines = all[len(all) - shown - back:][:shown]
+	} else {
+		all := sa.slice(&feed.console)
+		lines = all[len(all) - min(len(all), max(feed.console_length, 0)):]
+	}
+	for &line, i in lines {
 		text := utils.short_string_text(&line.text)
 		font := SMALLEST_FONT if text_width(u, text, SMALL_FONT) > u.width - 10 else SMALL_FONT
 		write(u, text, {5, 1 + f32(i) * CONSOLE_ROW}, font, with_alpha(line.color, 60 if dim else 255))
@@ -94,11 +106,16 @@ draw_respawn :: proc(u: ^ui.Ui, art: ^Art, mine: ^Mine) {
 	}
 }
 
-// The FPS line (ui_info), and my ping.
+// The FPS line (ui_info), and my ping; online, under it, how the line has been over the
+// last second.
 draw_info :: proc(u: ^ui.Ui, data: ^Hud_Data) {
 	color := rl.Color{239, 170, 200, 255}
 	write(u, fmt.tprintf("FPS: %d", data.fps), {460 * wide(u), 10}, SMALL_FONT, color)
 	write(u, fmt.tprintf("Ping: %d", data.players[data.me].ping), {550 * wide(u), 10}, SMALL_FONT, color)
+	if !data.online do return
+	line := fmt.tprintf("Loss: %d%%  Jitter: %d", data.loss, data.jitter)
+	x := min(550 * wide(u), u.width - text_width(u, line, SMALL_FONT) - 4)
+	write(u, line, {x, 26}, SMALL_FONT, {255, 90, 70, 255} if data.loss >= 5 else color)
 }
 
 // My last kill's shot: how far, how long in the air, how many ricochets; pulsing.

@@ -1,0 +1,152 @@
+package match
+
+import "core:time"
+
+import ai "../../../core/bots"
+import sim "../../../core/game"
+import res "../../../core/resources"
+import "../draw"
+import "../input"
+
+// Offline Play: this machine decides. Me and the bots on the config's limits, the rounds
+// played on its maps in turn, everyone placed as a server would place them, and the
+// bots' chat heard here.
+
+// How the game is played: Offline Play's limits over the game's own settings.
+@(private = "package")
+settings_from :: proc(offline: res.Offline_Settings) -> sim.Game_Settings {
+	s := sim.DEFAULT_GAME_SETTINGS
+	if offline.time_limit > 0 do s.time_limit = offline.time_limit * 60 * sim.TICK_RATE
+	if offline.capture_limit > 0 do s.capture_limit = offline.capture_limit
+	return s
+}
+
+// The world a tick on, on my command and the bots'; then on the team I asked for, if I
+// did. My command, which it ran.
+@(private = "package")
+offline_step :: proc(match: ^Match, config: ^res.Client_Config) -> sim.Command {
+	game := match.game
+	commands: [sim.MAX_PLAYERS]sim.Command
+	match.sequence += 1
+	aim := draw.camera_to_world(match.camera, match.input.cursor)
+	commands[match.me] = input.input_take_command(&match.input, match.sequence, aim, config.controls.legacy_flag_throw)
+	game.world.soldiers[match.me].player.typing = prompt_up(match)
+	names := soldier_names(match)
+	ai.bots_commands(&match.bots, game, &names, &commands)
+	scoped := scoped_now(match)
+	draw.snapshot_take(&match.before, &game.world)
+	sim.game_tick(game, &commands)
+	ai.bots_hear(&match.bots, game)
+	track_shot(match, scoped)
+	if team, asked := match.team_asked.?; asked {
+		spawn(game, match.me, team, game.world.soldiers[match.me].loadout)
+		match.team_asked = nil
+	}
+	return commands[match.me]
+}
+
+// The next round, on the next of the maps, drawn with that map's art; or on the same
+// map again.
+@(private = "package")
+next_round :: proc(match: ^Match) {
+	next := (match.map_index + 1) % len(match.maps)
+	if next == match.map_index {
+		round_start(match)
+		return
+	}
+	match.map_index = next
+	match.map_name = match.maps[next]
+	if !round_start(match) do return // tried again, on the map after, next tick
+	art_reload(match)
+}
+
+// A new round on the match's map: me with my loadout, and the bots with theirs. They are
+// placed as a tick's rulings, which the sparks and the sound then see as any tick's.
+@(private = "package")
+round_start :: proc(match: ^Match) -> bool {
+	game := match.game
+	config := match.config
+	me := match.me
+	kept := game.world.soldiers[me].team // the team I was on, which I stay on
+	sim.game_start_round(game, match.map_name, seed = u64(time.time_to_unix_nano(time.now()))) or_return
+	sim.clear_output(&game.output)
+
+	player := config.player
+	soldier := &game.world.soldiers[me]
+	soldier.player.look = look_of(config)
+	my_team := kept if kept == .Alpha || kept == .Bravo else .Alpha
+	spawn(game, me, my_team, {player.primary_weapon, player.secondary_weapon})
+	// the bots by team, alpha's first; the slots after them are let go
+	counts := match.bot_counts
+	alpha := bot_count(counts.alpha)
+	wanted := min(alpha + bot_count(counts.bravo), sim.MAX_PLAYERS - 1)
+	for id in 1 ..< sim.MAX_PLAYERS {
+		slot := sim.Soldier_Id(id)
+		if id > wanted {
+			ai.bots_detach(&match.bots, slot)
+			continue
+		}
+		if !ai.bots_has(&match.bots, slot) {
+			profile := ai.profile_random(match.profiles, &game.world.rng) or_break
+			ai.bots_attach(&match.bots, slot, profile, game.world.rng.state + u64(id))
+		}
+		profile := &match.bots.brains[id].profile
+		game.world.soldiers[id].player = {look = ai.profile_look(profile), bot = true}
+		team: res.Team = .Alpha if id <= alpha else .Bravo
+		spawn(game, slot, team, {profile.favourite, profile.secondary})
+	}
+	ai.bots_new_round(&match.bots)
+	draw.snapshot_take(&match.before, &game.world) // a new round is a jump, not a journey
+	hud_new_round(match)
+	return true
+}
+
+// My look, as the config has it.
+look_of :: proc(config: ^res.Client_Config) -> sim.Look {
+	player := &config.player
+	return {
+		gostek      = player.gostek,
+		shirt       = player.shirt,
+		pants       = player.pants,
+		skin        = player.skin,
+		hair        = player.hair,
+		jet         = player.jet,
+		hair_style  = player.hair_style,
+		head_style  = player.head_style,
+		chain_style = player.chain_style,
+	}
+}
+
+// A soldier placed on one of its team's spawn points, as the server places one: a new
+// life, ruled and recorded in the tick's output.
+@(private = "package")
+spawn :: proc(game: ^sim.Game, id: sim.Soldier_Id, team: res.Team, loadout: sim.Loadout) {
+	respawn := sim.Respawn {
+		target    = id,
+		life      = game.world.soldiers[id].vitals.life + 1,
+		team      = team,
+		primary   = loadout.primary,
+		secondary = loadout.secondary,
+		pos       = sim.spawn_point(game.world.polymap, team, &game.world.rng),
+	}
+	sim.rule(&game.world, &game.resources, respawn, &game.output)
+}
+
+// The bots' brains at the config's skill, and the profiles of data/bots they are dressed
+// from; each round seats as many as the config asks for (round_start). What they say is
+// heard in the chat, as a player's is.
+@(private = "package")
+bots_join :: proc(match: ^Match, settings: res.Bot_Settings) {
+	ai.bots_init(&match.bots, {difficulty = settings.difficulty, chat = settings.chat}, bot_said, match)
+	match.profiles = res.bot_profiles_load(sim.DATA_DIR)
+}
+
+@(private = "file")
+bot_said :: proc(user: rawptr, slot: sim.Soldier_Id, text: string) {
+	chat_heard(cast(^Match)user, slot, false, false, text)
+}
+
+@(private = "file")
+bot_count :: proc(n: i32) -> int {
+	return clamp(int(n), 0, sim.MAX_PLAYERS - 1)
+}

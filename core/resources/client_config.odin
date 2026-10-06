@@ -6,9 +6,9 @@ import "../utils"
 
 // The game's own settings, client.config.json at the install's root (config.odin): your
 // soldier, the window and the effects, the sound, the server to join, Offline Play, the
-// radio's calls and the keys. Read as the game starts (the file made with the defaults
-// if it isn't there), written as it closes. A setting the file doesn't hold keeps its
-// default.
+// radio's calls, your mutes and the keys. Read as the game starts (the file made with
+// the defaults if it isn't there), written as it closes. A setting the file doesn't hold
+// keeps its default.
 
 Client_Config :: struct {
 	player:    Player_Settings,
@@ -20,6 +20,7 @@ Client_Config :: struct {
 	demos:     Demo_Settings,
 	offline:   Offline_Settings,  // a game against bots on this machine, alone
 	radio:     Radio_Settings,    // the radio menu's calls, and the places each can name
+	mutes:     Mute_Settings,     // the chat kept off your screen: kinds of it, and players by name
 	binds:     map[string]string, // your keys: a key to a command; an empty command lets one of the game's own go (client_config_bind)
 
 	arena:     virtual.Arena `json:"-"`, // everything the config's strings and binds are allocated in
@@ -73,7 +74,8 @@ Chain_Style :: enum {
 }
 
 Control_Settings :: struct {
-	sensitivity: f32, // the mouse's speed
+	sensitivity:       f32,  // the mouse's speed
+	legacy_flag_throw: bool, // jump and crouch held together (w+s) throw the flag too, as older versions did
 }
 
 Graphics_Settings :: struct {
@@ -107,7 +109,7 @@ Window_Mode :: enum {
 Interface_Settings :: struct {
 	minimap:           bool,              // the minimap
 	info:              bool,              // the FPS and ping line
-	player_names:      bool,              // teammates' names at the screen's edge when out of view (everyone's, spectating), and the ping dot
+	player_names:      bool,              // teammates' names at the screen's edge when out of view (everyone's, spectating), and your ping
 	team_names:        bool,              // teammates' names by them always, not only at the screen's edge when out of view (with player_names)
 	typing:            Typing_Style,      // over a player typing: off, dots (the original's) or typing, the word
 	kill_log_length:   i32,               // the kill log's lines, two a kill, 0 to 50; 0 shows none
@@ -164,6 +166,17 @@ Radio_Settings :: struct {
 Radio_Call :: struct {
 	name:   string,
 	places: [3]string,
+}
+
+// Your own mutes, on your screen alone: a server's are its admins'. A muted player's taunts
+// and radio calls, said by a key and not typed, still come through, but for a
+// spectator's while the spectators are muted.
+Mute_Settings :: struct {
+	everyone:   bool,     // everyone's chat
+	team:       bool,     // your team's
+	enemies:    bool,     // the other team's
+	spectators: bool,     // the spectators', their taunts too
+	players:    []string, // these players', by name in any case, until unmuted
 }
 
 LOBBY_URL :: "https://soldatreloaded-lobby.fly.dev"
@@ -244,8 +257,6 @@ DEFAULT_BINDS := [?][2]string {
 	{"f5", "toggle ui_info"},
 	{"f7", "toggle ui_playernames"},
 	{"f9", "togglewindow"},
-	{"ctrl+f9", "toggle r_wireframe"},
-	{"f10", "toggle r_debug"},
 	{"f6", "demo_pause"},
 	{"f8", "demo_fast"},
 	{"leftarrow", "demo_tick_r -600"},

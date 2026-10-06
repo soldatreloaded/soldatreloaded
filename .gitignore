@@ -2,3 +2,5 @@ tests/compare/build/
 build/
 assets/*.exe
 assets/*.config.json
+assets/data/downloads/
+assets/demos/

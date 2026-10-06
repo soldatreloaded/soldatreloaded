@@ -1,22 +1,25 @@
 package menu
 
 import "core:fmt"
+import "core:strings"
 
+import "../../../core/utils"
 import "../demo"
 import "../ui"
 
 // The demos in demos/, newest first, a row each: its name, map, recorder, length and
-// date. A click picks one, a second plays it, as Play does; the wheel scrolls, and with
-// the focus on the list the arrows pick and Enter plays. Above, whether every game is
-// recorded; below, the one picked, and Play. Demos can't be played yet: Play says so.
+// date, as its header says. A click picks one, a second plays it, as Play does; the
+// wheel scrolls, and with the focus on the list the arrows pick and Enter plays. Above,
+// whether every game is recorded; below, the one picked, and Play, or why the last
+// couldn't be played.
 
 Demos :: struct {
 	listings:   []demo.Listing,
 	listed:     bool, // read from demos/ since the page was opened
 	scroll:     int,  // the list's first row shown
 	selected:   int,  // the demo picked, -1 for none
-	clicked_at: f64,  // when it was picked, so a second click soon after plays it
-	play_asked: bool, // Play was pressed: the word on it shows beside it
+	clicked_at: f64,    // when it was picked, so a second click soon after plays it
+	note:       string, // why the demo last asked for couldn't be played
 }
 
 DEMO_ROW :: 20
@@ -24,6 +27,7 @@ SCROLL_DEMOS :: ui.SCROLL_PAGE + 3
 
 demos_destroy :: proc(demos: ^Demos) {
 	demo.listings_destroy(demos.listings)
+	delete(demos.note)
 	demos^ = {}
 }
 
@@ -36,7 +40,6 @@ page_demos :: proc(menu: ^Menu) {
 		demos.listings = demo.demo_list()
 		demos.listed = true
 		demos.selected = -1
-		demos.play_asked = false
 	}
 	n := len(demos.listings)
 	x, w, y := k.x, k.w, f32(BODY_TOP)
@@ -100,12 +103,12 @@ page_demos :: proc(menu: ^Menu) {
 			ui.rrect(u, x + 2, ry, w - 4, DEMO_ROW, ui.RADIUS, ui.HOVER)
 		}
 		ui.text_fit(k, ui.BODY, d.name, x + 12, cy, map_x - x - 20, ui.TEXT)
-		ui.text_fit(k, ui.BODY, "-", map_x, cy, player_x - map_x - 8, ui.MUTED)
-		ui.text_fit(k, ui.BODY, "-", player_x, cy, length_x - player_x - 8, ui.MUTED)
-		ui.text_mid(k, ui.BODY, "-", length_x, cy, ui.MUTED)
+		ui.text_fit(k, ui.BODY, utils.short_string_text(&d.header.map_name), map_x, cy, player_x - map_x - 8, ui.MUTED)
+		ui.text_fit(k, ui.BODY, utils.short_string_text(&d.header.name), player_x, cy, length_x - player_x - 8, ui.MUTED)
+		ui.text_mid(k, ui.BODY, demo.ticks_text(d.header.ticks), length_x, cy, ui.MUTED)
 		ui.text_fit(k, ui.BODY, d.recorded, date_x, cy, x + w - date_x - 8, ui.MUTED)
 		if ui.take(k, list_id, x, ry, w, DEMO_ROW) {
-			demos.play_asked = picked && k.time - demos.clicked_at < ui.DOUBLE_CLICK
+			if picked && k.time - demos.clicked_at < ui.DOUBLE_CLICK do play(menu, d)
 			demos.selected = i
 			demos.clicked_at = k.time
 		}
@@ -120,20 +123,36 @@ page_demos :: proc(menu: ^Menu) {
 	selected := demos.selected >= 0 && demos.selected < n
 	if focused && k.enter {
 		k.enter = false
-		if selected do demos.play_asked = true
+		if selected do play(menu, &demos.listings[demos.selected])
 	}
 
 	// the action bar: the one picked, and Play
 	pressed, px := big_button(menu, x + w, "PLAY", true, !selected)
-	if pressed do demos.play_asked = true
+	if pressed && selected do play(menu, &demos.listings[demos.selected])
 	tw := px - x - 16
-	if selected && demos.play_asked {
-		footer_text(menu, x, tw, NOT_YET_DEMOS, ui.MUTED)
+	if demos.note != "" {
+		footer_text(menu, x, tw, demos.note, ui.WARN)
 	} else if selected {
 		d := &demos.listings[demos.selected]
 		ui.text_fit(k, ui.LABEL, d.name, x, ACTION_CY - 7, tw, ui.TEXT)
-		ui.text_fit(k, ui.BODY, d.recorded, x, ACTION_CY + 9, tw, ui.MUTED)
+		line := fmt.tprintf("%s on %s, %s  -  %s", utils.short_string_text(&d.header.name), utils.short_string_text(&d.header.map_name), demo.ticks_text(d.header.ticks), d.recorded)
+		ui.text_fit(k, ui.BODY, line, x, ACTION_CY + 9, tw, ui.MUTED)
 	} else if n > 0 {
 		footer_text(menu, x, tw, "Pick a demo, or double-click one to play it. The arrows skip ten seconds as it plays.", ui.MUTED)
 	}
+}
+
+// The demo asked for: played in the menu's place, if it can be.
+@(private = "file")
+play :: proc(menu: ^Menu, d: ^demo.Listing) {
+	delete(menu.demos.note)
+	menu.demos.note = ""
+	menu.request = Play_Demo{d.name}
+}
+
+// The demo asked for couldn't be played: why, on the demos page.
+menu_demo_failed :: proc(menu: ^Menu, why: string) {
+	if menu.page != .Demos do go_page(menu, .Demos)
+	delete(menu.demos.note)
+	menu.demos.note = strings.clone(why)
 }

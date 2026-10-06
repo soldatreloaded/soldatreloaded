@@ -19,8 +19,10 @@ Now that the game is in a decent state, with most issues fixed, a refactor is du
   checked tick by tick against it (`tests/compare`).
 - **The dedicated server** hosts games over the network, with bots, votes, admin
   commands, bans and mutes, a listing in the server browser and Lua scripts.
-- **The client** has its main menu, and Offline Play against bots with the HUD, sound
-  and the full look of the game. Online play and demos are not there yet.
+- **The client** has its main menu, Offline Play against bots, and online play: the
+  server browser, joining by address, the chat, votes, the radio and spectating, with
+  the HUD, sound and the full look of the game. Games are recorded as demos and played
+  back.
 - **Releases** are built and published by tagging (docs/git.md), each package with a
   manifest of its files. **The launcher** keeps a player's install at the newest
   release by them, then starts the game.
@@ -64,9 +66,9 @@ odin test tests/network
 odin test tests/server -define:ODIN_TEST_THREADS=1
 ```
 
-The other suites run the same way: `tests/bots`, `tests/lists`, `tests/lobby` and
-`tests/script`. The server's tests use real sockets on the loopback, so they run one at
-a time.
+The other suites run the same way: `tests/bots`, `tests/lists`, `tests/lobby`,
+`tests/script` and `tests/client`. The server's and the client's tests use real sockets
+on the loopback, so they run one at a time.
 
 `tests/compare` plays the simulation against the C game, every field after every tick.
 It needs the C game checked out beside this repository (`../bettersoldat`, or set

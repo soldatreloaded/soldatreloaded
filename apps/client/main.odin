@@ -3,15 +3,16 @@ package main
 // The client: one screen at a time, the main menu or a game, each its own package.
 // The loop reads input, updates the screen, draws it, and switches screens when the
 // screen asks. It also loads the configs at the start and saves them at the end, keeps
-// the window as the config has it as that changes, and keeps the sound, which outlives
-// the screens: a match plays into it, as the menu will.
+// the window as the config has it as that changes, and keeps what outlives the screens:
+// the sound, which a match plays into; the line to a server, which the menu opens and a
+// match plays on, polled here each frame; and the server browser's list.
 // Discord presence (interface.discord, the C client's net/discord.c) comes later, pumped
 // from this loop.
 //
 //   menu    the main menu                        match   being in a game
 //   draw    the world, drawn                     hud     what is drawn over it
 //   ui      fonts and widgets                    sound   the game's sounds
-//   input   keys and mouse into commands         net     the connection to a server
+//   input   keys and mouse into commands         online  the line to a server, the browser
 //   demo    recording and playing back games
 //
 // It runs from the install's root, where data/ and mods/ are: assets/ in this
@@ -21,13 +22,17 @@ package main
 //   cd assets && odin run ../apps/client
 
 import "core:log"
+import "core:strings"
 
 import rl "vendor:raylib"
 
 import sim "../../core/game"
+import network "../../core/network"
 import res "../../core/resources"
+import "../../core/utils"
 import "match"
 import "menu"
+import "online"
 import "sound"
 import "ui"
 
@@ -47,6 +52,9 @@ Client :: struct {
 	window:      Window, // as it was last made
 	screen:      Screen,
 	accumulator: f64, // seconds not yet ticked
+	line:        online.Line, // the line to a server, or a demo's
+	browser:     online.Browser, // the server browser's list
+	last_map:    string, // Offline Play's last, which the menu offers again
 }
 
 // What the window shows; none once the client is closing. Each screen is large (a match
@@ -63,11 +71,13 @@ main :: proc() {
 	client: Client
 	client.config = res.client_config_load(CONFIG_PATH)
 	client.mod = res.mod_make(MODS_DIR, client.config.graphics.mod)
+	client.last_map = strings.clone(menu.FIRST_MAP)
+	if !online.line_init(&client.line) do log.error("ENet wouldn't start: there is no playing online")
 	window_open(&client.window, &client.config.graphics)
 	rl.InitAudioDevice()
 	sound.sound_init(&client.sound, client.mod)
 	ui.ui_init(&client.ui, client.mod)
-	client.screen = menu_open(&client, menu.FIRST_MAP)
+	client.screen = menu_open(&client)
 
 	for client.screen != nil && !rl.WindowShouldClose() {
 		window_follow(&client.window, &client.config.graphics)
@@ -83,20 +93,26 @@ main :: proc() {
 	}
 
 	screen_switch(&client, nil)
+	online.browser_close(&client.browser)
+	online.line_shutdown(&client.line)
 	ui.ui_destroy(&client.ui)
 	sound.sound_destroy(&client.sound)
 	rl.CloseAudioDevice()
 	rl.CloseWindow()
 	config_save(client.config)
+	delete(client.last_map)
 	res.mod_destroy(&client.mod)
 	res.client_config_destroy(client.config)
 }
 
-// The screen's frame, and the screen it asks for in its place. The menu doesn't tick;
-// a match is given the ticks the frame owes.
+// The line first, with what it brings going into the game on screen; then the screen's
+// frame, and the screen it asks for in its place. The menu doesn't tick; a match is
+// given the ticks the frame owes, at its pace.
 update :: proc(client: ^Client, dt: f32) {
+	online.line_poll(&client.line, line_game(client))
 	switch screen in client.screen {
 	case ^menu.Menu:
+		online.browser_pump(&client.browser)
 		switch request in menu.menu_update(screen) {
 		case menu.Play:
 			playing := new(match.Match)
@@ -105,16 +121,44 @@ update :: proc(client: ^Client, dt: f32) {
 			} else {
 				free(playing)
 			}
+		case menu.Connect:
+			connect(client, request.address)
+		case menu.Disconnect:
+			online.line_disconnect(&client.line)
+		case menu.Play_Demo:
+			demo_play(client, request.name)
+		case menu.Refresh:
+			online.browser_refresh(&client.browser, client.config.network.lobby)
 		case menu.Quit:
 			screen_switch(client, nil)
 		}
+		// a server has taken me, and its map is in hand: the game on it
+		if _, still := client.screen.(^menu.Menu); still && online.line_live(&client.line) && online.line_has_map(&client.line) {
+			playing := new(match.Match)
+			if match.match_join(playing, &client.line, client.config, client.mod, &client.sound) {
+				screen_switch(client, playing)
+			} else {
+				free(playing)
+				online.line_disconnect(&client.line)
+			}
+		}
 	case ^match.Match:
-		ticks := ticks_owed(client, dt)
-		switch _ in match.match_update(screen, client.config, &client.sound, ticks, tick_fraction(client), dt) {
+		ticks := ticks_owed(client, dt * f32(match.match_pace(screen)))
+		switch request in match.match_update(screen, client.config, &client.sound, ticks, tick_fraction(client), dt) {
 		case match.Leave:
-			screen_switch(client, menu_open(client, screen.map_name))
+			leave(client)
+		case match.Quit:
+			leave(client)
+			screen_switch(client, nil)
+		case match.Connect:
+			leave(client)
+			connect(client, request.address)
+		case match.Play_Demo:
+			leave(client)
+			demo_play(client, request.name)
 		}
 	}
+	online.line_flush(&client.line) // what the ticks said goes out now, not a tick late
 }
 
 draw :: proc(client: ^Client) {
@@ -124,11 +168,54 @@ draw :: proc(client: ^Client) {
 	}
 }
 
-// The main menu, its Offline Play on `last_map`.
-menu_open :: proc(client: ^Client, last_map: string) -> Screen {
+// The main menu, its Offline Play on the map played last.
+menu_open :: proc(client: ^Client) -> Screen {
 	m := new(menu.Menu)
-	menu.menu_init(m, client.config, client.mod, last_map)
+	menu.menu_init(m, client.config, client.mod, client.last_map, &client.line, &client.browser)
 	return m
+}
+
+// The match over, whatever played it: its line closed, and the main menu back, on the
+// map Offline Play last played.
+leave :: proc(client: ^Client) {
+	if playing, is_match := client.screen.(^match.Match); is_match && playing.mode == .Offline {
+		delete(client.last_map)
+		client.last_map = strings.clone(playing.map_name)
+	}
+	online.line_disconnect(&client.line)
+	screen_switch(client, menu_open(client))
+}
+
+// The line to `address`, saying who I am in the Hello: my name, the password to join
+// with, my look, my loadout.
+connect :: proc(client: ^Client, address: string) {
+	config := client.config
+	hello := network.Msg_Hello {
+		look      = match.look_of(config),
+		primary   = config.player.primary_weapon,
+		secondary = config.player.secondary_weapon,
+	}
+	utils.short_string_set(&hello.name, config.player.name)
+	utils.short_string_set(&hello.password, config.network.password)
+	online.line_connect(&client.line, address, hello)
+}
+
+// The demo `name` played, from the menu; why not, on the menu's demos page, if it can't be.
+demo_play :: proc(client: ^Client, name: string) {
+	playing := new(match.Match)
+	if error, ok := match.match_play_demo(playing, &client.line, name, client.config, client.mod, &client.sound); ok {
+		screen_switch(client, playing)
+		return
+	} else if m, is_menu := client.screen.(^menu.Menu); is_menu {
+		menu.menu_demo_failed(m, error)
+	}
+	free(playing)
+}
+
+// The world the line's snapshots go into: the match's, while one plays on the line.
+line_game :: proc(client: ^Client) -> ^sim.Game {
+	playing, is_match := client.screen.(^match.Match)
+	return playing.game if is_match && playing.mode != .Offline else nil
 }
 
 // The screen closed and `next` shown in its place, its time starting now.
@@ -178,6 +265,13 @@ window_open :: proc(window: ^Window, graphics: ^res.Graphics_Settings) {
 	if graphics.vsync do flags += {.VSYNC_HINT}
 	rl.SetConfigFlags(flags)
 	rl.InitWindow(graphics.screen_width, graphics.screen_height, "Soldat Reloaded")
+	when ODIN_OS != .Windows { // the badge as the window's icon; on Windows it is the executable's own
+		icon := rl.LoadImage("data/icon.png")
+		if icon.data != nil {
+			rl.SetWindowIcon(icon)
+			rl.UnloadImage(icon)
+		}
+	}
 	rl.SetExitKey(.KEY_NULL) // Escape is the screens'
 	window^ = {mode = .Windowed, size = {graphics.screen_width, graphics.screen_height}, vsync = graphics.vsync, fps = -1}
 	window_follow(window, graphics)

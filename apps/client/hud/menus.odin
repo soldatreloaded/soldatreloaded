@@ -5,23 +5,25 @@ import "core:math"
 
 import rl "vendor:raylib"
 
+import sim "../../../core/game"
 import res "../../../core/resources"
 import "../ui"
 
-// The in-game menus: escape, team and weapons, the original's GameMenus. Each is a set of
-// buttons in the view's units; the cursor is over one, and a click or its number key
-// chooses it. What a choice means is handed back as a Menu_Action for the match to carry
-// out: nothing here touches the game, and nothing draws (draw_menus.odin). From the C
-// client's ui/menus.c.
+// The in-game menus: escape, team and weapons, and the kick and map windows the escape
+// menu opens: the original's GameMenus. Each is a set of buttons in the view's units;
+// the cursor is over one, and a click or its number key chooses it. What a choice means
+// is handed back as a Menu_Action for the match to carry out: nothing here touches the
+// game, and nothing draws (draw_menus.odin). From the C client's ui/menus.c.
 //
-// The escape menu's map and kick windows are online's, as is the team menu's spectating:
-// their buttons are in the tables, never shown offline. The windows, when they come, are
-// menus of their own here, opened by the escape menu's buttons.
+// The kick and map windows, and the team menu's spectating, are online's: offline they
+// are never offered.
 
 Menu :: enum {
 	Escape,
 	Team,
 	Weapons,
+	Kick, // the escape menu's: a player to vote off, by the arrows
+	Map,  // and a map to vote for, by the arrows through the server's list
 }
 
 Menus :: struct {
@@ -29,6 +31,15 @@ Menus :: struct {
 	weapons_back: bool,   // the weapons menu was open as the escape menu opened, and comes back as it closes
 	cursor:       [2]f32, // where the game's cursor is, in units
 	width:        f32,    // the view's width, in units
+	online:       bool,   // on a server: the windows and spectating are offered
+	// what the windows page through, as the match keeps it: who is on (the kick window
+	// passes over empty slots, as GameMenus.pas does), which is me (whom it will not
+	// kick), and how many maps the server offers (0 before it has said)
+	players:      [sim.MAX_PLAYERS]bool,
+	me:           sim.Soldier_Id,
+	map_count:    int,
+	kick_index:   sim.Soldier_Id, // the player the kick window shows
+	map_index:    int,            // the map the map window shows
 }
 
 // What a choice asks of the match. Nil when nothing was chosen.
@@ -37,6 +48,8 @@ Menu_Action :: union {
 	Pick_Primary,
 	Pick_Secondary,
 	Pick_Team,
+	Kick_Player,
+	Vote_Map,
 	Menu_Changed,
 }
 
@@ -56,6 +69,16 @@ Pick_Team :: struct {
 	team: res.Team,
 }
 
+// A vote to kick this player: its reason is typed first.
+Kick_Player :: struct {
+	slot: sim.Soldier_Id,
+}
+
+// A vote for the map the window shows: the `index`-th of the server's list.
+Vote_Map :: struct {
+	index: int,
+}
+
 // A menu opened or closed, and nothing more: the click is used up.
 Menu_Changed :: struct {}
 
@@ -67,7 +90,16 @@ Escape_Choice :: enum {
 	Change_Team,
 }
 
+// The windows' buttons, by their order.
+Window_Button :: enum {
+	Back,   // <<<<
+	On,     // >>>>
+	Choose, // Kick, or Select
+	Ban,    // the kick window's, never offered, as the original's
+}
+
 ESCAPE_SIZE :: [2]f32{300, 200}
+WINDOW_BOX :: rl.Rectangle{125, 355, 370, 90}
 PRIMARIES :: 10 // the weapons menu's first buttons; the secondaries follow
 SECONDARIES :: 4
 
@@ -84,7 +116,8 @@ menus_any_open :: proc(menus: ^Menus) -> bool {
 }
 
 // Opens or closes a menu, as the original does: the escape menu hides the rest and
-// brings the weapons menu back as it closes; the team menu hides the rest.
+// brings the weapons menu back as it closes; the team menu hides the rest; a window
+// hides the other, and the kick window starts at the first slot.
 menus_show :: proc(menus: ^Menus, menu: Menu, show: bool) {
 	switch menu {
 	case .Escape:
@@ -100,6 +133,15 @@ menus_show :: proc(menus: ^Menus, menu: Menu, show: bool) {
 			menus.open -= {.Weapons}
 			menus.weapons_back = false
 		}
+	case .Kick, .Map:
+		other: Menu = .Map if menu == .Kick else .Kick
+		if show {
+			menus.open -= {other}
+			menus.open += {menu}
+			if menu == .Kick do menus.kick_index = 0
+		} else {
+			menus.open -= {menu}
+		}
 	}
 }
 
@@ -109,7 +151,8 @@ menus_close_all :: proc(menus: ^Menus) {
 }
 
 // Where a menu's buttons are, and which are offered; by their index, which is what each
-// menu's choices go by: the Escape_Choice, the team less one, the weapon less one.
+// menu's choices go by: the Escape_Choice, the team less one, the weapon less one, the
+// Window_Button.
 menu_buttons :: proc(menus: ^Menus, menu: Menu) -> (buttons: Buttons) {
 	switch menu {
 	case .Escape:
@@ -117,17 +160,24 @@ menu_buttons :: proc(menus: ^Menus, menu: Menu) -> (buttons: Buttons) {
 		box := menu_box(menus, .Escape)
 		for choice in Escape_Choice {
 			row := f32(choice) + 1
-			sa.append(&buttons, Button{{box.x + 5, box.y + 25 * row, 240, 25}, escape_offered(choice)})
+			sa.append(&buttons, Button{{box.x + 5, box.y + 25 * row, 240, 25}, escape_offered(menus, choice)})
 		}
 	case .Team:
 		for team in res.Team.Alpha ..= res.Team.Spectator {
-			sa.append(&buttons, Button{{40, 140 + 40 * f32(team), 215, 35}, team_offered(team)})
+			sa.append(&buttons, Button{{40, 140 + 40 * f32(team), 215, 35}, team_offered(menus, team)})
 		}
 	case .Weapons:
 		for i in 0 ..< PRIMARIES + SECONDARIES {
 			row := f32(i + 1 if i >= PRIMARIES else i) // a row's gap before the secondaries
 			sa.append(&buttons, Button{{35, 154 + 18 * row, 235, 16}, true})
 		}
+	case .Kick, .Map:
+		b := WINDOW_BOX
+		choose: rl.Rectangle = {b.x + 105, b.y + 55, 90, 25} if menu == .Kick else {b.x + 120, b.y + 55, 90, 25}
+		sa.append(&buttons, Button{{b.x + 15, b.y + 35, 90, 25}, true})
+		sa.append(&buttons, Button{{b.x + 265, b.y + 35, 90, 25}, true})
+		sa.append(&buttons, Button{choose, true})
+		if menu == .Kick do sa.append(&buttons, Button{{b.x + 195, b.y + 55, 80, 25}, false})
 	}
 	return
 }
@@ -135,9 +185,10 @@ menu_buttons :: proc(menus: ^Menus, menu: Menu) -> (buttons: Buttons) {
 // The box a menu is drawn in.
 menu_box :: proc(menus: ^Menus, menu: Menu) -> rl.Rectangle {
 	switch menu {
-	case .Escape:  return {math.round((menus.width - ESCAPE_SIZE.x) / 2), math.round((ui.VIEW_HEIGHT - ESCAPE_SIZE.y) / 2), ESCAPE_SIZE.x, ESCAPE_SIZE.y}
-	case .Team:    return {45, 140, 262, 250}
-	case .Weapons: return {45, 140, 252, 210}
+	case .Escape:    return {math.round((menus.width - ESCAPE_SIZE.x) / 2), math.round((ui.VIEW_HEIGHT - ESCAPE_SIZE.y) / 2), ESCAPE_SIZE.x, ESCAPE_SIZE.y}
+	case .Team:      return {45, 140, 262, 250}
+	case .Weapons:   return {45, 140, 252, 210}
+	case .Kick, .Map: return WINDOW_BOX
 	}
 	return {}
 }
@@ -192,10 +243,15 @@ choose :: proc(menus: ^Menus, menu: Menu, button: int) -> Menu_Action {
 		case .Leave:
 			menus_close_all(menus)
 			return Leave{}
+		case .Change_Map:
+			menus_show(menus, .Map, .Map not_in menus.open)
+			return Menu_Changed{}
+		case .Kick:
+			menus_show(menus, .Kick, .Kick not_in menus.open)
+			return Menu_Changed{}
 		case .Change_Team:
 			menus_show(menus, .Team, true)
 			return Menu_Changed{}
-		case .Change_Map, .Kick:
 		}
 	case .Team:
 		menus_show(menus, .Team, false)
@@ -205,22 +261,52 @@ choose :: proc(menus: ^Menus, menu: Menu, button: int) -> Menu_Action {
 		if button >= PRIMARIES do return Pick_Secondary{weapon}
 		menus_show(menus, .Weapons, false)
 		return Pick_Primary{weapon}
+	case .Kick:
+		switch Window_Button(button) {
+		case .Back, .On: // to the next player on, either way, wrapping (GameMenus.pas)
+			step := sim.MAX_PLAYERS - 1 if Window_Button(button) == .Back else 1
+			i := int(menus.kick_index)
+			for _ in 0 ..< sim.MAX_PLAYERS {
+				i = (i + step) % sim.MAX_PLAYERS
+				if menus.players[i] do break
+			}
+			if menus.players[i] do menus.kick_index = sim.Soldier_Id(i)
+			return Menu_Changed{}
+		case .Choose: // never me: the button does nothing then
+			if menus.kick_index == menus.me || !menus.players[menus.kick_index] do return nil
+			menus_show(menus, .Escape, false)
+			return Kick_Player{menus.kick_index}
+		case .Ban:
+		}
+	case .Map:
+		switch Window_Button(button) {
+		case .Back: // within the server's list, each asking it the map's name anew
+			menus.map_index = max(menus.map_index - 1, 0)
+			return Menu_Changed{}
+		case .On:
+			menus.map_index = min(menus.map_index + 1, max(menus.map_count - 1, 0))
+			return Menu_Changed{}
+		case .Choose:
+			menus_show(menus, .Escape, false)
+			return Vote_Map{menus.map_index}
+		case .Ban:
+		}
 	}
 	return nil
 }
 
-// Offline the escape menu offers leaving and changing team.
+// Leaving and changing team always; the windows online, where there is a server to vote with.
 @(private = "file")
-escape_offered :: proc(choice: Escape_Choice) -> bool {
+escape_offered :: proc(menus: ^Menus, choice: Escape_Choice) -> bool {
 	switch choice {
 	case .Leave, .Change_Team: return true
-	case .Change_Map, .Kick:   return false
+	case .Change_Map, .Kick:   return menus.online
 	}
 	return false
 }
 
-// Alpha and bravo: charlie and delta are a four-team game's, spectating online's.
+// Alpha and bravo, and online spectating: charlie and delta are a four-team game's.
 @(private = "file")
-team_offered :: proc(team: res.Team) -> bool {
-	return team == .Alpha || team == .Bravo
+team_offered :: proc(menus: ^Menus, team: res.Team) -> bool {
+	return team == .Alpha || team == .Bravo || (team == .Spectator && menus.online)
 }

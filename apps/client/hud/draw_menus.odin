@@ -41,6 +41,13 @@ TEAM_COLORS := #partial [res.Team][2]rl.Color {
 	.Spectator = {{210, 210, 105, 255}, {210, 210, 105, 250}},
 }
 
+// What the windows' buttons say, by their Window_Button.
+@(private = "file", rodata)
+WINDOW_CAPTIONS := #partial [Menu][Window_Button]string {
+	.Kick = {.Back = "<<<<", .On = ">>>>", .Choose = "Kick", .Ban = "Ban"},
+	.Map  = {.Back = "<<<<", .On = ">>>>", .Choose = "Select", .Ban = ""},
+}
+
 @(private = "file") CAPTION_COLOR :: rl.Color{255, 255, 255, 230}
 @(private = "file") CHOSEN_COLOR :: rl.Color{55, 165, 55, 230}
 @(private = "file") CHOSEN_HOT_COLOR :: rl.Color{85, 105, 55, 230}
@@ -90,7 +97,7 @@ draw_menus :: proc(u: ^ui.Ui, art: ^Art, menus: ^Menus, data: ^Hud_Data, dim: bo
 		r := menu_box(menus, .Escape)
 		box(u, art, r)
 		write(u, "ESC - return to game", {r.x + 20, r.y + r.height - 45}, SMALL_FONT, {250, 245, 255, 240})
-		name := "Soldat Reloaded"
+		name := "Soldat Reloaded " + VERSION
 		write(u, name, {r.x + r.width - 2 - text_width(u, name, SMALL_FONT), r.y + r.height}, SMALL_FONT, {230, 235, 255, 190}, vertical = .Bottom)
 		buttons := menu_buttons(menus, .Escape)
 		for b, i in sa.slice(&buttons) {
@@ -119,6 +126,32 @@ draw_menus :: proc(u: ^ui.Ui, art: ^Art, menus: ^Menus, data: ^Hud_Data, dim: bo
 				for &player in data.players do members += int(player.active && player.team == team)
 				write(u, fmt.tprintf("(%d)", members), {269 + h, y}, MENU_FONT, color, shadow)
 			}
+		}
+	}
+	draw_windows(u, art, menus, data)
+}
+
+// The kick and map windows: a box, the player or map they show, their buttons.
+@(private = "file")
+draw_windows :: proc(u: ^ui.Ui, art: ^Art, menus: ^Menus, data: ^Hud_Data) {
+	hot_menu, hot, _ := menus_hovered(menus)
+	for window in ([2]Menu{.Kick, .Map}) {
+		if window not_in menus.open do continue
+		box(u, art, WINDOW_BOX)
+		buttons := menu_buttons(menus, window)
+		first := sa.get(buttons, 0).rect
+		if window == .Kick {
+			if shown := &data.players[menus.kick_index]; shown.active {
+				write(u, shown.name, {first.x, first.y - 15}, MENU_FONT, with_alpha(shown.shirt, 255))
+			}
+		} else {
+			write(u, data.map_offered, {first.x, first.y - 15}, MENU_FONT, {135, 235, 135, 230})
+		}
+		for b, i in sa.slice(&buttons) {
+			if !b.shown do continue
+			h := f32(int(window == hot_menu && i == hot))
+			at := [2]f32{b.rect.x + 10 + h, b.rect.y - h + (b.rect.height - line_height(u, MENU_FONT)) / 2}
+			write(u, WINDOW_CAPTIONS[window][Window_Button(i)], at, MENU_FONT, {255, 255, 255, 250})
 		}
 	}
 }

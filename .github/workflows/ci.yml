@@ -39,3 +39,4 @@ jobs:
             odin test tests/$suite $ODIN_FLAGS
           done
           odin test tests/server -define:ODIN_TEST_THREADS=1 $ODIN_FLAGS # real sockets, one at a time
+          odin test tests/client -define:ODIN_TEST_THREADS=1 $ODIN_FLAGS

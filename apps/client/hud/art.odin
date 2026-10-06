@@ -39,6 +39,7 @@ Picture :: enum {
 	Flag,
 	Bot,
 	Connection,
+	Mute,
 }
 
 @(private = "file", rodata)
@@ -63,6 +64,7 @@ PICTURE_FILES := [Picture]string {
 	.Flag           = "flag.png",
 	.Bot            = "bot.png",
 	.Connection     = "connection.png",
+	.Mute           = "mute.png",
 }
 
 // Each weapon's icon, for the kill feed, the weapons menu and the stats: the original's

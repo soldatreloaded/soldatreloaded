@@ -29,6 +29,7 @@ Input :: struct {
 	held:    sim.Buttons, // the buttons whose keys are down
 	pressed: sim.Buttons, // the one-shot buttons gone down since a tick last took them
 	cursor:  [2]f32,      // the game's own cursor, in view units from the view's top-left
+	view:    [2]f32,      // the view's size it was last kept in, so a resized window keeps its place
 	clicked: bool,        // a menu took the left button's press: it is no bind's until let go
 }
 
@@ -59,7 +60,7 @@ BUTTON_COMMANDS := [?]struct {
 // middle of a view this size.
 input_start :: proc(input: ^Input, view: [2]f32) {
 	rl.DisableCursor()
-	input^ = {cursor = view / 2}
+	input^ = {cursor = view / 2, view = view}
 }
 
 // The window is the menus' again.
@@ -70,12 +71,16 @@ input_stop :: proc(input: ^Input) {
 
 // Each frame: the mouse's motion, and the keys through the binds. The actions whose
 // keys went down this frame. With a `menu` open, the left button and the number keys
-// are its own (input_menu_keys), not their binds'.
-input_poll :: proc(input: ^Input, config: ^res.Client_Config, view: [2]f32, menu: bool) -> (actions: Actions) {
+// are its own (input_menu_keys), not their binds'. While `typing`, the keys are the
+// chat's: nothing going down reaches a bind, but a key held before is let go of.
+input_poll :: proc(input: ^Input, config: ^res.Client_Config, view: [2]f32, menu, typing: bool) -> (actions: Actions) {
+	if input.view != {} && input.view != view do input.cursor *= view / input.view // the same place in a window resized
+	input.view = view
 	motion := rl.GetMouseDelta() * config.controls.sensitivity
 	input.cursor = {clamp(input.cursor.x + motion.x, 0, view.x), clamp(input.cursor.y + motion.y, 0, view.y)}
 
 	if input.clicked && !rl.IsMouseButtonDown(.LEFT) do input.clicked = false
+	was_held := input.held
 	input.held = {}
 	for name, command in config.binds {
 		modifier, key, is_key := key_parse(name)
@@ -84,11 +89,12 @@ input_poll :: proc(input: ^Input, config: ^res.Client_Config, view: [2]f32, menu
 
 		if button, is_button := button_of(command); is_button {
 			if key_down(key) do input.held += {button}
-			if key_pressed(key) && button in sim.ONE_SHOT_BUTTONS do input.pressed += {button}
-		} else if key_pressed(key) {
+			if !typing && key_pressed(key) && button in sim.ONE_SHOT_BUTTONS do input.pressed += {button}
+		} else if !typing && key_pressed(key) {
 			sa.append(&actions, command)
 		}
 	}
+	if typing do input.held &= was_held // only let go of: what goes down is the chat's
 	return
 }
 
@@ -108,9 +114,11 @@ input_menu_keys :: proc(input: ^Input) -> (keys: Menu_Keys) {
 }
 
 // The command for a tick, aimed at `aim` in the world: the buttons held, and the
-// presses since the last, which it takes.
-input_take_command :: proc(input: ^Input, sequence: u32, aim: [2]f32) -> sim.Command {
+// presses since the last, which it takes. With `legacy_flag_throw`, jump and crouch held
+// together throw the flag too, as the original's LocalInput has it.
+input_take_command :: proc(input: ^Input, sequence: u32, aim: [2]f32, legacy_flag_throw := false) -> sim.Command {
 	command := sim.Command{sequence = sequence, buttons = input.held + input.pressed, aim = aim}
+	if legacy_flag_throw && (sim.Buttons{.Jump, .Crouch} <= command.buttons) do command.buttons += {.Flag_Throw}
 	input.pressed = {}
 	return command
 }
@@ -150,4 +158,11 @@ overridden :: proc(config: ^res.Client_Config, modifier: Modifier, name: string)
 		if _, bound := res.client_config_bind(config, with); bound do return true
 	}
 	return false
+}
+
+// Every key let go of, as the menus come up over the game: what was held is held no
+// more, and a press not yet taken is dropped.
+input_release_all :: proc(input: ^Input) {
+	input.held = {}
+	input.pressed = {}
 }

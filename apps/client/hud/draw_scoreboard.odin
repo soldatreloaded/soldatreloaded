@@ -104,6 +104,7 @@ draw_scoreboard_box :: proc(u: ^ui.Ui, art: ^Art, data: ^Hud_Data) -> f32 {
 		if id == data.me do picture(u, art.pictures[.Small_Dot], {align(u, 31 + x), align(u, row + 1)}, mark)
 		if player.flags > 0 do picture(u, art.pictures[.Flag], {align(u, 337 + x), align(u, row - 1)}, mark)
 		if player.bot do picture(u, art.pictures[.Bot], {align(u, 534 + x), align(u, row)}, mark)
+		if player.muted do picture(u, art.pictures[.Mute], {align(u, 246 + x), align(u, row - 1)}, mark) // the original's mute sign
 		// the line's quality, red to green: the original's by its ConnectionQuality, here by the
 		// ping, whole up to 50 ms and gone by 350
 		quality := clamp(100 - (player.ping - 50) / 3, 0, 100)
@@ -127,9 +128,9 @@ TOTAL_COLORS := #partial [res.Team]rl.Color {
 	.Delta   = {0x05, 0xD2, 0x05, 0xDD},
 }
 
-// The scoreboard's texts: the columns, the game and its clock, how many play, and the
-// players in their groups.
-draw_scoreboard :: proc(u: ^ui.Ui, data: ^Hud_Data) {
+// The scoreboard's texts: the columns, the server and its clock, how many play, the
+// players in their groups, and over the bottom (at `bottom`) the demo being recorded.
+draw_scoreboard :: proc(u: ^ui.Ui, data: ^Hud_Data, bottom: f32) {
 	x := board_x(u)
 	ranked := rank_players(data)
 	ranks := sa.slice(&ranked)
@@ -140,7 +141,7 @@ draw_scoreboard :: proc(u: ^ui.Ui, data: ^Hud_Data) {
 	write(u, "Points:", {x + 280, 40}, MENU_FONT, HEADING_COLOR)
 	write(u, "Deaths:", {x + 390, 40}, MENU_FONT, HEADING_COLOR)
 	write(u, "Ping:", {x + 530, 40}, MENU_FONT, HEADING_COLOR)
-	write(u, "Soldat Reloaded", {x + 30, 15}, SMALL_FONT, HOST_COLOR)
+	write(u, data.hostname, {x + 30, 15}, SMALL_FONT, HOST_COLOR)
 	write(u, fmt.tprintf("Time %02d:%02d", data.time_left / 60, data.time_left % 60), {x + 485, 15}, SMALL_FONT, CLOCK_COLOR)
 	write(u, "Players", {x + 330, 15}, SMALL_FONT, COUNT_COLOR)
 	for team, i in ([2]res.Team{.Alpha, .Bravo}) {
@@ -171,6 +172,11 @@ draw_scoreboard :: proc(u: ^ui.Ui, data: ^Hud_Data) {
 		if g.team >= .Alpha && g.team <= .Delta {
 			write(u, fmt.tprintf("%d", totals[i]), {x + 284, g.top + 3}, SMALL_FONT, TOTAL_COLORS[g.team])
 		}
+	}
+	// the demo being recorded, its name blinking above the board's bottom (the original's)
+	if data.recording && data.demo_name != "" {
+		blink := u8(abs(math.sin(5.1 * data.seconds / 2)) * 255)
+		write(u, data.demo_name, {x + 280, bottom - 10}, SMALL_FONT, {0, 128, 0, blink})
 	}
 }
 
