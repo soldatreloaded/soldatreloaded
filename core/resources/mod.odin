@@ -49,12 +49,12 @@ mod_file :: proc(mod: Mod, file: string) -> string {
 // An image in a mod's directory `dir` ("scenery-gfx"), as Soldat finds one: in any
 // case, preferring a .png whatever extension `name` gives. The mod's if it has it, else
 // the default's. Allocated with the temp allocator.
-mod_image :: proc(mod: Mod, dir, name: string) -> (path: string, ok: bool) {
+mod_image :: proc(mod: Mod, dir, name: string, listings: ^utils.Dir_Listings = nil) -> (path: string, ok: bool) {
 	if mod.dir != "" {
-		path, ok = utils.find_file_any_case(utils.temp_path(mod.dir, dir), name, ".png", context.temp_allocator)
+		path, ok = utils.find_file_any_case(utils.temp_path(mod.dir, dir), name, ".png", context.temp_allocator, listings)
 		if ok {
 			return
 		}
 	}
-	return utils.find_file_any_case(utils.temp_path(mod.fallback, dir), name, ".png", context.temp_allocator)
+	return utils.find_file_any_case(utils.temp_path(mod.fallback, dir), name, ".png", context.temp_allocator, listings)
 }

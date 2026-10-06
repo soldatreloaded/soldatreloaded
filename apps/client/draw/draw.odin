@@ -51,7 +51,7 @@ art_load :: proc(art: ^Art, mod: res.Mod, polymap: ^res.Poly_Map) {
 
 	art.scales = scales_load(mod)
 	art.sprite_atlas = {side = ATLAS_SIDE}
-	source := Source{mod, &art.scales, &art.sprite_atlas}
+	source := Source{mod, &art.scales, &art.sprite_atlas, source_listings()}
 	gostek_load(&art.gostek, source)
 	art.bullets = bullets_load(source)
 	art.things = things_load(source)

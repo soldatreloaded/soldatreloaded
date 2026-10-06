@@ -81,7 +81,7 @@ things_load :: proc(source: Source) -> (art: Thing_Art) {
 	}
 	art.canopy[0] = sprite_load(source, "gostek-gfx/para.png", key)
 	art.canopy[1] = sprite_load(source, "gostek-gfx/para2.png", key)
-	art.rope = sprite_load(source, "gostek-gfx/para-rope.png", key)
+	art.rope = sprite_load(source, "gostek-gfx/para-rope.png", res.BLACK_KEY)
 	return
 }
 

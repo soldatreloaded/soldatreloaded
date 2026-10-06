@@ -32,12 +32,23 @@ Scales :: struct {
 }
 
 // Where sprites are loaded from: the mod, and its scales; and the atlas they are packed
-// into.
+// into. With `listings`, the mod's folders are read once for all the sprites loaded
+// (source_listings).
 @(private = "package")
 Source :: struct {
-	mod:    res.Mod,
-	scales: ^Scales,
-	atlas:  ^Atlas,
+	mod:      res.Mod,
+	scales:   ^Scales,
+	atlas:    ^Atlas,
+	listings: ^utils.Dir_Listings,
+}
+
+// Folders' listings for a load of many sprites at once, kept with the temp allocator: for
+// this frame's loading, and no later, when mods/ may have changed.
+@(private = "package")
+source_listings :: proc() -> ^utils.Dir_Listings {
+	listings := new(utils.Dir_Listings, context.temp_allocator)
+	listings^ = make(utils.Dir_Listings, context.temp_allocator)
+	return listings
 }
 
 // Sprites drawn over the world rather than in it, the HUD's: the mod's images packed into
@@ -63,7 +74,7 @@ sprite_book_close :: proc(book: ^Sprite_Book) {
 // An image in the mod's folder `dir`, found as the original finds one (sprite_find),
 // green keyed out as the original's interface is. None if the mod hasn't it.
 sprite_book_load :: proc(book: ^Sprite_Book, dir, name: string) -> Sprite {
-	return sprite_find({book.mod, &book.scales, &book.atlas}, dir, name, res.COLOR_KEY)
+	return sprite_find({book.mod, &book.scales, &book.atlas, nil}, dir, name)
 }
 
 // mod.json's `scale` (res.Mod_Config); everything at the default without one. A scale
@@ -93,21 +104,24 @@ scale_of :: proc(scales: ^Scales, path: string) -> f32 {
 	return scales.default
 }
 
-// The image at `path` in the mod ("gostek-gfx/male/klata.png"). With `key`, pixels
-// exactly that colour are see-through; with `flat`, it can also be drawn in a flat
-// colour (draw_sprite_flat). None, drawing nothing, if it isn't there.
+// The image at `path` in the mod ("gostek-gfx/klata.png"), found as the original
+// finds one (sprite_find): so an old mod's .bmp in its place is too. Pixels exactly
+// `key`'s colour are see-through, the original's green unless it says otherwise; with
+// `flat`, it can also be drawn in a flat colour (draw_sprite_flat). None, drawing
+// nothing, if it isn't there: a mirrored image some art hasn't, a style's part it leaves
+// out.
 @(private = "package")
-sprite_load :: proc(source: Source, path: string, key: Maybe(utils.Rgba) = nil, flat := false) -> Sprite {
-	file := res.mod_file(source.mod, path)
-	if !utils.file_exists(file) do return {} // a mirrored image some art hasn't, a style's part it leaves out
-	return sprite_from(source, file, path, key, flat)
+sprite_load :: proc(source: Source, path: string, key: Maybe(utils.Rgba) = res.COLOR_KEY, flat := false) -> Sprite {
+	slash := strings.last_index_byte(path, '/')
+	return sprite_find(source, path[:max(slash, 0)], path[slash + 1:], key, flat)
 }
 
-// An image in the mod's folder `dir` found as the original finds one: in any case,
-// a .png first whatever `name`'s extension.
+// An image in the mod's folder `dir` found as the original finds one: in any case, a
+// .png first whatever `name`'s extension, then `name` itself, then a .bmp of it; the
+// mod's, else the default's. Keyed as sprite_load is.
 @(private = "package")
-sprite_find :: proc(source: Source, dir, name: string, key: Maybe(utils.Rgba) = nil, flat := false) -> Sprite {
-	file, found := res.mod_image(source.mod, dir, name)
+sprite_find :: proc(source: Source, dir, name: string, key: Maybe(utils.Rgba) = res.COLOR_KEY, flat := false) -> Sprite {
+	file, found := res.mod_image(source.mod, dir, name, source.listings)
 	if !found do return {}
 	return sprite_from(source, file, utils.temp_path(dir, name), key, flat)
 }

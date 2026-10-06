@@ -180,14 +180,17 @@ CLIP_FILES := #partial [res.Weapon]string {
 	.USSOCOM       = "colt1911-clip",
 }
 
+// The sparks' images the original keys black, not green.
+@(private = "file")
+BLACK_KEYED :: bit_set[Spark_Image]{.Big_Smoke, .Mini_Smoke, .Spawn}
+
 sparks_load :: proc(source: Source) -> (art: Spark_Art) {
-	key := res.COLOR_KEY
 	for file, image in IMAGE_FILES {
-		art.images[image] = sprite_load(source, concat("sparks-gfx/", file), key)
+		art.images[image] = sprite_load(source, concat("sparks-gfx/", file), res.BLACK_KEY if image in BLACK_KEYED else res.COLOR_KEY)
 	}
-	for &clod, i in art.clods do clod = sprite_load(source, frame_path("sparks-gfx/odlamek", i), key)
-	for &frame, i in art.explode do frame = sprite_load(source, frame_path("sparks-gfx/explosion/explode", i), key)
-	for &frame, i in art.smoke do frame = sprite_load(source, frame_path("sparks-gfx/explosion/smoke", i), key)
+	for &clod, i in art.clods do clod = sprite_load(source, frame_path("sparks-gfx/odlamek", i))
+	for &frame, i in art.explode do frame = sprite_load(source, frame_path("sparks-gfx/explosion/explode", i))
+	for &frame, i in art.smoke do frame = sprite_load(source, frame_path("sparks-gfx/explosion/smoke", i), res.BLACK_KEY)
 	for file, weapon in SHELL_FILES {
 		if file != "" do art.shells[weapon] = sprite_find(source, "weapons-gfx", concat(file, ".png"))
 	}

@@ -31,7 +31,7 @@ Dress :: struct {
 preview_load :: proc(preview: ^Preview, mod: res.Mod) {
 	preview.scales = scales_load(mod)
 	preview.atlas = {side = ATLAS_SIDE}
-	gostek_load(&preview.gostek, {mod, &preview.scales, &preview.atlas})
+	gostek_load(&preview.gostek, {mod, &preview.scales, &preview.atlas, source_listings()})
 	preview.animations, _ = res.animations_load(sim.DATA_DIR)
 	preview.skeleton, _ = res.skeleton_load(sim.DATA_DIR, "gostek.po", res.GOSTEK_SCALE)
 }

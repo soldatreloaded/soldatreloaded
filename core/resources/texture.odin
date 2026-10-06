@@ -20,6 +20,9 @@ Texture :: struct {
 // channel (the original's ApplyColorKey).
 COLOR_KEY :: utils.Rgba{0, 255, 0, 255}
 
+// And a few of its images (the smoke, the spawn's spark, the parachute's rope) black.
+BLACK_KEY :: utils.Rgba{0, 0, 0, 255}
+
 // An image file's bytes; any pixel exactly `color_key` made fully transparent.
 texture_decode :: proc(data: []byte, color_key: Maybe(utils.Rgba) = nil, allocator := context.allocator) -> (texture: Texture, ok: bool) {
 	width, height, channels: i32
