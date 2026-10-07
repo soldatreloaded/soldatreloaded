@@ -43,6 +43,7 @@ SCENARIOS := [?]Scenario {
 	{"rolls", "ctf_Ash", 120, {.AK74, .AK74}, 700, rolls, false, {}},
 	{"change", "ctf_Ash", 120, {.AK74, .Minigun}, 480, change, false, {}},
 	{"idle_antics", "ctf_Ash", 120, {.AK74, .Ruger77}, 3600, press_nothing, false, {}},
+	{"antic_interrupt", "ctf_Ash", 120, {.AK74, .Ruger77}, 3600, antic_interrupt, false, {}},
 	{"fire_ak74", "ctf_Ash", 120, {.AK74, .AK74}, 360, fire, false, {}},
 	{"fire_spas", "ctf_Ash", 120, {.Spas12, .AK74}, 240, fire, false, {}},
 	{"fire_barrett", "ctf_Ash", 200, {.Barrett, .AK74}, 360, fire, false, {}},
@@ -71,6 +72,7 @@ SCENARIOS := [?]Scenario {
 	{"kits", "ctf_Dropdown", 0, {.AK74, .AK74}, 600, kits, false, {placed = true, at = {{714, 280}, {600, 280}}, health = {40, 0}}},
 	{"gun_pickup", "ctf_Ash", 50, {.AK74, .Punch}, 1800, gun_pickup, false, {}},
 	{"parachute", "ctf_Dropdown", 120, {.AK74, .AK74}, 900, parachute, false, {}}, // the alpha spawn point is high
+	{"parachute_steer", "ctf_Dropdown", 120, {.AK74, .AK74}, 900, parachute_steer, false, {}},
 	{"melee_run", "ctf_Ash", 40, {.AK74, .AK74}, 400, melee_run, false, {}},
 	{"spas_overkill", "ctf_Ash", 40, {.Spas12, .AK74}, 300, fire, false, {health = {0, 10}}}, // the first pellet kills; the rest go through a body killed this tick
 	{"grenade_kill", "ctf_Ash", 150, {.AK74, .AK74}, 600, throw_grenade, false, {health = {0, 10}}}, // the blast kills, and throws the body it killed
@@ -270,6 +272,21 @@ gun_pickup :: proc(tick: int) -> [2]game.Buttons {
 // Dead, and placed again high over the map: the parachute comes down and lies.
 parachute :: proc(tick: int) -> [2]game.Buttons {
 	return {{.Suicide} if tick == SETTLE else {}, {}}
+}
+
+// The same, steered on the way down: right a while, left a while, then let be. Under the
+// canopy the keys pull its corners, not the legs into a run.
+parachute_steer :: proc(tick: int) -> [2]game.Buttons {
+	if tick == SETTLE do return {{.Suicide}, {}}
+	if tick < SETTLE do return {}
+	phase := tick % 90
+	return {{.Right} if phase < 30 else {.Left} if phase < 60 else {}, {}}
+}
+
+// Soldier 0 idles into its antics and has them cut short by a tap of reload, which does
+// nothing else with a full gun; soldier 1 idles through its own as before.
+antic_interrupt :: proc(tick: int) -> [2]game.Buttons {
+	return {{.Reload} if tick >= SETTLE && tick % 50 == 25 else {}, {}}
 }
 
 // Soldier 1 runs at soldier 0, who holds fire: the rifle butt when they are near, judged

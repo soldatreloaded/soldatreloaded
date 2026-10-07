@@ -1,7 +1,7 @@
 # Porting the game from C
 
 `core/game` is a port of the C game's simulation (`apps/shared/game` in
-[soldatreloaded](../../bettersoldat), at commit `74fee85`). It must play **exactly** as
+[soldatreloaded](../../bettersoldat), at commit `583b7ea`). It must play **exactly** as
 the C game does: the same numbers, bit for bit, tick after tick. It does not keep the C
 game's structure: the logic is ported line by line, into the organization described in
 `core/game/world.odin`.
@@ -13,7 +13,7 @@ gun, no cluster grenades. What it keeps plays as the C game plays it.
 ## Checking it: tests/compare
 
 ```
-tests/compare/build.sh          # the C game at 74fee85, built into tests/compare/build/reference.lib
+tests/compare/build.sh          # the C game at 583b7ea, built into tests/compare/build/reference.lib
 odin run tests/compare          # every scenario, in both games, compared every tick
 odin run tests/compare -- jump  # only the scenarios whose name contains "jump"
 ```
@@ -223,3 +223,30 @@ without authority.
 **Where that leaves it.** Every difference found was one the C game had too, so the port
 stayed faithful to its oracle, and the four fixed were fixed in both. What remains differs
 by design or is unobservable; the respawn tick is moot until wave respawn is decided.
+
+## The controls against OpenSoldat's ControlSprite
+
+A second audit (October 2026), of the controls step (`Control.pas`) and the body's
+physics (`Sprites.pas`, `Parts.pas`) line by line, found the movement the same: the
+locomotion machine, its forces and frame windows, the animation table, the integration,
+the collision probes and the friction. Two behaviours were missing from both games, and
+were fixed in both, each with a scenario:
+
+- **An antic cut short.** Any key (`Control.pas:1601`) puts a cigar, match, smoke, wipe
+  or scratch on its last frame, so the body's pose takes the stance's back that tick.
+  `antics_interrupt`, between the cover check and the locomotion. Scenario
+  `antic_interrupt`.
+- **The parachute steered.** Under a canopy, left and right don't run the legs; they pull
+  one corner of it down and lift the other (`Control.pas:1955`, the force on the held
+  thing's points 1 and 2). Under a canopy means as the last step ended (OpenSoldat's
+  `Para`, set beside the lift), so a soldier just let go of one doesn't run for a tick
+  more and one just given one runs a tick first. The soldier asks the things pass
+  (`Parachute_Steer`, the C game's local `EVENT_PARACHUTE_STEER`), which adds the force
+  before the canopy's step, the same tick. A client stepping another soldier on to its
+  word asks nothing, as the C game's scratch mail isn't read. Scenario `parachute_steer`.
+
+Also found, and left: a client gone quiet keeps its last keys where OpenSoldat stops
+integrating and controlling it; out of bounds skips the rest of the tick rather than
+respawning in it; no realistic-mode fall damage; and the background poly is tracked by
+the poly's own index, where OpenSoldat's `BackgroundTestBigPolyCenter` indexes the polys
+with a background poly's number.

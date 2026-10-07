@@ -269,11 +269,13 @@ soldier_apply :: proc(c: ^Client_Stream, g: ^game.Game, id: game.Soldier_Id, fra
 	soldier_take_owned(g.resources.animations, s, heard)
 	steps_left := min(steps, STREAM_STEPS_MAX)
 	if game.round_standing(&g.round) do steps_left = 0 // the world stands, paused or between rounds: so does the word
+	asked := sa.len(w.things_asked)
 	for _ in 0 ..< steps_left {
 		game.clear_output(scratch) // what the steps would say is said by nobody
 		game.soldier_move(w, s)
 		game.soldier_update(w, &g.resources, id, game.soldier_last_command(s, false), nil, scratch)
 	}
+	sa.resize(&w.things_asked, asked) // nor asked of the things (a parachute steered), as the C game's scratch mail isn't read
 	jump := before - s.body.pos
 	c.blend[id] = {} if placed else c.blend[id] + jump
 	if placed || utils.length(c.blend[id]) > STREAM_SNAP_DISTANCE {

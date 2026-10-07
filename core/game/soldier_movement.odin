@@ -15,8 +15,8 @@ import "../utils"
 // the feel depends on it:
 //
 //   left and right -> the jets -> the weapon -> prone -> the Barrett's
-//   bolt -> the slowdown -> cover -> the locomotion -> the reload -> the rolls -> the
-//   body's pose -> the sniper view
+//   bolt -> the slowdown -> cover -> an antic cut short -> the locomotion -> the reload
+//   -> the rolls -> the body's pose -> the sniper view
 
 // The speeds are folded in double and narrowed once, as the C game's are.
 RUN_SPEED :: f32(0.118)
@@ -60,7 +60,8 @@ soldier_control :: proc(world: ^World, resources: ^Resources, id: Soldier_Id, au
 	if armed do combat_after_prone(resources, soldier)
 	animation_slowdown(soldier)
 	cover_check(world, resources, id)
-	movement_control(resources, soldier, input)
+	antics_interrupt(resources.animations, soldier, input)
+	movement_control(world, resources, soldier, input)
 	if armed do combat_reload_animation(resources, soldier)
 	roll_control(resources, soldier, input)
 	body_pose_control(resources, soldier)
@@ -234,10 +235,21 @@ animation_slowdown :: proc(soldier: ^Soldier) {
 	}
 }
 
+// A key pressed ends an idle antic at once (Control.pas): on its last frame, the body's
+// pose takes the stance's back.
+@(private = "file")
+antics_interrupt :: proc(animations: ^res.Animations, soldier: ^Soldier, input: Control_Input) {
+	body := &soldier.pose.body
+	antic := body.id == .Cigar || body.id == .Match || body.id == .Smoke || body.id == .Wipe || body.id == .Groin
+	keys :: Buttons{.Fire, .Throw, .Change, .Drop, .Reload}
+	pressed := input.left || input.right || input.up || input.down || input.jet || input.prone || soldier.controls.buttons & keys != {}
+	if antic && pressed do body.frame = animations[body.id].frame_count
+}
+
 // Locomotion: one move wins a tick, in this order: rolling, the crouch-run, the crawl,
 // the side jump, the jump, the crouch, the run, standing. Some body poses freeze it.
 @(private = "file")
-movement_control :: proc(resources: ^Resources, soldier: ^Soldier, input: Control_Input) {
+movement_control :: proc(world: ^World, resources: ^Resources, soldier: ^Soldier, input: Control_Input) {
 	animations := resources.animations
 	legs, body := &soldier.pose.legs, &soldier.pose.body
 
@@ -263,7 +275,7 @@ movement_control :: proc(resources: ^Resources, soldier: ^Soldier, input: Contro
 	case input.down:
 		if soldier.body.on_ground do soldier_legs_switch(animations, soldier, .Crouch)
 	case sideways:
-		move_run(animations, soldier, input)
+		move_run(world, animations, soldier, input)
 	case:
 		soldier_legs_switch(animations, soldier, .Stand if soldier.body.on_ground else .Fall)
 	}
@@ -373,10 +385,16 @@ move_jump :: proc(animations: ^res.Animations, soldier: ^Soldier) {
 	}
 }
 
+// Under a parachute the legs don't run: the key steers the canopy, which is the things'
+// to pull (the original writes the held thing's forces from here).
 @(private = "file")
-move_run :: proc(animations: ^res.Animations, soldier: ^Soldier, input: Control_Input) {
+move_run :: proc(world: ^World, animations: ^res.Animations, soldier: ^Soldier, input: Control_Input) {
 	sign: f32 = 1 if input.right else -1
-	soldier_legs_switch(animations, soldier, run_animation(soldier, input.right))
+	if !soldier.carrying.parachuting {
+		soldier_legs_switch(animations, soldier, run_animation(soldier, input.right))
+	} else if held, holding := soldier.carrying.held.?; holding {
+		things_ask(world, Parachute_Steer{thing = held, way = 1 if input.right else -1})
+	}
 	if soldier.body.on_ground {
 		soldier.body.forces = {sign * RUN_SPEED, -RUN_SPEED_UP}
 	} else {

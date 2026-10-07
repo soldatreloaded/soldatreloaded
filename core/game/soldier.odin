@@ -183,6 +183,9 @@ Carrying :: struct {
 	held:               Maybe(Thing_Id) `net:"served"`, // the flag carried, or the parachute hung from
 	flag_grab_cooldown: i32 `net:"served 16"`,
 	medikit_cooldown:   i32 `net:"served 16"`,
+	// hung from a parachute as the last step ended (Para, set with the lift): left and
+	// right steer the canopy then, and don't run the legs
+	parachuting:        bool,
 }
 
 Loadout :: struct {

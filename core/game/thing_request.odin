@@ -18,6 +18,14 @@ Thing_Request :: union {
 	Thing_Knock,
 	Let_Go,
 	Placed,
+	Parachute_Steer,
+}
+
+// A soldier hung from a parachute steered with left (`way` -1) or right (1): that side
+// of its canopy pulled down and the other lifted.
+Parachute_Steer :: struct {
+	thing: Thing_Id,
+	way:   i8,
 }
 
 // A bullet struck point `point` of a thing: knocked along the bullet's velocity, by the
@@ -56,6 +64,7 @@ things_take_requests :: proc(world: ^World, resources: ^Resources, authority: ^A
 		case Thing_Knock: thing_knock(&world.things[r.thing], r.point, r.velocity, r.push)
 		case Let_Go:      things_let_go(world, r.soldier, out)
 		case Placed:      things_on_respawn(world, resources, r.soldier)
+		case Parachute_Steer: parachute_steer(world, r)
 		}
 	}
 	sa.clear(&world.things_asked)

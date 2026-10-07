@@ -88,9 +88,21 @@ parachute_catch :: proc(world: ^World, soldier: ^Soldier) {
 	if thing := parachute_of(world, soldier); thing != nil && thing.flipped do soldier.body.forces.y = world.gravity
 }
 
-// After the soldier's step: the lift, for the next.
+// After the soldier's step: the lift, for the next, and whether it hangs from one, which
+// the next step's left and right read.
 parachute_carry :: proc(world: ^World, soldier: ^Soldier) {
-	if parachute_of(world, soldier) != nil do soldier.body.forces.y = PARACHUTE_LIFT
+	soldier.carrying.parachuting = parachute_of(world, soldier) != nil
+	if soldier.carrying.parachuting do soldier.body.forces.y = PARACHUTE_LIFT
+}
+
+// A holder's steer, at the things' turn. The canopy's corners are points 1 and 2:
+// steering right pulls 1 down and lifts 2, left the other way (Control.pas, the left
+// and right keys under a parachute).
+parachute_steer :: proc(world: ^World, steer: Parachute_Steer) {
+	thing := &world.things[steer.thing]
+	if thing.kind == .None || thing.point_count < 3 do return
+	thing.forces[1].y += 0.5 * f32(steer.way)
+	thing.forces[2].y -= 0.5 * f32(steer.way)
 }
 
 // The parachute the soldier hangs from, if it does.
