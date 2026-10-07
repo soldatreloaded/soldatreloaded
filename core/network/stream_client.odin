@@ -141,7 +141,7 @@ client_stream_hear :: proc(c: ^Client_Stream, g: ^game.Game, me: game.Soldier_Id
 			c.stats.dropped += 1
 			return false
 		}
-		base = {soldiers = &frame.soldiers, word = &frame.word, things = &frame.things, thing_word = &frame.thing_word}
+		base = {soldiers = &frame.soldiers, word = &frame.word, things = &frame.things, thing_word = &frame.thing_word, round = &frame.match}
 		against = &base
 		// the soldiers and things start from the base, where it carried them, so the delta
 		// lands on it

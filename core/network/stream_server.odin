@@ -14,6 +14,7 @@ Server_Stream :: struct {
 	ack:             u32,                       // the newest snapshot the client has
 	sent_word:       [STREAM_RING][game.MAX_PLAYERS]Snap_Word, // what each snapshot sent carried, by tick
 	sent_thing_word: [STREAM_RING][game.MAX_THINGS]Snap_Word,
+	sent_round:      [STREAM_RING]game.Round,   // and the round, for its delta
 	sent_tick:       [STREAM_RING]u32,
 	event_ack:       u32,                       // the newest of the server's words the client has heard
 	event_last:      u32,                       // the newest of the client's words heard here
@@ -125,7 +126,7 @@ server_stream_snapshot :: proc(s: ^Server_Stream, g: ^game.Game, slot: game.Sold
 	if s.ack != 0 && w.tick - s.ack <= STREAM_WHOLE_AFTER && s.sent_tick[s.ack % STREAM_RING] == s.ack && g.authority != nil {
 		soldiers, things, kept := game.history_at(&g.authority.history, s.ack)
 		if kept {
-			base = {soldiers = soldiers, things = things, word = &s.sent_word[s.ack % STREAM_RING], thing_word = &s.sent_thing_word[s.ack % STREAM_RING]}
+			base = {soldiers = soldiers, things = things, word = &s.sent_word[s.ack % STREAM_RING], thing_word = &s.sent_thing_word[s.ack % STREAM_RING], round = &s.sent_round[s.ack % STREAM_RING]}
 			against = &base
 			m.base = s.ack
 		}
@@ -151,6 +152,7 @@ server_stream_snapshot :: proc(s: ^Server_Stream, g: ^game.Game, slot: game.Sold
 		if bytes != nil {
 			s.sent_word[w.tick % STREAM_RING] = m.word
 			s.sent_thing_word[w.tick % STREAM_RING] = m.thing_word
+			s.sent_round[w.tick % STREAM_RING] = m.match
 			s.sent_tick[w.tick % STREAM_RING] = w.tick
 			return bytes
 		}

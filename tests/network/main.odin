@@ -333,3 +333,44 @@ lobby_list :: proc(t: ^testing.T) {
 	testing.expect_value(t, list[1].port, u16(40000))
 	testing.expect_value(t, net.query_parse_list(text, list[:1]), 1)
 }
+
+// The round in a snapshot is a delta against the base's, as the soldiers are: read back as
+// it was, the ended phase's winner and countdown with it, and smaller than whole when only
+// the clock moved.
+@(test)
+round_delta :: proc(t: ^testing.T) {
+	base := game.Round{phase = game.Playing{}, time_left = 900}
+	base.captures[.Alpha], base.captures[.Bravo] = 3, 2
+	ticked := base
+	ticked.time_left -= 1
+
+	encode :: proc(round, base: ^game.Round, buf: []u8) -> []u8 {
+		b := net.buffer_writer(buf)
+		net.net_round(&b, round, base)
+		return net.buffer_written(&b)
+	}
+	decode :: proc(data: []u8, base: ^game.Round) -> (round: game.Round, ok: bool) {
+		b := net.buffer_reader(data)
+		net.net_round(&b, &round, base)
+		return round, net.buffer_done(&b)
+	}
+	whole_buf, delta_buf: [64]u8
+	whole := encode(&ticked, nil, whole_buf[:])
+	delta := encode(&ticked, &base, delta_buf[:])
+	testing.expectf(t, len(delta) < len(whole), "a tick's clock alone is smaller as a delta (%d bytes) than whole (%d)", len(delta), len(whole))
+	got, ok := decode(delta, &base)
+	testing.expect(t, ok && got.time_left == 899 && got.captures == ticked.captures, "and reads back against the base")
+	_, playing := got.phase.(game.Playing)
+	testing.expect(t, playing, "still playing")
+
+	ended := ticked
+	ended.phase = game.Ended{winner = .Bravo, countdown = 300}
+	ended.captures[.Bravo] = 10
+	buf: [64]u8
+	got, ok = decode(encode(&ended, &base, buf[:]), &base)
+	over, is_ended := got.phase.(game.Ended)
+	testing.expect(t, ok && is_ended && over.winner == .Bravo && over.countdown == 300 && got.captures[.Bravo] == 10, "the round's end, against a round being played")
+	got, ok = decode(encode(&ended, nil, buf[:]), nil)
+	over, is_ended = got.phase.(game.Ended)
+	testing.expect(t, ok && is_ended && over.winner == .Bravo && got.time_left == 899, "and whole")
+}

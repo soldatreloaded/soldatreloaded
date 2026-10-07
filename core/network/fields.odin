@@ -50,14 +50,15 @@ Field_Kind :: enum {
 
 Field_Table :: []Field
 
-// The soldier's halves (soldier.odin's tags), its loadout, a thing, a look, and the
-// weapons' numbers.
+// The soldier's halves (soldier.odin's tags), its loadout, a thing, a look, the weapons'
+// numbers, and the round as the wire carries it (stream.odin's Round_Wire).
 SOLDIER_OWNED_FIELDS: Field_Table
 SOLDIER_SERVED_FIELDS: Field_Table
 SOLDIER_LOADOUT_FIELDS: Field_Table
 THING_FIELDS: Field_Table
 LOOK_FIELDS: Field_Table
 WEAPONS_FIELDS: Field_Table
+ROUND_FIELDS: Field_Table
 
 @(init, private = "file")
 tables_init :: proc "contextless" () {
@@ -68,6 +69,7 @@ tables_init :: proc "contextless" () {
 	THING_FIELDS = fields_of(game.Thing, "served")
 	LOOK_FIELDS = fields_of(game.Look, "")
 	WEAPONS_FIELDS = fields_of(Msg_Weapons, "")
+	ROUND_FIELDS = fields_of(Round_Wire, "")
 }
 
 // The fields of `id` in `group`, or all of them for "". Kept for the program's life.

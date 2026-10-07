@@ -19,8 +19,10 @@ import res "../resources"
 // keeps stepping it). A soldier's halves are a delta against the snapshot the client
 // last acknowledged, if that snapshot carried the soldier, and whole otherwise; the
 // server deltas against what it sent, out of its history, and the client against what
-// it received. The client applies the served half of everyone and the owned half of
-// everyone but itself, and its own only on a new life: a placing.
+// it received. The round (its phase, clock and scores) is a delta against the round the
+// same base carried, as the C game's match is. The client applies the served half of
+// everyone and the owned half of everyone but itself, and its own only on a new life: a
+// placing.
 //
 // Between words, everyone steps a soldier heard of on its last keys
 // (soldier_last_command), one-shot buttons cleared so a throw is not thrown again;
@@ -113,6 +115,7 @@ Snap_Base :: struct {
 	word:       ^[game.MAX_PLAYERS]Snap_Word,
 	things:     ^[game.MAX_THINGS]game.Thing,
 	thing_word: ^[game.MAX_THINGS]Snap_Word,
+	round:      ^game.Round, // the round as that snapshot carried it
 }
 
 msg_snapshot_header :: proc(b: ^Buffer, h: ^Snapshot_Header) {
@@ -126,7 +129,7 @@ msg_snapshot_header :: proc(b: ^Buffer, h: ^Snapshot_Header) {
 // The round, the soldiers with their names, the things. The words follow, written and
 // read with wire_write and wire_read_pending.
 msg_snapshot_body :: proc(b: ^Buffer, m: ^Msg_Snapshot, base: ^Snap_Base) {
-	net_round(b, &m.match)
+	net_round(b, &m.match, base.round if base != nil else nil)
 	for &word, i in m.word {
 		net_enum(b, &word)
 		if word != .State do continue
@@ -143,29 +146,56 @@ msg_snapshot_body :: proc(b: ^Buffer, m: ^Msg_Snapshot, base: ^Snap_Base) {
 	}
 }
 
-// The round, whole: its phase, its clock, its mode and the scores.
-net_round :: proc(b: ^Buffer, round: ^game.Round) {
-	phase: u32
-	ended: game.Ended
+// The round as the wire carries it: its phase flat, the ended phase's winner and
+// countdown beside it (none while playing or paused), so a field table can take it.
+Round_Wire :: struct {
+	phase:     Round_Wire_Phase,
+	winner:    res.Team,
+	countdown: i32 `net:"16"`, // ticks the scores still stand, once ended
+	time_left: i32 `net:"32"`,
+	captures:  [res.Team]i32 `net:"16"`,
+}
+
+Round_Wire_Phase :: enum u8 {
+	Playing,
+	Paused,
+	Ended,
+}
+
+round_wire :: proc(round: game.Round) -> (w: Round_Wire) {
+	w.time_left, w.captures = round.time_left, round.captures
 	switch p in round.phase {
-	case game.Playing: phase = 0
-	case game.Paused:  phase = 1
-	case game.Ended:   phase = 2; ended = p
+	case game.Playing: w.phase = .Playing
+	case game.Paused:  w.phase = .Paused
+	case game.Ended:   w.phase, w.winner, w.countdown = .Ended, p.winner, p.countdown
 	}
-	net_range(b, &phase, 2)
-	if phase == 2 {
-		net_enum(b, &ended.winner)
-		net_signed(b, &ended.countdown, 16)
+	return
+}
+
+round_unwire :: proc(w: Round_Wire) -> (round: game.Round) {
+	round.time_left, round.captures = w.time_left, w.captures
+	switch w.phase {
+	case .Playing: round.phase = game.Playing{}
+	case .Paused:  round.phase = game.Paused{}
+	case .Ended:   round.phase = game.Ended{winner = w.winner, countdown = w.countdown}
 	}
-	net_signed(b, &round.time_left, 32)
-	for &captures in round.captures do net_signed(b, &captures, 16)
-	if b.reading {
-		switch phase {
-		case 0: round.phase = game.Playing{}
-		case 1: round.phase = game.Paused{}
-		case 2: round.phase = ended
-		}
+	return
+}
+
+// The round: its phase, its clock and the scores; a delta against `base` (the round the
+// base snapshot carried), as the soldiers are, or whole without one. Most ticks only the
+// clock has moved.
+net_round :: proc(b: ^Buffer, round: ^game.Round, base: ^game.Round) {
+	w := round_wire(round^)
+	from: Round_Wire
+	against: rawptr
+	if base != nil {
+		from = round_wire(base^)
+		against = &from
+		if b.reading do w = from
 	}
+	fields_serialize(b, ROUND_FIELDS, &w, against)
+	if b.reading do round^ = round_unwire(w)
 }
 
 // ---------------------------------------------------------------------------------
