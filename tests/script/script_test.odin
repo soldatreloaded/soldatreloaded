@@ -12,7 +12,6 @@ package script_test
 
 import sa "core:container/small_array"
 import "core:fmt"
-import "core:log"
 import "core:os"
 import "core:strings"
 import "core:testing"
@@ -301,21 +300,11 @@ hosted :: proc(t: ^testing.T) {
 	testing.expect(t, sv.hooks.chat == nil && sv.hooks.ticked == nil, "closed, the script's ears are off the server")
 }
 
-// The game run from the chat, by the example that does it (scripts/examples/), where it
-// is to be found: this repository's, or the C game's beside it.
+// The game run from the chat, by the example that does it (scripts/match_controls.lua.disabled),
+// run as it ships: its count from 3.
 @(private = "file")
 match_controls :: proc(t: ^testing.T, sv: ^server.Server, s: ^server.Script) {
-	dir := ""
-	for candidate in ([]string{"scripts", "../../bettersoldat/assets/scripts"}) {
-		if os.exists(strings.concatenate({candidate, "/examples/match_controls.lua"}, context.temp_allocator)) do dir = candidate
-		if dir != "" do break
-	}
-	if dir == "" {
-		log.warn("no scripts/examples/match_controls.lua: the match controls go untried")
-		return
-	}
-	take_up := strings.concatenate({"package.path = '", dir, "/?.lua;' .. package.path\nrequire('examples.match_controls')({countdown = 1})"}, context.temp_allocator)
-	testing.expect(t, server.script_run(s, take_up, "match_controls"), "the match controls example is taken up")
+	testing.expect(t, server.script_run(s, "dofile('scripts/match_controls.lua.disabled')", "match_controls"), "the match controls example is taken up")
 	hooks := sv.hooks
 	testing.expect(t, !hooks.chat(hooks.user, 0, "!p", false), "!p goes to the chat like any line")
 	pump(sv, s)
@@ -323,7 +312,7 @@ match_controls :: proc(t: ^testing.T, sv: ^server.Server, s: ^server.Script) {
 	hooks.chat(hooks.user, 0, "!up", false)
 	pump(sv, s, 2)
 	testing.expect(t, server.server_paused(sv), "!up counts before the game goes on")
-	pump(sv, s, game.TICK_RATE + 2)
+	pump(sv, s, 3 * game.TICK_RATE + 2)
 	testing.expect(t, !server.server_paused(sv), "then it goes on")
 	hooks.chat(hooks.user, 0, "!map aren", false)
 	hooks.chat(hooks.user, 0, "!map nowhere", false)
@@ -334,4 +323,24 @@ match_controls :: proc(t: ^testing.T, sv: ^server.Server, s: ^server.Script) {
 	hooks.chat(hooks.user, 0, "!map CTF_RUN", false)
 	testing.expect(t, pump_until(sv, s, "started", game.ROUND_END_TICKS + 120) && holds(s, "assert(started == 'ctf_Run', started)"),
 		"!map ctf_run ends the round, and the next is on ctf_Run")
+}
+
+// The examples the server ships, each a .lua.disabled until renamed: every one of them
+// runs, side by side in one state as the scripts folder's would.
+@(test)
+examples :: proc(t: ^testing.T) {
+	entries, err := os.read_all_directory_by_path("scripts", context.temp_allocator)
+	testing.expect(t, err == nil, "scripts/ is there")
+	paths := make([dynamic]string, context.temp_allocator)
+	for entry in entries {
+		if strings.has_suffix(entry.name, ".lua.disabled") do append(&paths, strings.concatenate({"scripts/", entry.name}, context.temp_allocator))
+	}
+	testing.expectf(t, len(paths) >= 6, "the examples ship (%d)", len(paths))
+	sv := new(server.Server)
+	defer free(sv)
+	s := new(server.Script)
+	defer free(s)
+	testing.expect(t, server.script_open(s, sv, ..paths[:]), "every example runs")
+	defer server.script_close(s)
+	testing.expect(t, sv.hooks.chat != nil && sv.hooks.command != nil && sv.hooks.joined != nil, "and hangs its handlers on the server")
 }

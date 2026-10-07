@@ -1,29 +1,34 @@
 # Scripting
 
-The server runs a Lua script (Lua 5.4), named by `server.script` in server.config.mjson:
-`scripts/main.lua` by default, read once as the server starts, if the file is there.
-It, and every script it `require`s, hands the server functions to call when things
-happen (`server.on`), and calls the server back through the `server` table. Requests to
-the web go through `http`, with `json` for their bodies.
+The server runs Lua scripts (Lua 5.4): every `.lua` file in the folder `server.scripts`
+names in server.config.mjson (`scripts/` by default), read once as the server starts, in
+order of their names, into one state. Each hands the server functions to call when
+things happen (`server.on`), and calls the server back through the `server` table, so
+the scripts run side by side, each with its own handlers. Requests to the web go through
+`http`, with `json` for their bodies.
 
-`scripts/main.lua` is the server owner's, and none comes with the server: its package's
-`scripts/` holds no script yet, and a server with no `main.lua` plays without one. A
-script may `require` any file beside `main.lua`, so scripts of your own go there too. A
-script that returns a function to set it up lets `main.lua` take it up with settings of
-its own:
+The server ships examples in `scripts/`, each a `.lua.disabled`, which the server passes
+over: rename one to `.lua` to run it, and change the settings at its top. A script of
+your own goes beside them as a `.lua`. A file only to be `require`d, by several scripts,
+goes in a folder under `scripts/` (`scripts/lib/util.lua`, as `require("lib.util")`), so it
+isn't run as a script of its own.
 
-```lua
-require("greeter")({welcome = "Welcome, %s."})
-require("rounds")({url = "https://discord.com/api/webhooks/..."})
-```
+| Example | What it does |
+|---|---|
+| `greeter.lua.disabled` | greets whoever joins, and says each map as it begins |
+| `stats.lua.disabled` | /stats and /top, kills called out every so many, captures and the winner said |
+| `chat_filter.lua.disabled` | keeps lines with the words given out of the chat |
+| `match_controls.lua.disabled` | !pause, !up (a count of 3, 2, 1), !restart and !map <name>, for gathers |
+| `admin.lua.disabled` | /hold, /go and /skip for the names given, for a game among friends |
+| `round_webhook.lua.disabled` | each round's result printed and sent to a webhook (Discord's, or any JSON one) |
 
 The script runs on the server's thread, between ticks, so nothing it does races the
 game, and anything slow it does stalls the game: a request is sent from a thread of its
 own and answered later, on the server's thread, for that reason. An error in the script
 is printed on the console and the call is dropped; the game goes on.
 
-Console commands: `pause` and `unpause`; `script_reload` reads the script again from the
-start, losing its state; `lua <code>` runs a line in the script's state.
+Console commands: `script_reload` reads the scripts again from the start, losing their
+state, and picks up any renamed since; `lua <code>` runs a line in their state.
 
 ## What the script hears
 
@@ -35,7 +40,9 @@ and an error in one is printed on the console and the next is called. For `chat`
 answered, and the handlers after it don't hear it.
 
 A global function named `on_<event>` (`on_join`, `on_chat`, ...), as a lone script may
-still define it, is called after the handlers handed in.
+still define it, is called after the handlers handed in. The scripts share one state, so
+there is one such global for all of them, the last to define it winning: with more than
+one script, hand handlers in with `server.on`, and keep a script's own names `local`.
 
 | event | the handler's arguments | when | return |
 |---|---|---|---|
@@ -104,13 +111,11 @@ held in a table), and `json.array(t)` marks an empty table as an array.
 
 ## An example
 
-Two scripts side by side: `main.lua` answers /stats itself and takes up a script of its
-own, `scripts/rounds.lua`, which counts the joins and reports each round to a webhook.
+Two scripts side by side: `stats.lua` answers /stats, and `rounds.lua` counts the joins and
+reports each round to a webhook. Each is a file of `scripts/`, and runs as it is.
 
 ```lua
--- scripts/main.lua
-require("rounds")({url = "https://discord.com/api/webhooks/..."})
-
+-- scripts/stats.lua
 server.on("command", function(slot, text)
     if text == "stats" then
         local p = server.player(slot)
@@ -122,16 +127,15 @@ end)
 
 ```lua
 -- scripts/rounds.lua
-return function(options)
-    local joined = 0
-    server.on("join", function() joined = joined + 1 end)
-    server.on("round_end", function(stats)
-        local lines = {}
-        for _, p in ipairs(stats.players) do
-            lines[#lines + 1] = ("%s %d/%d"):format(p.name, p.kills, p.deaths)
-        end
-        http.post(options.url, {content = ("Round over on %s, %d joined: %s"):format(
-            stats.map, joined, table.concat(lines, ", "))})
-    end)
-end
+local url = "https://discord.com/api/webhooks/..."
+local joined = 0
+server.on("join", function() joined = joined + 1 end)
+server.on("round_end", function(stats)
+    local lines = {}
+    for _, p in ipairs(stats.players) do
+        lines[#lines + 1] = ("%s %d/%d"):format(p.name, p.kills, p.deaths)
+    end
+    http.post(url, {content = ("Round over on %s, %d joined: %s"):format(
+        stats.map, joined, table.concat(lines, ", "))})
+end)
 ```

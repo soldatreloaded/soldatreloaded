@@ -15,7 +15,8 @@ package server
 //   weapons.ini          the weapons' numbers, as Soldat's weapons.ini has them
 //                        (core/resources/weapons.odin); made as it starts if it isn't
 //                        there, each number commented out
-//   scripts/main.lua     the script, as the config names it (app_script.odin)
+//   scripts/             the Lua scripts, every .lua in the folder the config names
+//                        (app_script.odin); the examples ship as .lua.disabled
 //
 //   server [-map:<name>] [-port:<port>]
 //

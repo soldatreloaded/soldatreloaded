@@ -23,8 +23,8 @@ server: {
   capture_limit: 10
   // the percentage of players whose yes passes a vote
   vote_percent: 60
-  // the Lua script the server runs, if the file is there (docs/scripting.md)
-  script: "scripts/main.lua"
+  // the folder of Lua scripts the server runs: every .lua in it, in name order (docs/scripting.md); a .lua.disabled is passed over, so an example runs once renamed; empty for none
+  scripts: "scripts"
 }
 
 // the rotation, played in turn; none plays every map under data/maps, the map again each round

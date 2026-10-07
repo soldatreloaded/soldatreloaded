@@ -1,12 +1,13 @@
 package server
 
-// A Lua script on the server: an admin's ears and voice on a hosted game. It is read
-// once (the config's `script`, scripts/main.lua by default), and from then on it is
-// called when things happen and may act on the game through a small API.
-// docs/scripting.md is the reference; scripts/examples/ shows it in use.
+// A Lua script on the server: an admin's ears and voice on a hosted game. Every .lua in
+// the config's `scripts` folder (scripts/ by default) is read once, in name order, into
+// one state (app_script.odin), and from then on called when things happen, acting on the
+// game through a small API. docs/scripting.md is the reference; the examples beside them,
+// each a .lua.disabled until renamed, show it in use.
 //
-// What the script hears, as it hands functions to server.on(event, fn): as many as it
-// likes, from as many files as it requires, so several scripts run side by side. Each
+// What the scripts hear, as they hand functions to server.on(event, fn): as many as they
+// like, from as many files as there are or they require, side by side. Each
 // event's handlers are heard in the order they were handed in, and a global on_<event>,
 // as a lone script may write it, last. A handler's error is reported and the next heard.
 //
@@ -53,7 +54,6 @@ REGISTRY_KEY :: "soldatreloaded.script"
 Script :: struct {
 	L:       ^lua.State, // nil: no script
 	server:  ^Server,
-	path:    string,
 	jobs:    [dynamic]^Http_Job, // requests made and not yet answered to the script
 	quiet:   bool,               // say nothing in the log (the tests)
 	console: Console,            // server.command's; set by the owner, and kept by script_open
@@ -71,10 +71,12 @@ Console :: struct {
 	user: rawptr,
 }
 
-// Runs `path` with the API in place and the hooks on the server. False, with the reason
-// logged, if it can't be read or fails, and then there is no script. The Script must
-// stay where it is until script_close: Lua holds it by its address.
-script_open :: proc(s: ^Script, sv: ^Server, path: string) -> bool {
+// Runs each of `paths`, in turn, in one state with the API in place and the hooks on the
+// server: their handlers side by side, as a script's are with those of the files it
+// requires. One that can't be read or fails is said, and the rest run. False if none
+// ran, and then there is no script. The Script must stay where it is until
+// script_close: Lua holds it by its address.
+script_open :: proc(s: ^Script, sv: ^Server, paths: ..string) -> bool {
 	s^ = {server = sv, quiet = s.quiet, console = s.console, ctx = context}
 	if !lua_library() {
 		complain(s, "no Lua here (lua54.dll), so no script")
@@ -97,22 +99,28 @@ script_open :: proc(s: ^Script, sv: ^Server, path: string) -> bool {
 		script_end(s)
 		return false
 	}
-	set_module_path(L, path)
+	if len(paths) > 0 do set_module_path(L, paths[0])
 
-	lua.pushcfunction(L, traceback)
-	base := lua.gettop(L)
-	path_c := strings.clone_to_cstring(path, context.temp_allocator)
-	if lua.L_loadfile(L, path_c) != .OK || lua.pcall(L, 0, 0, base) != c.int(lua.OK) {
-		complain(s, "%s", to_string(L, -1))
+	ran := make([dynamic]string, context.temp_allocator)
+	for path in paths {
+		lua.pushcfunction(L, traceback)
+		base := lua.gettop(L)
+		path_c := strings.clone_to_cstring(path, context.temp_allocator)
+		if lua.L_loadfile(L, path_c) != .OK || lua.pcall(L, 0, 0, base) != c.int(lua.OK) {
+			complain(s, "%s", to_string(L, -1))
+		} else {
+			append(&ran, path)
+		}
+		lua.settop(L, base - 1)
+	}
+	if len(ran) == 0 {
 		script_end(s)
 		return false
 	}
-	lua.settop(L, base - 1)
 
-	s.path = strings.clone(path)
 	if sv.game != nil do _, s.match_heard = sv.game.round.phase.(game.Ended) // a round over already is no news
 	server_set_hooks(sv, hooks(s))
-	if !s.quiet do log.infof("script: running %s", path)
+	if !s.quiet do log.infof("script: running %s", strings.join(ran[:], ", ", context.temp_allocator))
 	return true
 }
 
@@ -152,10 +160,8 @@ script_end :: proc(s: ^Script) {
 	for job in s.jobs do http_drop(s.L, job)
 	delete(s.jobs)
 	lua.close(s.L)
-	delete(s.path)
 	s.L = nil
 	s.jobs = nil
-	s.path = ""
 }
 
 @(private = "file")

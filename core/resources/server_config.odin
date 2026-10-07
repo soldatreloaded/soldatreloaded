@@ -44,7 +44,7 @@ Host_Settings :: struct {
 	time_limit:     i32 `jsoncomment:"minutes a round lasts"`,
 	capture_limit:  i32 `jsoncomment:"the captures that win a round"`,
 	vote_percent:   i32 `jsoncomment:"the percentage of players whose yes passes a vote"`,
-	script:         string `jsoncomment:"the Lua script the server runs, if the file is there (docs/scripting.md)"`,
+	scripts:        string `jsoncomment:"the folder of Lua scripts the server runs: every .lua in it, in name order (docs/scripting.md); a .lua.disabled is passed over, so an example runs once renamed; empty for none"`,
 }
 
 Bot_Settings :: struct {
@@ -97,7 +97,7 @@ DEFAULT_SERVER_CONFIG := Server_Config {
 		time_limit    = 15,
 		capture_limit = 10,
 		vote_percent  = 60,
-		script        = "scripts/main.lua",
+		scripts       = "scripts",
 	},
 	bots = {difficulty = 100, chat = true},
 	network = {flooding_packets = 120, flood_warnings = 4},

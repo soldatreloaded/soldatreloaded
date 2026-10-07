@@ -1,23 +1,43 @@
 package server
 
 import "core:log"
+import "core:os"
+import "core:slice"
+import "core:strings"
 
-import "../../core/utils"
-
-// The script beside the server (script.odin): the one server.config.mjson names, read as the
-// server starts, pumped with it, and the console's script_reload and lua. Its path is
-// the install's, from its root where the server runs; a path set by hand that isn't
-// there is said, the default's absence is nothing.
+// The scripts beside the server (script.odin): every .lua in the folder server.config.mjson
+// names (`scripts`), read in name order into one state as the server starts, pumped with
+// it, and the console's script_reload and lua. A script is left out by its name: the
+// examples ship as .lua.disabled, and run once renamed to .lua. The folder is the
+// install's, from its root where the server runs; one set by hand that isn't there is
+// said, the default's absence is nothing.
 
 app_start :: proc(app: ^App) {
-	path := app.config.server.script
-	if path == "" do return
-	if !utils.file_exists(path) {
-		if path != DEFAULT_SCRIPT do log.warnf("no script at %s", path)
+	dir := app.config.server.scripts
+	if dir == "" do return
+	paths, found := scripts_in(dir)
+	if !found {
+		if dir != DEFAULT_SCRIPTS do log.warnf("no scripts folder %s", dir)
 		return
 	}
+	if len(paths) == 0 do return
 	app.script.console = {run = proc(user: rawptr, text: string) { console_execute((^App)(user), text) }, user = app}
-	script_open(&app.script, &app.sv, path)
+	script_open(&app.script, &app.sv, ..paths)
+}
+
+// The .lua files in `dir`, by name, in the temp allocator; false if there is no `dir`.
+@(private = "file")
+scripts_in :: proc(dir: string) -> (paths: []string, found: bool) {
+	entries, err := os.read_all_directory_by_path(dir, context.temp_allocator)
+	if err != nil do return nil, false
+	names := make([dynamic]string, context.temp_allocator)
+	for entry in entries {
+		if entry.type == .Directory || !strings.has_suffix(strings.to_lower(entry.name, context.temp_allocator), ".lua") do continue
+		append(&names, entry.name)
+	}
+	slice.sort(names[:])
+	for &name in names do name = strings.concatenate({dir, "/", name}, context.temp_allocator)
+	return names[:], true
 }
 
 // The answers to the script's requests, between pumps of the server.
@@ -29,8 +49,8 @@ app_stop :: proc(app: ^App) {
 	script_close(&app.script)
 }
 
-// script_reload: the script read again, from the start; its state is lost. lua <code>:
-// a line of Lua run in the script's state. False for a line that is neither.
+// script_reload: the scripts read again, from the start; their state is lost. lua <code>:
+// a line of Lua run in the scripts' state. False for a line that is neither.
 script_command :: proc(app: ^App, word, rest: string) -> bool {
 	switch word {
 	case "script_reload":
@@ -45,4 +65,4 @@ script_command :: proc(app: ^App, word, rest: string) -> bool {
 	return true
 }
 
-DEFAULT_SCRIPT :: "scripts/main.lua"
+DEFAULT_SCRIPTS :: "scripts"
