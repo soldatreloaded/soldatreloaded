@@ -42,7 +42,8 @@ bind :: proc(menu: ^Menu, key, command: string) {
 // The taunts: a modifier and a key, the message said when they are pressed.
 // `alt+q = "say_team Cover me!"` is a taunt, and so is one whose text runs as a radio
 // call: `alt+1 = "radio 1 2 Base!"` says "Base!" to the team as the "Enemy flagger,
-// middle!" call, with its sound. A slot holds one taunt: setting it unbinds the slot's
+// middle!" call, with its sound; `alt+2 = "radio 1 2"`, with no words, makes the call
+// itself, as the radio menu does. A slot holds one taunt: setting it unbinds the slot's
 // other modifiers. The message loses what a console line can't carry: `"` ends a quoted
 // word, `;` ends a command, and `//` comments the rest of the line away (it becomes a
 // space).
@@ -143,8 +144,8 @@ taunt_at :: proc(config: ^res.Client_Config, slot: int) -> (taunt: Taunt, found:
 }
 
 // The bind's text for a taunt: `say` or `say_team` and the message, or
-// `radio <call> <place>` and the message, said as that call to the team. For this
-// frame.
+// `radio <call> <place>` and the message, said as that call to the team; with no
+// message, the call alone, which says its own words. For this frame.
 taunt_compose :: proc(mode: Taunt_Mode, text: string, radio: int) -> string {
 	clean := strings.builder_make(context.temp_allocator)
 	for i := 0; i < len(text); i += 1 {
@@ -158,7 +159,11 @@ taunt_compose :: proc(mode: Taunt_Mode, text: string, radio: int) -> string {
 		}
 	}
 	message := strings.to_string(clean)
-	if radio >= 1 && radio <= 9 do return fmt.tprintf("radio %d %d %s", (radio - 1) / 3 + 1, (radio - 1) % 3 + 1, message)
+	if radio >= 1 && radio <= 9 {
+		call := fmt.tprintf("radio %d %d", (radio - 1) / 3 + 1, (radio - 1) % 3 + 1)
+		if strings.trim_space(message) == "" do return call // the call's own words
+		return fmt.tprintf("%s %s", call, message)
+	}
 	if mode == .Team do return fmt.tprintf("say_team %s", message)
 	return fmt.tprintf("say %s", message)
 }

@@ -151,6 +151,7 @@ old_json_config :: proc(t: ^testing.T) {
 	defer res.client_config_destroy(config)
 	testing.expect(t, config.player.name == "Old" && config.player.gostek == .Rat && config.player.shirt == {0x11, 0x22, 0x33, 255}, "the JSON config of before is read")
 	testing.expect(t, config.binds["g"] == "say gg" && config.binds["a"] == "+left", "its binds over the game's")
+	testing.expect(t, config.radio.weapons_first && !config.radio.close_on_weapons, "a setting it hasn't keeps its default")
 	testing.expect(t, os.exists(path) && os.exists(old_path), "the MJSON made from it, and it left as it was")
 
 	again := res.client_config_load(path, old_path)

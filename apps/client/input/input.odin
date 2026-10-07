@@ -88,10 +88,10 @@ input_stop :: proc(input: ^Input) {
 }
 
 // Each frame: the mouse's motion, and the keys through the binds. The actions whose
-// keys went down this frame. With a `menu` open, the left button and the number keys
-// are its own (input_menu_keys), not their binds'; with the radio menu open, its
-// `radio` calls' plain digits are its own (input_radio_digit) and the rest of the keys
-// go on to their binds, the mouse too. While `typing`, the keys are the chat's: nothing
+// keys went down this frame. With a `menu` open, the left button and the number keys,
+// plain or with Ctrl, are its own (input_menu_keys), not their binds'; with the radio
+// menu open, its `radio` calls' plain digits are its own (input_radio_digit) and the
+// rest of the keys go on to their binds, the mouse too. While `typing`, the keys are the chat's: nothing
 // going down reaches a bind, but a key held before is let go of. Without `controls` (the
 // weapons or the team menu open, Control.pas), no button is held or pressed: my soldier
 // stands, the cursor still aims, and the other binds still act.
@@ -129,14 +129,16 @@ input_poll :: proc(input: ^Input, config: ^res.Client_Config, view: [2]f32, menu
 
 // With a menu open, after input_poll: what the menu takes of the keys this frame. A click
 // the menu takes stays its own until the button is let go, so a click that closes a
-// menu fires nothing.
+// menu fires nothing. A number key with Alt or Shift held is no menu's: it is a taunt's.
 input_menu_keys :: proc(input: ^Input) -> (keys: Menu_Keys) {
 	if rl.IsMouseButtonPressed(.LEFT) {
 		keys.click = true
 		input.clicked = true
 	}
-	for digit in 0 ..= 9 {
-		if rl.IsKeyPressed(digit_key(digit)) do keys.digit = digit
+	if !modifier_down(.Alt) && !modifier_down(.Shift) {
+		for digit in 0 ..= 9 {
+			if rl.IsKeyPressed(digit_key(digit)) do keys.digit = digit
+		}
 	}
 	keys.ctrl = modifier_down(.Ctrl)
 	return
@@ -165,13 +167,14 @@ input_radio_digit :: proc(calls: int) -> (digit: int, chosen: bool) {
 }
 
 // The keys a menu has for its own: the left button, while open or while its click is
-// held; the number keys, while open. The radio menu's: its calls' plain digits.
+// held; the number keys, plain or with Ctrl (the weapons menu's secondaries), while
+// open: with Alt or Shift they are the taunts'. The radio menu's: its calls' plain digits.
 @(private = "file")
 menu_owns :: proc(input: ^Input, modifier: Modifier, key: Key, menu: bool, radio: int) -> bool {
 	#partial switch k in key {
 	case rl.MouseButton:  return k == .LEFT && (menu || input.clicked)
 	case rl.KeyboardKey:
-		if menu do return k >= .ZERO && k <= .NINE
+		if menu do return k >= .ZERO && k <= .NINE && (modifier == .None || modifier == .Ctrl)
 		digit := int(k) - int(rl.KeyboardKey.ZERO)
 		return modifier == .None && digit >= 1 && digit <= radio
 	}

@@ -4,7 +4,8 @@ import "../ui"
 
 // The keys: what each control does and the key that does it, by what it is for, in two
 // columns where there is room. A click on a row, or Enter, waits for the next key.
-// Under them, the flag thrown the old way, by jump and crouch together.
+// Under them, the flag thrown the old way, by jump and crouch together, and how the
+// radio sits with the weapons menu.
 
 @(private = "file")
 Control :: struct {
@@ -62,4 +63,6 @@ page_controls :: proc(menu: ^Menu) {
 	k.y = max(ends[0], ends[1])
 	ui.gap(k, 6)
 	ui.toggle(k, "Legacy flag throw", &menu.config.controls.legacy_flag_throw) // jump and crouch together throw the flag
+	ui.toggle(k, "Prioritize weapons menu over radio", &menu.config.radio.weapons_first) // both open, the number keys pick a weapon
+	ui.toggle(k, "Auto close radio when weapons menu opens", &menu.config.radio.close_on_weapons)
 }

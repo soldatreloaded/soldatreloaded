@@ -130,6 +130,7 @@ escape_key :: proc(match: ^Match) {
 		hud.menus_show(menus, .Map, false)
 	case:
 		hud.menus_show(menus, .Escape, .Escape not_in menus.open)
+		if .Weapons in menus.open do weapons_show(match) // brought back as the escape menu shut
 	}
 }
 

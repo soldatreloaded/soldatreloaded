@@ -165,11 +165,13 @@ menus_follow :: proc(match: ^Match) {
 menu_keys :: proc(match: ^Match, config: ^res.Client_Config, sounds: ^sound.Sound, keys: input.Menu_Keys) -> (leave: bool) {
 	menus := &match.hud.menus
 	action: hud.Menu_Action
+	weapons := .Weapons in menus.open
 	if keys.click {
 		action = hud.menus_click(menus, chosen = true) // a primary is always chosen: the config has one
 	} else if digit, pressed := keys.digit.?; pressed {
 		action = hud.menus_number_key(menus, digit, keys.ctrl)
 	}
+	if !weapons && .Weapons in menus.open do weapons_show(match) // brought back as a choice shut the escape menu
 	return menu_choice(match, config, sounds, action)
 }
 
@@ -218,7 +220,8 @@ weapons_menu_key :: proc(match: ^Match) {
 	me := &match.game.world.soldiers[match.me]
 	if .Escape in menus.open || !me.active || me.team == .Spectator do return
 	if me.vitals.dead {
-		hud.menus_show(menus, .Weapons, .Weapons not_in menus.open)
+		if .Weapons in menus.open do hud.menus_show(menus, .Weapons, false)
+		else do weapons_show(match)
 		match.limbo.locked = .Weapons not_in menus.open
 	} else {
 		armed := me.arsenal.primary.weapon != .Punch && me.arsenal.secondary.weapon != .Punch
@@ -254,10 +257,17 @@ limbo_tick :: proc(match: ^Match) {
 	_, playing := match.game.round.phase.(sim.Playing)
 	due := first_life || (dying && world.tick - died_at >= sim.TICK_RATE)
 	if due && playing && !limbo.locked && menus.open & {.Weapons, .Escape} == {} {
-		hud.menus_show(menus, .Weapons, true)
+		weapons_show(match)
 		limbo.died_at = nil
 	}
 	limbo.was_dead = dead
+}
+
+// The weapons menu up; with `close_on_weapons`, the radio shut as it comes. The radio
+// never shuts the weapons menu.
+weapons_show :: proc(match: ^Match) {
+	hud.menus_show(&match.hud.menus, .Weapons, true)
+	if match.config.radio.close_on_weapons do match.radio = {cooldown = match.radio.cooldown}
 }
 
 // The round over (ClientHandleMapChange): its scores stand on the scoreboard, the stats

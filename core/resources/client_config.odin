@@ -175,9 +175,11 @@ Offline_Settings :: struct {
 }
 
 Radio_Settings :: struct {
-	call_1: Radio_Call `jsoncomment:"the first call: its name in the menu, and the three places it can name"`,
-	call_2: Radio_Call `jsoncomment:"the second"`,
-	call_3: Radio_Call `jsoncomment:"the third"`,
+	call_1:           Radio_Call `jsoncomment:"the first call: its name in the menu, and the three places it can name"`,
+	call_2:           Radio_Call `jsoncomment:"the second"`,
+	call_3:           Radio_Call `jsoncomment:"the third"`,
+	weapons_first:    bool `jsoncomment:"with the weapons menu and the radio both open, the number keys pick a weapon; off, a radio call"`,
+	close_on_weapons: bool `jsoncomment:"opening the weapons menu closes the radio"`,
 }
 
 Radio_Call :: struct {
@@ -249,6 +251,7 @@ DEFAULT_CLIENT_CONFIG := Client_Config {
 		call_1 = {"Enemy flagger", {"up!", "middle!", "down!"}},
 		call_2 = {"Friendly flagger", {"up!", "middle!", "down!"}},
 		call_3 = {"Enemy spotted", {"up!", "middle!", "down!"}},
+		weapons_first = true,
 	},
 }
 

@@ -306,15 +306,26 @@ keys :: proc(match: ^Match, config: ^res.Client_Config, sounds: ^sound.Sound) {
 	if typing do typing = chat_keys(match, config) // false once a click closed it, which the game takes
 	menu := hud.menus_any_open(&match.hud.menus)
 	controls := match.hud.menus.open & {.Weapons, .Team} == {} // either holds my soldier still (Control.pas)
-	radio := match.radio.open && !menu && !typing
+	// an open menu has the number keys; but without `weapons_first`, the weapons menu
+	// alone leaves the radio its calls' plain digits
+	weapons_only := match.hud.menus.open == {.Weapons}
+	radio := match.radio.open && !typing && (!menu || (weapons_only && !config.radio.weapons_first))
 	actions := input.input_poll(&match.input, config, match.camera.view, menu, RADIO_CALLS if radio else 0, typing, controls)
 	menus_follow(match)
-	if !typing && menu && menu_keys(match, config, sounds, input.input_menu_keys(&match.input)) {
-		match.request = Leave{}
-		return
-	}
+	radio_took := false
 	if radio {
-		if digit, chosen := input.input_radio_digit(RADIO_CALLS); chosen do radio_choose(match, digit)
+		if digit, chosen := input.input_radio_digit(RADIO_CALLS); chosen {
+			radio_choose(match, digit)
+			radio_took = true
+		}
+	}
+	if !typing && menu {
+		taken := input.input_menu_keys(&match.input)
+		if radio_took do taken.digit = nil // the press was the radio's, not a weapon too
+		if menu_keys(match, config, sounds, taken) {
+			match.request = Leave{}
+			return
+		}
 	}
 	for action in sa.slice(&actions) do command_run(match, action)
 }
