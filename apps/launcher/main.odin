@@ -11,7 +11,8 @@ package launcher
 //   4. start the game
 //
 // When the release can't be reached or the update fails, it says why and starts the
-// game as it is. A console program, so a player sees what it is doing.
+// game as it is. A console program, so a player sees what it is doing: its name, that
+// it is checking, how the check went, and that the game is starting.
 //
 // It runs from the install's root, wherever it is started from.
 //
@@ -36,12 +37,13 @@ main :: proc() {
 	enter_install()
 	remove_old_launcher()
 
-	fmt.println("Soldat Reloaded")
+	fmt.println("Soldat Reloaded Launcher")
+	fmt.println("Checking for updates...")
 	if err := update(); err != "" {
 		fmt.printfln("Could not update: %s", err)
-		fmt.println("Starting the game as it is.")
 	}
 
+	fmt.println("Launching the game...")
 	if !launch_game() {
 		fmt.printfln("Could not start %s. Reinstalling the game may help.", GAME)
 		fmt.println("Press Enter to close.")
