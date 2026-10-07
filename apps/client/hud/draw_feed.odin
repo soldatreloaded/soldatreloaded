@@ -14,7 +14,7 @@ import "../ui"
 // feed down the right (or left) with its weapons' icons, the console in the corner, the respawn
 // count and my last kill's shot. The original's RenderInterface's texts.
 
-KILL_FEED_LEFT_TEXT :: 45 // a line's start, the kill feed on the left: past the icon
+KILL_FEED_LEFT_TEXT :: 45 // a line's start, the kill feed on the left: past the original's icons
 KILL_ROW_GAP :: 2 // between the kill feed's lines, past font_weaponmenusize
 KILL_GAP :: 8 // KILLCONSOLE_SEPARATE_HEIGHT: above each killer's line
 CONSOLE_LINE_HEIGHT :: 1.5 // font_consolelineheight: a console line, in the small font's points
@@ -38,7 +38,7 @@ draw_big_message :: proc(u: ^ui.Ui, feed: ^Feed) {
 
 // Where the kill feed begins, by interface.kill_log_position: at the top on the right
 // (the original's), lower on the right, or on the left under the chat, where the icon
-// comes first and the lines run from the left edge.
+// comes first and the lines run past the widest icon.
 @(private = "file", rodata)
 KILL_FEED_TOP := [res.Kill_Log_Position]f32 {
 	.Top_Right   = 60,
@@ -69,7 +69,7 @@ draw_kill_icons :: proc(u: ^ui.Ui, art: ^Art, feed: ^Feed, place: res.Kill_Log_P
 
 // Its lines, right-aligned (or from the left, past the icons), smaller when long; on a
 // narrow window, faint behind the scoreboard and fainter while a line is typed.
-draw_kill_feed :: proc(u: ^ui.Ui, feed: ^Feed, place: res.Kill_Log_Position, top: f32, dim, typing: bool) {
+draw_kill_feed :: proc(u: ^ui.Ui, art: ^Art, feed: ^Feed, place: res.Kill_Log_Position, top: f32, dim, typing: bool) {
 	alpha := 245
 	if narrow(u) && dim do alpha = 80
 	else if narrow(u) && typing do alpha = 180
@@ -78,7 +78,7 @@ draw_kill_feed :: proc(u: ^ui.Ui, feed: ^Feed, place: res.Kill_Log_Position, top
 		text := utils.short_string_text(&kill.text)
 		if kill.icon do gap += KILL_GAP
 		font := SMALLEST_FONT if len(text) > 14 else WEAPONS_FONT
-		x := KILL_FEED_LEFT_TEXT if place == .Top_Left else 595 * wide(u) - text_width(u, text, font)
+		x := art.kill_left_text if place == .Top_Left else 595 * wide(u) - text_width(u, text, font)
 		at := [2]f32{x, top + f32(row) * kill_row(u) + gap}
 		write(u, text, at, font, with_alpha(kill.color, alpha))
 	}

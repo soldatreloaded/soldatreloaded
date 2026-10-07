@@ -21,18 +21,18 @@ import "../sound"
 // apply_menu_action and the limbo.
 
 CURSOR_REACH :: 15 // CURSORSPRITE_DISTANCE: how near the cursor names a player
-MOVING :: sim.Buttons{.Left, .Right, .Jump, .Crouch, .Prone, .Jet, .Fire, .Throw} // moving shuts the weapons menu
 
 // When the weapons menu comes up by itself (NetworkClientSprite.pas): at my first life
 // of a round, and a second after each death, unless its key shut it while I was dead.
-// Picking a primary, or moving, shuts it. Online, a spectator just joined is asked its
-// team first: the server keeps me watching until I say.
+// While it is up my soldier stands (keys); picking a primary, or its key, shuts it.
+// Online, a spectator just joined is asked its team first, once a join and not again at
+// each map (NetworkClientConnection.pas): the server keeps me watching until I say.
 Limbo :: struct {
 	locked:     bool,       // shut by its key while dead: it stays shut, through the spawn, until opened again
 	placed:     bool,       // my first life of the round has begun
 	was_dead:   bool,       // as of the tick before
 	died_at:    Maybe(u32), // the tick I died, while the menu waits to come up
-	team_asked: bool,       // the team menu shown for this round's join
+	team_asked: bool,       // the team menu shown since the join, which a new round keeps
 }
 
 // What the HUD shows of the world this frame.
@@ -135,6 +135,7 @@ hud_data :: proc(match: ^Match, config: ^res.Client_Config) -> (data: hud.Hud_Da
 	data.player_names = interface.player_names
 	data.team_names = interface.team_names
 	data.typing = interface.typing
+	data.typing_size = f32(clamp(interface.typing_size, 50, 200)) / 100
 	data.kill_log = interface.kill_log_position
 	data.crosshair = {rl.Color(graphics.crosshair_color), f32(clamp(graphics.crosshair_size, 50, 200)) / 100}
 	data.pointer = {rl.Color(graphics.cursor_color), f32(clamp(graphics.cursor_size, 50, 200)) / 100}
@@ -228,10 +229,9 @@ weapons_menu_key :: proc(match: ^Match) {
 	hud.console_say(&match.hud.feed, hud.GAME_COLOR, "Weapons menu disabled" if match.limbo.locked else "Weapons menu active")
 }
 
-// After each tick, on my command in it: the weapons menu up at my first life and a
-// second after I die, while the round is played; down as I move. Online, a spectator
-// just joined is shown the team menu, once.
-limbo_tick :: proc(match: ^Match, command: sim.Command) {
+// After each tick: the weapons menu up at my first life and a second after I die, while
+// the round is played. Online, a spectator just joined is shown the team menu, once.
+limbo_tick :: proc(match: ^Match) {
 	limbo := &match.limbo
 	menus := &match.hud.menus
 	world := &match.game.world
@@ -257,7 +257,6 @@ limbo_tick :: proc(match: ^Match, command: sim.Command) {
 		hud.menus_show(menus, .Weapons, true)
 		limbo.died_at = nil
 	}
-	if .Weapons in menus.open && !dead && command.buttons & MOVING != {} do hud.menus_show(menus, .Weapons, false)
 	limbo.was_dead = dead
 }
 
@@ -270,11 +269,11 @@ hud_round_ended :: proc(match: ^Match) {
 }
 
 // A new round: the last one's scoreboard down, and the weapons menu's comings and
-// goings begun again.
+// goings begun again; the team, asked once a join, not asked again.
 hud_new_round :: proc(match: ^Match) {
 	match.hud.scoreboard = false
 	match.hud.stats = false
-	match.limbo = {}
+	match.limbo = {team_asked = match.limbo.team_asked}
 	match.team_asked = nil
 }
 

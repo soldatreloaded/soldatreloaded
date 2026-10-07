@@ -156,7 +156,7 @@ words :: proc(t: ^testing.T) {
 		game.Gun_Drop{owner = 1, weapon = .M79, ammo = 1, pos = {10, 20}, impact = {0.5, 0.25}, thrown = true},
 		game.Flag_Throw{soldier = 9},
 		game.Shot_End{owner = 2, shot = 12, weapon = .Frag_Grenade, pos = {5, 6}, blast = .Frag},
-		game.Shot_End{owner = 2, shot = 13, weapon = .Thrown_Knife, pos = {5, 6}, blast = nil},
+		game.Shot_End{owner = 2, shot = 13, weapon = .Thrown_Knife, pos = {5, 6}, blast = nil, target = 4},
 		game.Ruling(game.Damage{attacker = 1, target = 2, weapon = .AK74, amount = 12.5, part = 3}),
 		game.Ruling(game.Kill{killer = 1, target = 2, weapon = .Knife, pos = {7, 8}, part = 2, impact = {1, 1}, fire = 3, distance = 99, airtime = 30, ricochets = 1}),
 		game.Ruling(game.Respawn{target = 4, life = 2, team = .Bravo, primary = .Spas12, secondary = .LAW, pos = {100, 200}}),
@@ -316,6 +316,34 @@ streams :: proc(t: ^testing.T) {
 	testing.expect(t, net.server_stream_receive(&streams[0], server, 0, state, &words))
 	testing.expect_value(t, int(sa.len(server.world.heard)), fired)
 	testing.expect_value(t, int(words.next - 1 - (words.first - 1)) >= fired, true)
+
+	// a corpse is the client's own, as the original never corrects one: begun from the
+	// served half alone (no word of the kill heard), it lies where the corpse here has it,
+	// and no word of the server's moves it or shows as a correction
+	bot_server.vitals.dead = true
+	bot_server.vitals.death = {pos = bot_server.body.pos}
+	bot_server.vitals.respawn_counter = 600
+	corpse_blend: f32
+	for tick in 0 ..< 20 {
+		run(server, 1, {})
+		net.wire_collect(&words, &server.output, server.world.tick - 1, nil)
+		snapshot := net.server_stream_snapshot(&streams[0], server, 0, &words, &names, buf[:])
+		testing.expect(t, net.client_stream_hear(&client_stream, client, 0, snapshot), "the client reads it")
+		net.client_stream_begin_tick(&client_stream, client, 0, 0)
+		corpse_blend = max(corpse_blend, utils.length(client_stream.blend[1]))
+		run(client, 1, {})
+		if tick == 0 {
+			body := &client.world.corpses[1]
+			testing.expect(t, bot_client.vitals.dead && body.active, "the bot killed lies as a corpse here, begun from the served half")
+			for k in 0 ..< game.CORPSE_POINTS {
+				body.points[k].x += 40
+				body.old_points[k].x += 40
+			}
+		}
+	}
+	testing.expect(t, bot_client.vitals.dead && corpse_blend == 0 && abs(bot_client.body.pos.x - bot_server.body.pos.x) > 30,
+		fmt.tprintf("the server's word of the corpse neither moves it nor corrects the picture (%.1f here, %.1f there, %.1f blended at most)",
+			bot_client.body.pos.x, bot_server.body.pos.x, corpse_blend))
 }
 
 

@@ -127,6 +127,7 @@ Interface_Settings :: struct {
 	player_names:      bool `jsoncomment:"teammates' names at the screen's edge when out of view (everyone's, spectating)"`,
 	team_names:        bool `jsoncomment:"teammates' names by them always, not only at the screen's edge when out of view (with player_names)"`,
 	typing:            Typing_Style `jsoncomment:"over a player typing: off, dots (the original's) or typing, the word"`,
+	typing_size:       i32 `jsoncomment:"the typing indicator's size, percent, 50 to 200"`,
 	kill_log_length:   i32 `jsoncomment:"the kill log's lines, two a kill, 0 to 50; 0 shows none"`,
 	kill_log_position: Kill_Log_Position `jsoncomment:"where the kill log is: top_right (the original's), lower_right, or top_left, under the chat"`,
 	console_lines:     i32 `jsoncomment:"how many console lines the HUD shows"`,
@@ -236,6 +237,7 @@ DEFAULT_CLIENT_CONFIG := Client_Config {
 		show_ping       = true,
 		player_names    = true,
 		typing          = .Dots,
+		typing_size     = 100,
 		kill_log_length = 15,
 		console_lines   = 6,
 		discord         = true,

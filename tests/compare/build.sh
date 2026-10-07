@@ -10,7 +10,7 @@
 #   odin run tests/compare
 set -euo pipefail
 
-REFERENCE_COMMIT=74fee85 # the C game's apps/shared as the port follows it
+REFERENCE_COMMIT=583b7ea # the C game's apps/shared as the port follows it
 
 here="$(cd "$(dirname "$0")" && pwd)"
 source="${BETTERSOLDAT:-$here/../../../bettersoldat}"

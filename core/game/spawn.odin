@@ -1,5 +1,6 @@
 package game
 
+import sa "core:container/small_array"
 import res "../resources"
 import "../utils"
 
@@ -42,5 +43,12 @@ soldier_place :: proc(g: ^Game, slot: Soldier_Id, team: res.Team, remote: bool) 
 	if team != .Spectator do respawn.pos = spawn_point(g.world.polymap, team, &g.world.rng)
 	soldier.remote = remote
 	apply_ruling(&g.world, &g.resources, respawn)
-	if team == .Spectator do soldier.vitals.dead = true
+	if team == .Spectator {
+		soldier.vitals.dead = true
+		return
+	}
+	// told as a referee's respawn is, the original's Respawn ending its team change: the
+	// next step records it, so the wire takes it to the clients for the sound and the
+	// spark (a spectator's isn't, which they would take for a life)
+	if sa.space(g.world.placed) > 0 do sa.push_back(&g.world.placed, respawn)
 }

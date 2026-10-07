@@ -48,6 +48,7 @@ World :: struct {
 	gifts:        sa.Small_Array(MAX_GIFTS, Pickup), // for the soldiers at the end of the things' turn (thing_gift.odin)
 	heard:        sa.Small_Array(MAX_HEARD, Hearing), // word from another machine, for the next step (word.odin)
 	kills_asked:  sa.Small_Array(MAX_PLAYERS, Kill_Asked), // deaths asked of the referee from outside the step (referee.odin)
+	placed:       sa.Small_Array(MAX_PLAYERS, Respawn), // placings made outside the step, told with the next step's rulings (spawn.odin)
 }
 
 // What the game plays by on every map, loaded once and never changed: the animations,
@@ -80,6 +81,9 @@ world_init :: proc(world: ^World, polymap: ^res.Poly_Map, gravity: f32, seed: u6
 // client) the rulings come later, from the server.
 world_step :: proc(world: ^World, resources: ^Resources, commands: ^[MAX_PLAYERS]Command, out: ^Tick_Output, authority: ^Authority = nil) {
 	clear_output(out)
+	// the placings since the last step, done already, are told first, frozen or not
+	for placing in sa.slice(&world.placed) do sa.push_back(&out.rulings, placing)
+	sa.clear(&world.placed)
 	if world.rules.frozen {
 		sa.clear(&world.things_asked) // what was asked is let go of, as the C game's mail is
 		sa.clear(&world.heard)

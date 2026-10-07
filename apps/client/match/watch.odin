@@ -10,11 +10,13 @@ import "../input"
 
 // The camera while I watch (LocalInput.pas, "change camera when dead"): as I die it stays
 // on my body; joining as a spectator, with no body, it goes to the first player up. Then,
-// with no weapons menu open, fire follows the next player and jet the one before, among
-// those alive I may watch (my team's, unless I am a spectator); jump, or freecam, is the
-// free camera, which the cursor pushes; and fire with nobody to follow is that too.
-// Alive, the camera is mine again. A demo is watched from outside, by my own keys and at
-// any time: fire and jet go round the players and its recorder, jump is the free camera.
+// a second after my death and with no weapons menu open, fire held follows the next
+// player and jet the one before, among those alive I may watch (my team's, unless I am a
+// spectator), ten ticks between switches while it is held (the original's MenuTimer);
+// jump, or freecam, is the free camera, which the cursor pushes; and fire with nobody to
+// follow is that too. Alive, the camera is mine again. A demo is watched from outside,
+// by my own keys and at any time: fire and jet go round the players and its recorder,
+// jump is the free camera.
 //
 // And a scoped Barrett shot of mine (the original's bullet Tracking): the camera rides
 // it, five ticks ahead, until it is gone or I stand up (graphics.track_shot).
@@ -27,12 +29,14 @@ import "../input"
 SPECTATOR_AIM_DIST :: 30 // the free camera's speed, by the cursor's offset from the middle
 TRACK_LEAD :: 5 // ticks of its flight the camera keeps ahead of a tracked shot
 WOBBLE_LIFE :: draw.EXPLOSION_FRAMES * 2.3 // a blast wobbles the camera while it has more life than this
+SWITCH_TICKS :: 10 // between switches of whom the camera follows, while the key is held
 
 Watch :: struct {
 	follow:       Maybe(sim.Soldier_Id), // the player the camera follows; nil for me
 	free:         bool,                  // or the free camera
 	keys:         sim.Buttons,           // last tick's, so a press switches once
 	was_watching: bool,                  // dead or a spectator as of the last tick
+	grace:        int,                   // ticks before fire, jet or jump moves the camera: a second from my death, then between switches
 	tracking:     Maybe(u32),            // the shot of mine the camera rides, by its number
 }
 
@@ -54,14 +58,21 @@ watch_tick :: proc(match: ^Match, mine: sim.Command) {
 	case watching:
 		if !w.was_watching {
 			w.follow, w.free = nil, false
+			w.grace = 0 if me.team == .Spectator else sim.TICK_RATE // the fire I died holding moves nothing
 			if me.team == .Spectator && !camera_next(match, false) do camera_free(match)
-		} else if .Weapons not_in match.hud.menus.open && pressed & {.Jump, .Fire, .Jet} != {} {
-			if .Jump in pressed {
+		} else if w.grace > 0 {
+			w.grace -= 1
+		} else if .Weapons not_in match.hud.menus.open && mine.buttons & {.Jump, .Fire, .Jet} != {} {
+			was_follow, was_free := w.follow, w.free
+			if .Jump in mine.buttons {
 				camera_free(match)
-			} else if !camera_next(match, .Jet in pressed) {
+			} else if !camera_next(match, .Jet in mine.buttons) {
 				camera_free(match)
 			}
-			input.input_centre(&match.input) // the original's cursor goes back to the middle on a switch
+			w.grace = SWITCH_TICKS
+			// the original's cursor goes back to the middle on a switch; a key held on the
+			// free camera switches nothing, and leaves the cursor to push it
+			if w.follow != was_follow || w.free != was_free do input.input_centre(&match.input)
 		}
 	case:
 		w.follow, w.free = nil, false

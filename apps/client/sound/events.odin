@@ -142,16 +142,20 @@ ruling_sounds :: proc(s: ^Sound, ruling: sim.Ruling, world: ^sim.World, me: sim.
 	case sim.Kill:
 		kill_sounds(s, r, world, me)
 	case sim.Respawn:
-		play_at(s, "wermusic.wav" if r.target == me else "spawn.wav", r.pos)
+		// one's own at the listener: the original's is at MySprite, its listener, and this
+		// tick's listener may still be the soldier watched while it was dead
+		if r.target == me do sound_flat(s, "wermusic.wav")
+		else do play_at(s, "spawn.wav", r.pos)
 	case sim.Pickup:
 		at := world.soldiers[r.soldier].body.pos
 		play_at(s, "takegun.wav" if r.kind == .Weapon else KIT_SOUNDS[r.kind], at)
-	// The flag's: a capture is heard wherever you are, flat, as the original's. The grab
-	// and the return are from where they happened; the original plays the return flat.
+	// The flag's: a capture and a return are heard wherever you are, flat, as the
+	// original's, a flag timed out back to its base among the returns. The grab is from
+	// where it happened.
 	case sim.Flag_Grab:
 		play_at(s, "capture.wav", world.soldiers[r.soldier].body.pos)
 	case sim.Flag_Return:
-		play_at(s, "capture.wav", world.things[r.flag].points[0])
+		sound_flat(s, "capture.wav")
 	case sim.Flag_Capture:
 		sound_flat(s, "ctf.wav")
 	}

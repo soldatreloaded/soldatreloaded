@@ -49,6 +49,7 @@ world_make :: proc(match: ^Match) -> bool {
 		return false
 	}
 	sim.clear_output(&game.output)
+	draw.sparks_init(&match.sparks) // the last round's go with it (ChangeMap)
 	online.line_weapons_apply(n, game)
 	game.settings.capture_limit = n.limit
 	match.me = n.slot

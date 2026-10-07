@@ -190,13 +190,14 @@ Outfit :: struct {
 
 // A soldier on its figure's points, in the shirt it wears (its team's). `grenade_color`
 // puts the belt's grenades in a flat colour of the player's choosing; nil leaves them as
-// the art has them.
+// the art has them. `standing`, the round stands still: no jets burn, though held.
 @(private = "package")
-draw_gostek :: proc(art: ^Gostek_Art, soldier: ^sim.Soldier, figure: ^Figure, shirt: utils.Rgba, grenade_color: Maybe(utils.Rgba)) {
+draw_gostek :: proc(art: ^Gostek_Art, soldier: ^sim.Soldier, figure: ^Figure, shirt: utils.Rgba, grenade_color: Maybe(utils.Rgba), standing := false) {
 	points := &figure.points
 	facing_left := soldier.body.direction != 1
 	team := 1 if soldier.team == .Bravo || soldier.team == .Delta else 0
 	outfit := outfit_of(soldier, figure.corpse)
+	if standing do outfit.jetting = false
 	style := outfit.look.gostek
 
 	draw_slung_weapon(art, soldier, points, facing_left) // across the back, behind the body

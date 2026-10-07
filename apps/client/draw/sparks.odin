@@ -201,16 +201,17 @@ sparks_load :: proc(source: Source) -> (art: Spark_Art) {
 	return
 }
 
-// None yet: a new match's.
+// None yet: a new match's, or a new round's.
 sparks_init :: proc(sparks: ^Sparks) {
 	sparks^ = {rng = {0x853C49E6748FEA9B}}
 }
 
 // After each tick: the sparks it made, then every spark on by a step, and the noises
-// they made. A paused round's sparks hang where they are, silent.
+// they made. A standing round's sparks, paused or ended, hang where they are, silent,
+// and none are made, a held jet's flames among them (UpdateFrame's MapChangeCounter).
 sparks_tick :: proc(sparks: ^Sparks, game: ^sim.Game) {
 	sa.clear(&sparks.noises)
-	if _, paused := game.round.phase.(sim.Paused); paused do return
+	if sim.round_standing(&game.round) do return
 	sparks_burst(sparks, game)
 	for &spark in sparks.pool {
 		if spark.kind != .None do spark_step(sparks, &spark, game.world.polymap)

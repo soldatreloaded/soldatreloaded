@@ -19,6 +19,7 @@ BLOOD_RANDOM_NORMAL :: 10
 BLOOD_RANDOM_HIGH :: 6
 LESS_BLEED_TIME :: 120 // ticks dead after which a body bleeds less, then all but none
 NO_BLEED_TIME :: 300
+HURT_HEALTH :: 25 // below this a soldier drips blood as it goes
 // A burning body flames for this long, one in this many ticks for each burning point, by
 // how full the pool is (ONFIRE_TIME, FIRE_RANDOM_LOW, _NORMAL, _HIGH).
 ON_FIRE_TIME :: 240
@@ -40,6 +41,7 @@ sparks_burst :: proc(sparks: ^Sparks, game: ^sim.Game) {
 	jets_burn(sparks, game)
 	reloads_drop(sparks, game)
 	corpses_bleed(sparks, game)
+	wounded_bleed(sparks, game)
 }
 
 // The map's weather, if it has any: every seventeenth tick a row of drops, grains or
@@ -329,6 +331,25 @@ corpses_bleed :: proc(sparks: ^Sparks, game: ^sim.Game) {
 			}
 			if burning && (point + 1) % fire == 0 do corpse_burn(sparks, corpse.points[point] + {0, 3}, moved * 0.3, fire_odds, soldier.body.pos)
 		}
+	}
+}
+
+// The badly hurt drip as they go (Sprites.pas, the live branch): under HURT_HEALTH, now
+// and then a drop of blood off the hip, thrown the way the body moves; half as often
+// while the pool is already full.
+@(private = "file")
+wounded_bleed :: proc(sparks: ^Sparks, game: ^sim.Game) {
+	live := 0
+	for &spark in sparks.pool {
+		if spark.kind != .None do live += 1
+	}
+	odds := 2 * BLOOD_RANDOM_NORMAL if live > 300 else BLOOD_RANDOM_NORMAL
+
+	for &soldier in game.world.soldiers {
+		if !soldier.active || soldier.vitals.dead || soldier.team == .Spectator || soldier.vitals.health >= HURT_HEALTH do continue
+		if below(sparks, odds) != 0 do continue
+		joints := sim.soldier_pose(game.resources.animations, &soldier, soldier.body.pos)
+		spark_add(sparks, .Blood, joints[5 - 1] + {2, 0}, soldier.body.velocity, 65 - f32(below(sparks, 10)))
 	}
 }
 

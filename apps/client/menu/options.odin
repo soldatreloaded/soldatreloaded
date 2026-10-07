@@ -27,6 +27,7 @@ page_options :: proc(menu: ^Menu) {
 	ui.toggle(k, "Player names", &config.interface.player_names)
 	ui.toggle(k, "Teammates' names always", &config.interface.team_names)
 	ui.enum_select(k, "Typing indicator", &config.interface.typing, TYPING_NAMES[:])
+	ui.slider(k, "Typing indicator size", &config.interface.typing_size, 50, 200, 10, "%d%%")
 	ui.slider(k, "Kill log length", &config.interface.kill_log_length, 0, 50, 2, "%d lines")
 	ui.enum_select(k, "Kill log position", &config.interface.kill_log_position, KILL_LOG_PLACES[:])
 	ui.toggle(k, "Minimap", &config.interface.minimap)

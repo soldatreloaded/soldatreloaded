@@ -67,6 +67,28 @@ free_slot :: proc(sv: ^Server) -> (game.Soldier_Id, bool) {
 	return 0, false
 }
 
+// `name` as `slot` may hold it: as said, unless another player or bot holds it already,
+// then with the first "(j)" nobody holds, the name cut to make room for it
+// (NetworkServerConnection.pas ServerHandlePlayerInfo: LeftStr(name, 22 - Length(j))).
+@(private = "file")
+unique_name :: proc(sv: ^Server, slot: game.Soldier_Id, name: net.Name) -> net.Name {
+	name := name
+	base := utils.short_string_text(&name)
+	held := name
+	for j := 1; ; j += 1 {
+		taken := false
+		for &player, i in sv.players {
+			if game.Soldier_Id(i) != slot && (player.joined || player.bot) && utils.short_string_text(&player.name) == utils.short_string_text(&held) {
+				taken = true
+				break
+			}
+		}
+		if !taken do return held
+		suffix := fmt.tprintf("(%d)", j)
+		held = utils.short_string(24, fmt.tprintf("%s%s", base[:min(len(base), 24 - len(suffix))], suffix))
+	}
+}
+
 players_count :: proc(sv: ^Server) -> (n: int) {
 	for &player in sv.players do n += int(player.joined)
 	return
@@ -217,7 +239,7 @@ hello :: proc(sv: ^Server, peer: net.Peer, e: ^net.Event) {
 
 	player := &sv.players[slot]
 	player^ = {peer = peer, joined = true, hwid = hwid, admin = lists.lists_admin(&sv.lists, host), muted = lists.lists_muted(&sv.lists, host, utils.short_string_text(&hwid))}
-	player.name = m.name if m.name.length != 0 else utils.short_string(24, "Player")
+	player.name = unique_name(sv, slot, m.name if m.name.length != 0 else utils.short_string(24, "Player"))
 	net.server_stream_init(&sv.streams[slot], sv.round)
 	sv.streams[slot].event_ack = net.wire_queue_present(&sv.words) // what happened before it came is nobody's news
 	soldier := &sv.game.world.soldiers[slot]
@@ -319,7 +341,7 @@ player_add_bot :: proc(sv: ^Server, profile: ^res.Bot_Profile, team: res.Team) -
 
 	player := &sv.players[slot]
 	player^ = {bot = true, chose_team = true, team = team, name = profile.name}
-	if player.name.length == 0 do player.name = utils.short_string(24, "Bot")
+	player.name = unique_name(sv, slot, player.name if player.name.length != 0 else utils.short_string(24, "Bot"))
 	soldier := &sv.game.world.soldiers[slot]
 	soldier.player.look = bots.profile_look(profile)
 	soldier.player.bot = true

@@ -305,8 +305,9 @@ keys :: proc(match: ^Match, config: ^res.Client_Config, sounds: ^sound.Sound) {
 	typing := prompt_up(match)
 	if typing do typing = chat_keys(match, config) // false once a click closed it, which the game takes
 	menu := hud.menus_any_open(&match.hud.menus)
+	controls := match.hud.menus.open & {.Weapons, .Team} == {} // either holds my soldier still (Control.pas)
 	radio := match.radio.open && !menu && !typing
-	actions := input.input_poll(&match.input, config, match.camera.view, menu, RADIO_CALLS if radio else 0, typing)
+	actions := input.input_poll(&match.input, config, match.camera.view, menu, RADIO_CALLS if radio else 0, typing, controls)
 	menus_follow(match)
 	if !typing && menu && menu_keys(match, config, sounds, input.input_menu_keys(&match.input)) {
 		match.request = Leave{}
@@ -336,7 +337,7 @@ tick :: proc(match: ^Match, config: ^res.Client_Config, sounds: ^sound.Sound) {
 		mine = online_step(match, config)
 	}
 	shown(match, config, sounds)
-	if match.mode != .Demo do limbo_tick(match, mine)
+	if match.mode != .Demo do limbo_tick(match)
 	watch_tick(match, mine)
 	camera_tick(match)
 	chat_tick(match)
@@ -352,8 +353,7 @@ shown :: proc(match: ^Match, config: ^res.Client_Config, sounds: ^sound.Sound) {
 	match.hud.feed.console_length = int(config.interface.console_lines)
 	match.hud.feed.kill_length = int(config.interface.kill_log_length)
 	if !match.playback.seeking {
-		_, paused := game.round.phase.(sim.Paused)
-		if !paused do draw.sparks_tick(&match.sparks, game) // paused, the sparks hang too
+		draw.sparks_tick(&match.sparks, game) // the round standing, the sparks hang too
 		_, playing := game.round.phase.(sim.Playing)
 		if config.graphics.weather && playing {
 			draw.sparks_weather(&match.sparks, &game.polymap, match.camera, game.world.tick)

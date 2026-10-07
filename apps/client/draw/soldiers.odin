@@ -8,8 +8,9 @@ import "../../../core/utils"
 
 @(private = "package")
 draw_soldiers :: proc(art: ^Art, game: ^sim.Game, frame: ^Frame, grenade_color: Maybe(utils.Rgba)) {
+	standing := sim.round_standing(&game.round) // the round standing, no jets burn, though their buttons stay held
 	for &soldier, id in game.world.soldiers {
 		if !soldier.active || soldier.team == .Spectator do continue
-		draw_gostek(&art.gostek, &soldier, &frame.figures[id], shirt_worn(&soldier), grenade_color)
+		draw_gostek(&art.gostek, &soldier, &frame.figures[id], shirt_worn(&soldier), grenade_color, standing)
 	}
 }

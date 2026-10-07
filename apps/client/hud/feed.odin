@@ -160,7 +160,8 @@ feed_tick :: proc(feed: ^Feed, game: ^sim.Game, names: ^[sim.MAX_PLAYERS]string,
 		case sim.Kill:
 			kill_said(feed, world, names, r, me)
 		case sim.Flag_Grab:
-			// the enemy's flag taken, in the taker's team's colour: mine to me, theirs to the rest
+			// the enemy's flag taken, in the taker's team's colour: mine to me, theirs to the
+			// rest, and who took it in the console
 			flag := world.things[r.flag].kind
 			taker := world.soldiers[r.soldier].team
 			if r.soldier == me {
@@ -168,6 +169,7 @@ feed_tick :: proc(feed: ^Feed, game: ^sim.Game, names: ^[sim.MAX_PLAYERS]string,
 			} else {
 				big_say(feed, team_color(taker), CAPTURE_MESSAGE_TICKS, "%s Flag captured!", flag_name(flag))
 			}
+			console_say(feed, team_color(taker), "%s captured the %s Flag", names[r.soldier], flag_name(flag))
 		case sim.Flag_Return:
 			// by a player: said; by the clock: nothing, as the original
 			returner := r.returner.? or_continue
@@ -231,8 +233,9 @@ feed_scroll :: proc(feed: ^Feed) {
 }
 
 // A kill (NetworkClientSprite.pas): the killer with its tally beside its weapon's icon,
-// the victim under; a suicide is the one line, in gold. And the big words about me:
-// whom I killed, and how many in a row, or who killed me.
+// the victim under; a suicide is the one line, in gold, without an icon when nothing
+// did it. And the big words about me: whom I killed, and how many in a row, or who
+// killed me.
 @(private = "file")
 kill_said :: proc(feed: ^Feed, world: ^sim.World, names: ^[sim.MAX_PLAYERS]string, kill: sim.Kill, me: sim.Soldier_Id) {
 	killer, victim := &world.soldiers[kill.killer], &world.soldiers[kill.target]
@@ -241,7 +244,7 @@ kill_said :: proc(feed: ^Feed, world: ^sim.World, names: ^[sim.MAX_PLAYERS]strin
 		kill_line(feed, tallied, killer_color(killer.team), kill.weapon, true)
 		kill_line(feed, names[kill.target], victim_color(victim.team), kill.weapon, false)
 	} else {
-		kill_line(feed, tallied, SUICIDE_COLOR, kill.weapon, true)
+		kill_line(feed, tallied, SUICIDE_COLOR, kill.weapon, kill.weapon != .Punch) // /kill: no icon
 	}
 
 	switch {

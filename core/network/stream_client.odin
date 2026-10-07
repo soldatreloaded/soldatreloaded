@@ -249,6 +249,9 @@ frame_apply :: proc(c: ^Client_Stream, g: ^game.Game, me: game.Soldier_Id, frame
 // Soldier `i` as its word in `frame` has it, stepped on `steps` ticks on its last keys
 // to where the tick on show wants it. The correction goes to the picture, to be shown
 // over a little while; a placing, or a jump too far to be a correction, shows at once.
+// A dead one takes the served half alone, as the original never corrects a corpse: its
+// body is the corpse here, started from the served vitals.death, and its place the
+// corpse's head.
 @(private = "file")
 soldier_apply :: proc(c: ^Client_Stream, g: ^game.Game, id: game.Soldier_Id, frame: ^Snap_Frame, steps: int, scratch: ^game.Tick_Output) {
 	w := &g.world
@@ -257,8 +260,13 @@ soldier_apply :: proc(c: ^Client_Stream, g: ^game.Game, id: game.Soldier_Id, fra
 	placed := heard.vitals.life != s.vitals.life
 	before := s.body.pos
 	soldier_take_served(s, heard)
-	soldier_take_owned(g.resources.animations, s, heard)
 	s.remote = true
+	if heard.vitals.dead {
+		c.blend[id] = {}
+		c.blend_vel[id] = {}
+		return
+	}
+	soldier_take_owned(g.resources.animations, s, heard)
 	steps_left := min(steps, STREAM_STEPS_MAX)
 	if game.round_standing(&g.round) do steps_left = 0 // the world stands, paused or between rounds: so does the word
 	for _ in 0 ..< steps_left {

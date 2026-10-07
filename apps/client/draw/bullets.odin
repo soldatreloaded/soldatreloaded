@@ -65,12 +65,14 @@ bullets_load :: proc(source: Source) -> (art: Bullet_Art) {
 }
 
 // Every bullet in flight, `alpha` of the way from its last tick to its latest; and a
-// shot run forward while its trail lasts, gone or not. With `trails`, the streaks
+// plain round run forward while its trail lasts, gone or not: the rest, without such a
+// trail, go with the shot (no missile parked where a rocket burst at once). With
+// `trails`, the streaks
 // behind them. `grenade_color` draws the grenades flat in that colour.
 @(private = "package")
 draw_bullets :: proc(art: ^Bullet_Art, world: ^sim.World, alpha: f32, grenade_color: Maybe(utils.Rgba), trails: bool) {
 	for &bullet in world.bullets {
-		if bullet.active || bullet.catch_up > 0 do draw_bullet(art, &bullet, alpha, grenade_color, trails)
+		if bullet.active || (bullet.catch_up > 0 && bullet.style == .Plain) do draw_bullet(art, &bullet, alpha, grenade_color, trails)
 	}
 }
 

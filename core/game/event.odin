@@ -39,7 +39,7 @@ MAX_RULINGS :: 256
 // What a tick leaves behind: what happened, and what was decided.
 Tick_Output :: struct {
 	events:  sa.Small_Array(MAX_EVENTS, Event),
-	rulings: sa.Small_Array(MAX_RULINGS, Ruling), // empty without authority
+	rulings: sa.Small_Array(MAX_RULINGS, Ruling), // without authority, those heard from the server
 	judged:  int, // the events judged so far
 }
 
@@ -192,11 +192,13 @@ Flag_Drop :: struct {
 }
 
 // The server's word of where a shot ended, for the clients' own flights of it
-// (bullet_shot_end): in a blast of `blast`, or with nil stopped in a body.
+// (bullet_shot_end): in a blast of `blast`, or with nil stopped in a body, `target`'s if
+// told.
 Shot_End :: struct {
 	owner:  Soldier_Id,
 	shot:   u32, // the owner's number for it
 	weapon: res.Weapon,
 	pos:    utils.Vec2,
 	blast:  Maybe(Explosion_Kind),
+	target: Maybe(Soldier_Id),
 }

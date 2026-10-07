@@ -108,7 +108,7 @@ hud_draw :: proc(u: ^ui.Ui, hud: ^Hud, data: ^Hud_Data, minimap: ^draw.Minimap) 
 	draw_vote(u, data)
 	if data.radio.open && !escape do draw_radio(u, art, data, hud.scoreboard || hud.stats)
 	draw_prompt(u, data)
-	draw_kill_feed(u, feed, data.kill_log, kill_feed_top(data), hud.scoreboard, typing)
+	draw_kill_feed(u, art, feed, data.kill_log, kill_feed_top(data), hud.scoreboard, typing)
 	if me.active {
 		draw_said(u, data)
 		if data.player_names do draw_names(u, data)

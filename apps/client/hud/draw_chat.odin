@@ -25,8 +25,8 @@ draw_prompt :: proc(u: ^ui.Ui, data: ^Hud_Data) {
 	color: rl.Color
 	switch prompt.mode {
 	case .None:    return
-	case .Public:  prefix, color = "Say:", CHAT_COLOR
-	case .Team:    prefix, color = "Team Say:", TEAM_CHAT_COLOR
+	case .Public:  prefix, color = "Chat:", CHAT_COLOR
+	case .Team:    prefix, color = "Team Chat:", TEAM_CHAT_COLOR
 	case .Command: prefix, color = "Cmd: ", ENTER_COLOR
 	}
 	line := fmt.tprintf("%s%s", prefix, prompt.text)
@@ -45,19 +45,21 @@ draw_prompt :: proc(u: ^ui.Ui, data: ^Hud_Data) {
 	fill(u, {x, y, pixel, align(u, 1.4 * height)}, CARET_COLOR)
 }
 
-// What each player said, over their head, and the dots while they type: not over the
-// dead or a spectator, who have no head on the field to put it over.
+// What each player said, over their head, and the dots while they type: over a corpse's
+// head too, as the original's, but not over a spectator, who has no head on the field.
 draw_said :: proc(u: ^ui.Ui, data: ^Hud_Data) {
 	for &player in data.players {
 		typing := player.typing && data.typing != .Off
-		if !player.active || player.dead || player.team == .Spectator || (!typing && player.said_ticks <= 0) do continue
+		if !player.active || player.team == .Spectator || (!typing && player.said_ticks <= 0) do continue
 		at := in_view(data, player.top)
 		dy: f32 = -25
-		if typing { // the dots stepping one to three, after "Typing" if asked (interface.typing)
+		if typing { // the dots stepping one to three, after "Typing" if asked (interface.typing), at interface.typing_size
 			full := "Typing..." if data.typing == .Typing else "..."
 			shown := full[:len(full) - 2 + int(data.tick / 30 % 3)]
-			write(u, shown, {at.x - text_width(u, full, SMALL_FONT) / 2, at.y + dy}, SMALL_FONT, ABOVE_CHAT_COLOR, vertical = .Bottom)
-			dy -= 15
+			font := SMALL_FONT
+			font.scale *= data.typing_size
+			write(u, shown, {at.x - text_width(u, full, font) / 2, at.y + dy}, font, ABOVE_CHAT_COLOR, vertical = .Bottom)
+			dy -= 15 * data.typing_size
 		}
 		if player.said_ticks > 0 && len(player.said) < MORE_CHAT_TEXT {
 			color := with_alpha(ABOVE_CHAT_COLOR, int(9 * player.said_ticks))

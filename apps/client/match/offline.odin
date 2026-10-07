@@ -105,6 +105,7 @@ round_start :: proc(match: ^Match) -> bool {
 	me := match.me
 	kept := game.world.soldiers[me].team // the team I was on, which I stay on
 	sim.game_start_round(game, match.map_name, seed = u64(time.time_to_unix_nano(time.now()))) or_return
+	draw.sparks_init(&match.sparks) // the last round's go with it (ChangeMap)
 	sim.clear_output(&game.output)
 
 	player := config.player

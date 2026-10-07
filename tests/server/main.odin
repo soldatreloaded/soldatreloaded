@@ -8,6 +8,8 @@ package server_test
 //   odin test tests/server -define:ODIN_TEST_THREADS=1
 
 import "core:fmt"
+import sa "core:container/small_array"
+import "core:slice"
 import "core:testing"
 import "core:time"
 
@@ -176,6 +178,27 @@ join :: proc(t: ^testing.T) {
 	testing.expect_value(t, sv.game.world.soldiers[a.welcome.slot].team, res.Team.Alpha)
 	testing.expect(t, !sv.game.world.soldiers[a.welcome.slot].vitals.dead, "and alive on it")
 
+	// the placing is told as a respawn, and Alice's world, stepped as a client steps it,
+	// records it among its tick's rulings, for the sound and the spark
+	respawned := false
+	for _ in 0 ..< ROUNDS {
+		server.server_pump(sv, 0.01)
+		for c in clients do client_pump(c)
+		net.client_stream_begin_tick(&a.stream, a.game, a.welcome.slot, 0)
+		commands: [game.MAX_PLAYERS]game.Command
+		game.game_tick(a.game, &commands)
+		// its state, which acknowledges the snapshots: a whole one has no room for words
+		buf: [net.MTU]u8
+		state := net.client_stream_state(&a.stream, &a.game.world.soldiers[a.welcome.slot], buf[:])
+		if state != nil do net.net_send(a.link.peer, .Client_State, state)
+		for ruling in sa.slice(&a.game.output.rulings) {
+			if r, is_respawn := ruling.(game.Respawn); is_respawn && r.target == a.welcome.slot && r.team == .Alpha do respawned = true
+		}
+		if respawned do break
+		time.sleep(10 * time.Millisecond)
+	}
+	testing.expect(t, respawned, "Alice's client heard her respawn on alpha as a ruling")
+
 	// chat is relayed to everyone with the sender's slot
 	say(a, "hello")
 	relayed := pump_until(sv, clients, proc(cs: []^Test_Client) -> bool { return cs[1].chats > 0 })
@@ -212,6 +235,40 @@ join :: proc(t: ^testing.T) {
 	left := pump_until(sv, {a}, proc(cs: []^Test_Client) -> bool { return cs[0].announcements > before })
 	testing.expect(t, left, "Alice heard Bob leave")
 	testing.expect(t, !sv.players[slot].joined && !sv.game.world.soldiers[slot].active, "Bob's slot is free")
+}
+
+// A name already held is numbered as the original numbers it (NetworkServerConnection.pas):
+// a second Bob is Bob(1), a third Bob(2); a bot's the same.
+@(test)
+same_names :: proc(t: ^testing.T) {
+	testing.expect(t, net.net_init())
+	defer net.net_shutdown()
+	sv := new(server.Server)
+	defer free(sv)
+	config: res.Server_Config
+	testing.expect(t, open_server(sv, &config))
+	defer server.server_destroy(sv)
+
+	a, b, c := new(Test_Client), new(Test_Client), new(Test_Client)
+	defer {free(a); free(b); free(c)}
+	testing.expect(t, client_open(a, "Bob"))
+	testing.expect(t, client_open(b, "Bob"))
+	testing.expect(t, client_open(c, "Bob"))
+	defer {client_close(a); client_close(b); client_close(c)}
+	joined := pump_until(sv, {a, b, c}, proc(cs: []^Test_Client) -> bool {
+		return cs[0].welcomed && cs[1].welcomed && cs[2].welcomed
+	})
+	testing.expect(t, joined, "all three welcomed")
+	names: [3]string
+	for client, i in ([]^Test_Client{a, b, c}) do names[i] = utils.short_string_text(&sv.players[client.welcome.slot].name)
+	slice.sort(names[:])
+	testing.expect_value(t, names, [3]string{"Bob", "Bob(1)", "Bob(2)"})
+
+	first, added := server.server_add_bot(sv, .Alpha, "Admiral")
+	second, added_too := server.server_add_bot(sv, .Alpha, "Admiral")
+	testing.expect(t, added && added_too, "two bots of one profile")
+	testing.expect_value(t, utils.short_string_text(&sv.players[first].name), "Admiral")
+	testing.expect_value(t, utils.short_string_text(&sv.players[second].name), "Admiral(1)")
 }
 
 @(test)

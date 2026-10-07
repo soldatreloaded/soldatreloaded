@@ -133,7 +133,9 @@ bullets_fade_trails :: proc(world: ^World) {
 // The server's word of where a shot ended, on a client: its own flight of the shot, if
 // still flying, is put there and ended the same way, so a grenade that went off on
 // someone there goes off on them here, whatever path it took here. One already ended
-// here stays ended: a second blast for it would be a blast twice.
+// here stays ended: a second blast for it would be a blast twice. A body it stopped in
+// that the flight here never met is hit here all the same, for the hit's sound and
+// blood (a thrown knife's, which only a flight meeting a body makes).
 // TODO(net): heard at the start of the bullets' turn, as the C game takes it.
 bullet_shot_end :: proc(world: ^World, resources: ^Resources, end: Shot_End, out: ^Tick_Output) {
 	for &bullet, i in world.bullets {
@@ -142,9 +144,14 @@ bullet_shot_end :: proc(world: ^World, resources: ^Resources, end: Shot_End, out
 		bullet.old_pos = end.pos
 		if kind, blast := end.blast.?; blast {
 			explode(world, resources, Bullet_Id(i), kind, nil, -1, nil, out)
-		} else {
-			bullet_end(world, Bullet_Id(i), out, end.pos)
+			return
 		}
+		if target, told := end.target.?; told && bullet.last_hit != target {
+			owner, live := &world.soldiers[bullet.owner], &world.soldiers[target]
+			friendly := owner.team != .None && owner.team == live.team && target != bullet.owner
+			emit(out, Blood{target = target, pos = end.pos, velocity = bullet.velocity, bloodless = friendly})
+		}
+		bullet_end(world, Bullet_Id(i), out, end.pos)
 		return
 	}
 }

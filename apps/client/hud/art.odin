@@ -91,15 +91,21 @@ GUN_FILES := [res.Weapon]string {
 }
 
 Art :: struct {
-	book:     draw.Sprite_Book,
-	pictures: [Picture]draw.Sprite,
-	guns:     [res.Weapon]draw.Sprite,
+	book:           draw.Sprite_Book,
+	pictures:       [Picture]draw.Sprite,
+	guns:           [res.Weapon]draw.Sprite,
+	kill_left_text: f32, // a kill feed line's start with the feed on the left, past the widest icon
 }
 
 art_load :: proc(art: ^Art, mod: res.Mod) {
 	draw.sprite_book_open(&art.book, mod, ART_SIDE)
 	for file, picture in PICTURE_FILES do art.pictures[picture] = interface_image(art, file)
 	for file, weapon in GUN_FILES do art.guns[weapon] = interface_image(art, file)
+	// the kill feed's lines on the left begin past the widest icon, drawn at 0.8, so a
+	// mod's wide guns don't cover the names
+	widest: f32 = 0
+	for gun in art.guns do widest = max(widest, gun.size.x)
+	art.kill_left_text = max(KILL_FEED_LEFT_TEXT, 5 + widest * 0.8 + 5)
 }
 
 art_destroy :: proc(art: ^Art) {

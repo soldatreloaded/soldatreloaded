@@ -463,7 +463,7 @@ body_collide :: proc(
 				return
 			}
 			knife_land(world, bullet)
-			shot_end_tell(authority, bullet, point, nil, out)
+			shot_end_tell(authority, bullet, point, nil, target_id, out)
 			bullet_end(world, id, out, point)
 			return
 		}

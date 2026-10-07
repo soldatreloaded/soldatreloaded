@@ -22,19 +22,24 @@ sound_tick :: proc(s: ^Sound, game: ^sim.Game, me: sim.Soldier_Id, followed: May
 	if s.ringing > -1 do s.ringing -= 1
 	loops_age(s)
 
-	// paused, the soldiers' voices stop (ClientHandleServerSyncMsg): a jet or a reload
-	// would sound on for as long as the pause lasts; nothing new sounds till it ends
-	if _, paused := game.round.phase.(sim.Paused); paused {
+	// the round standing, paused or ended, the soldiers' voices stop (ClientHandleServerSyncMsg,
+	// and the map change's): their buttons stay held through it, so a jet or a reload would
+	// sound on for as long as it lasts; paused, nothing new sounds till it ends
+	standing := sim.round_standing(&game.round)
+	if standing {
 		for &voices in s.reserved {
 			for &r in voices do reserved_stop(s, &r)
 		}
-		return
 	}
+	if _, paused := game.round.phase.(sim.Paused); paused do return
 
 	clock_sounds(s, &game.round)
 	for event in sa.slice(&game.output.events) do event_sounds(s, event, world, me)
 	for ruling in sa.slice(&game.output.rulings) do ruling_sounds(s, ruling, world, me)
-	for id in 0 ..< sim.MAX_PLAYERS do soldier_sounds(s, game, sim.Soldier_Id(id))
+	// ended, the soldiers stand silent
+	if !standing {
+		for id in 0 ..< sim.MAX_PLAYERS do soldier_sounds(s, game, sim.Soldier_Id(id))
+	}
 	bullet_sounds(s, game, followed)
 	for noise in sa.slice(&sparks.noises) do noise_sounds(s, noise)
 

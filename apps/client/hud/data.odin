@@ -56,6 +56,7 @@ Hud_Data :: struct {
 	player_names: bool,
 	team_names:   bool, // teammates' names by them always, not only out of view
 	typing:       res.Typing_Style, // over a player typing
+	typing_size:  f32, // the indicator's size, 1 the small font's own
 	kill_log:     res.Kill_Log_Position,
 	crosshair:    Pointer_Look,
 	pointer:      Pointer_Look, // the menus' cursor
@@ -105,7 +106,7 @@ Pointer_Look :: struct {
 	scale: f32, // its size, 1 the image's own
 }
 
-// The chat's prompt, the original's: what is typed after "Say:", "Team Say:" or "Cmd: ".
+// The chat's prompt, the original's: what is typed after "Chat:", "Team Chat:" or "Cmd: ".
 // Its text begins with the mode's own character, a space or a slash, which the drawing
 // shows and the sending drops.
 Chat_Mode :: enum {

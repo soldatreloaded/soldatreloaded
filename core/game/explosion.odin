@@ -35,7 +35,7 @@ explode :: proc(
 ) {
 	bullet := &world.bullets[id]
 	radius := explosion_radius(kind)
-	shot_end_tell(authority, bullet, bullet.pos, kind, out) // where it went off, for the clients' own flights of it
+	shot_end_tell(authority, bullet, bullet.pos, kind, nil, out) // where it went off, for the clients' own flights of it
 	emit(out, Explosion{owner = bullet.owner, weapon = explosion_weapon(kind), pos = bullet.pos, velocity = bullet.velocity, radius = radius})
 
 	for &soldier, i in world.soldiers {
@@ -77,11 +77,11 @@ explode :: proc(
 }
 
 // The server's word of where a shot ended, for the clients' own flights of it (EventShotEnd):
-// in a blast of `blast`, or with nil stopped in a body at `pos`. Only with authority: a
-// client's shots end as the server's word puts them (bullet_shot_end).
-shot_end_tell :: proc(authority: ^Authority, bullet: ^Bullet, pos: utils.Vec2, blast: Maybe(Explosion_Kind), out: ^Tick_Output) {
+// in a blast of `blast`, or with nil stopped in a body at `pos`, `target`'s if told. Only
+// with authority: a client's shots end as the server's word puts them (bullet_shot_end).
+shot_end_tell :: proc(authority: ^Authority, bullet: ^Bullet, pos: utils.Vec2, blast: Maybe(Explosion_Kind), target: Maybe(Soldier_Id), out: ^Tick_Output) {
 	if authority == nil do return
-	emit(out, Shot_End{owner = bullet.owner, shot = bullet.shot, weapon = bullet.weapon, pos = pos, blast = blast})
+	emit(out, Shot_End{owner = bullet.owner, shot = bullet.shot, weapon = bullet.weapon, pos = pos, blast = blast, target = target})
 }
 
 @(private = "file")

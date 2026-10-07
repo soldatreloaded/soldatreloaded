@@ -57,7 +57,9 @@ heard_apply :: proc(world: ^World, resources: ^Resources, authority: ^Authority,
 			}
 			bullet_hear(world, resources, w, hearing.catch_up, authority, out)
 		case Shot_End:   if turn == .Bullets do bullet_shot_end(world, resources, w, out)
-		case Ruling:     if turn == ruling_turn(w) do apply_ruling(world, resources, w)
+		// recorded as the server's own are, for the sounds, the sparks and the feed; a
+		// client's collection for the wire leaves rulings out, so none goes back
+		case Ruling:     if turn == ruling_turn(w) do rule(world, resources, w, out)
 		}
 	}
 	if turn == .Things do sa.clear(&world.heard)

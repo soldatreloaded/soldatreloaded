@@ -92,8 +92,10 @@ input_stop :: proc(input: ^Input) {
 // are its own (input_menu_keys), not their binds'; with the radio menu open, its
 // `radio` calls' plain digits are its own (input_radio_digit) and the rest of the keys
 // go on to their binds, the mouse too. While `typing`, the keys are the chat's: nothing
-// going down reaches a bind, but a key held before is let go of.
-input_poll :: proc(input: ^Input, config: ^res.Client_Config, view: [2]f32, menu: bool, radio: int, typing: bool) -> (actions: Actions) {
+// going down reaches a bind, but a key held before is let go of. Without `controls` (the
+// weapons or the team menu open, Control.pas), no button is held or pressed: my soldier
+// stands, the cursor still aims, and the other binds still act.
+input_poll :: proc(input: ^Input, config: ^res.Client_Config, view: [2]f32, menu: bool, radio: int, typing: bool, controls: bool) -> (actions: Actions) {
 	if input.view != {} && input.view != view { // the same place in a window resized
 		input.cursor *= view / input.view
 		input.prev *= view / input.view
@@ -113,6 +115,7 @@ input_poll :: proc(input: ^Input, config: ^res.Client_Config, view: [2]f32, menu
 		if menu_owns(input, modifier, key, menu, radio) do continue
 
 		if button, is_button := button_of(command); is_button {
+			if !controls do continue
 			if key_down(key) do input.held += {button}
 			if !typing && key_pressed(key) && button in sim.ONE_SHOT_BUTTONS do input.pressed += {button}
 		} else if !typing && key_pressed(key) {
@@ -120,6 +123,7 @@ input_poll :: proc(input: ^Input, config: ^res.Client_Config, view: [2]f32, menu
 		}
 	}
 	if typing do input.held &= was_held // only let go of: what goes down is the chat's
+	if !controls do input.pressed = {} // nor a press from before the menu came up
 	return
 }
 

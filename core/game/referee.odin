@@ -24,7 +24,7 @@ judge :: proc(world: ^World, resources: ^Resources, authority: ^Authority, out: 
 		hit_land(world, resources, authority, Hit{
 			shooter = asked.soldier,
 			target  = asked.soldier,
-			weapon  = soldier.arsenal.primary.weapon,
+			weapon  = .Punch, // none: the original's HealthHit with a What of -1 (ServerCommands.pas)
 			amount  = BRUTAL_KILL_WOUND if asked.brutal else KILL_WOUND,
 			pos     = soldier.body.pos,
 		}, out)
