@@ -44,11 +44,18 @@ Turn :: enum {
 
 // What was heard that `turn` does, in the order heard; the inbox is emptied at the last.
 heard_apply :: proc(world: ^World, resources: ^Resources, authority: ^Authority, out: ^Tick_Output, turn: Turn) {
+	flashed: bit_set[0 ..< MAX_PLAYERS; u32] // the shooters given their flash this turn, one each
 	for hearing in sa.slice(&world.heard) {
 		switch w in hearing.word {
 		case Gun_Drop:   if turn == .Soldiers do things_ask(world, w)
 		case Flag_Throw: if turn == .Soldiers do things_ask(world, w)
-		case Shot:       if turn == .Bullets do bullet_hear(world, resources, w, hearing.catch_up, authority, out)
+		case Shot:
+			if turn != .Bullets do continue
+			if authority == nil && int(w.owner) not_in flashed { // a client hearing of it: the flash
+				flashed += {int(w.owner)}
+				bullet_remote_fire(world, resources, w, out)
+			}
+			bullet_hear(world, resources, w, hearing.catch_up, authority, out)
 		case Shot_End:   if turn == .Bullets do bullet_shot_end(world, resources, w, out)
 		case Ruling:     if turn == ruling_turn(w) do apply_ruling(world, resources, w)
 		}

@@ -110,7 +110,7 @@ Server :: struct {
 	ending_told: bool,                         // the countdown has begun and been announced
 	end_why:     string,                       // "limit", "nextmap" or "vote", for the hooks; "" until known
 	hooks:       Hooks,
-	suicides:    [MAX_PLAYERS]bool,       // asked for in the chat (/kill) or by an admin (pkill), pressed at the next tick
+	suicides:    [MAX_PLAYERS]Maybe(bool), // a death asked for in the chat (/kill, /brutalkill: brutal) or by an admin (pkill), for the next tick
 	last_joined: Maybe(Slot),             // the person who joined last, for kicklast
 	last_ban:    Maybe(Last_Ban),          // the ban made last, for unbanlast
 }
@@ -209,8 +209,8 @@ server_pump :: proc(sv: ^Server, dt: f64) -> bool {
 		line_commands(sv, &commands)
 		bots.bots_commands(&sv.bots, sv.game, &names, &commands)
 		for &asked, i in sv.suicides { // a player's /kill, or an admin's pkill of anyone, bots too
-			if asked do commands[i].buttons += {.Suicide}
-			asked = false
+			if brutal, is_asked := asked.?; is_asked do game.world_ask_kill(&sv.game.world, game.Soldier_Id(i), brutal)
+			asked = nil
 		}
 		game.game_tick(sv.game, &commands)
 		if sv.hooks.ticked != nil do sv.hooks.ticked(sv.hooks.user)

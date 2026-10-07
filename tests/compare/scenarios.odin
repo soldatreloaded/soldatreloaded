@@ -69,6 +69,7 @@ SCENARIOS := [?]Scenario {
 	{"kits", "ctf_Dropdown", 0, {.AK74, .AK74}, 600, kits, false, {placed = true, at = {{714, 280}, {600, 280}}, health = {40, 0}}},
 	{"gun_pickup", "ctf_Ash", 50, {.AK74, .Punch}, 1800, gun_pickup, false, {}},
 	{"parachute", "ctf_Dropdown", 120, {.AK74, .AK74}, 900, parachute, false, {}}, // the alpha spawn point is high
+	// {"lava", "ctf_Blade", 0, {.AK74, .AK74}, 900, press_nothing, false, {placed = true, at = {{-30, -330}, {30, -330}}}}, // dropped onto the lava pool: hurt, sparks, the dice rolled for them. Parts at the flame the C game shoots at a soldier in lava (the flamer's bullet, not ported); in step up to it
 }
 
 press_nothing :: proc(tick: int) -> [2]game.Buttons {

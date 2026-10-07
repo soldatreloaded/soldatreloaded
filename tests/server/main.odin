@@ -394,7 +394,7 @@ admin_commands :: proc(t: ^testing.T) {
 	name := utils.short_string_text(&sv.players[bot].name)
 	testing.expect(t, server.admin_command(sv, nil, fmt.tprintf("setteam2 %s", name)))
 	testing.expect_value(t, sv.game.world.soldiers[bot].team, res.Team.Bravo)
-	testing.expect(t, server.admin_command(sv, nil, fmt.tprintf("pkill %d", bot)) && sv.suicides[bot], "pkill presses its Suicide at the next tick")
+	testing.expect(t, server.admin_command(sv, nil, fmt.tprintf("pkill %d", bot)) && sv.suicides[bot] != nil, "pkill asks its death of the next tick")
 	server.server_pump(sv, 0.05)
 	testing.expect(t, sv.game.world.soldiers[bot].vitals.dead, "and it dies by it")
 

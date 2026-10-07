@@ -77,7 +77,7 @@ Match :: struct {
 	hud:        hud.Hud,
 	limbo:      Limbo,
 	team_asked: Maybe(res.Team), // offline, chosen in the team menu, for the next tick to place me on
-	suicide:    bool, // offline, /kill said: my next command's Suicide button
+	suicide:    Maybe(bool), // offline, /kill or /brutalkill (true) said: my death, asked of the world at the next tick
 	bots:       ai.Bots,
 	profiles:   []res.Bot_Profile, // data/bots, the bots are dressed from
 	chat:       Chat,
@@ -306,14 +306,14 @@ keys :: proc(match: ^Match, config: ^res.Client_Config, sounds: ^sound.Sound) {
 	if typing do typing = chat_keys(match, config) // false once a click closed it, which the game takes
 	menu := hud.menus_any_open(&match.hud.menus)
 	radio := match.radio.open && !menu && !typing
-	actions := input.input_poll(&match.input, config, match.camera.view, menu || radio, typing)
+	actions := input.input_poll(&match.input, config, match.camera.view, menu, RADIO_CALLS if radio else 0, typing)
 	menus_follow(match)
 	if !typing && menu && menu_keys(match, config, sounds, input.input_menu_keys(&match.input)) {
 		match.request = Leave{}
 		return
 	}
 	if radio {
-		if digit, pressed := input.input_menu_keys(&match.input).digit.?; pressed do radio_choose(match, digit)
+		if digit, chosen := input.input_radio_digit(RADIO_CALLS); chosen do radio_choose(match, digit)
 	}
 	for action in sa.slice(&actions) do command_run(match, action)
 }

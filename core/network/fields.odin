@@ -171,6 +171,7 @@ leaf :: proc(info: ^runtime.Type_Info, offset: uintptr, name: string, bits: int)
 		field.size = inner.size
 		field.tag = v.tag_offset
 		field.tag_size = v.tag_type.size
+		assert(int(field.tag) >= field.size, fmt.tprintf("%s: a Maybe's tag is expected after its value", name)) // field_bytes spans both
 		field.max = inner.max + 1 if inner.max != 0 else u32(1) << uint(min(inner.bits, 31))
 	case:
 		panic(fmt.tprintf("%s: a %v can't go on the wire", name, info.id))
@@ -245,10 +246,15 @@ field_serialize :: proc(b: ^Buffer, f: ^Field, at: rawptr) {
 	}
 }
 
-// What of a field is compared and copied: all of it, but an animation's id and frame.
+// What of a field is compared and copied: all of it, but an animation's id and frame;
+// a Maybe's value and its tag, so nil and a 0 are told apart.
 @(private = "file")
 field_bytes :: proc(f: ^Field, at: rawptr) -> []u8 {
-	size := f.size if f.kind != .Animation else int(offset_of(res.Animation_State, count))
+	size := f.size
+	#partial switch f.kind {
+	case .Animation: size = int(offset_of(res.Animation_State, count))
+	case .Maybe:     size = int(f.tag) + f.tag_size
+	}
 	return ([^]u8)(at)[:size]
 }
 

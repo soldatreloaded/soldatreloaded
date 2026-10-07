@@ -47,6 +47,7 @@ World :: struct {
 	things_asked: sa.Small_Array(MAX_THING_REQUESTS, Thing_Request), // for the things' next turn (thing_request.odin)
 	gifts:        sa.Small_Array(MAX_GIFTS, Pickup), // for the soldiers at the end of the things' turn (thing_gift.odin)
 	heard:        sa.Small_Array(MAX_HEARD, Hearing), // word from another machine, for the next step (word.odin)
+	kills_asked:  sa.Small_Array(MAX_PLAYERS, Kill_Asked), // deaths asked of the referee from outside the step (referee.odin)
 }
 
 // What the game plays by on every map, loaded once and never changed: the animations,
@@ -82,6 +83,7 @@ world_step :: proc(world: ^World, resources: ^Resources, commands: ^[MAX_PLAYERS
 	if world.rules.frozen {
 		sa.clear(&world.things_asked) // what was asked is let go of, as the C game's mail is
 		sa.clear(&world.heard)
+		sa.clear(&world.kills_asked)
 		world.tick += 1
 		return
 	}

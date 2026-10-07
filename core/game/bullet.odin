@@ -86,12 +86,25 @@ bullet_fire :: proc(world: ^World, resources: ^Resources, shot: Shot) -> (id: Bu
 	return
 }
 
+// A shot heard from another machine fires nothing here: its soldier steps unarmed, so
+// the flash, the smoke and the sound that the weapon gives a shot of its own are given
+// here instead, once per shooter per tick (a shotgun is one bang), at the muzzle of the
+// soldier as it stands here (remote_fire).
+bullet_remote_fire :: proc(world: ^World, resources: ^Resources, shot: Shot, out: ^Tick_Output) {
+	soldier := &world.soldiers[shot.owner]
+	if !soldier.active do return
+	joints := soldier_pose(resources.animations, soldier, soldier.body.pos)
+	aim := utils.normalize(soldier.controls.aim - joints[14])
+	muzzle := utils.Vec2{joints[14].x - aim.x * 4.0, joints[14].y - aim.y * 4.0 - 2.0}
+	soldier.arsenal.fired = true // the gostek's muzzle flash
+	emit(out, Fired{shot.owner, shot.weapon, muzzle, shot.velocity})
+}
+
 // A shot heard from another machine, run forward `catch_up` ticks to where its shooter
 // has it, each step judged against the soldiers as the shooter saw them then
 // (bullet_target); caught up, it meets the present like any other. A client draws it
 // with a trail over the run. Heard at the start of the bullets' turn, after
 // bullets_fade_trails, as the C game takes them.
-// TODO(net): nothing hears shots yet; and a client's flash for a heard shot (remote_fire).
 bullet_hear :: proc(world: ^World, resources: ^Resources, shot: Shot, catch_up: u8, authority: ^Authority, out: ^Tick_Output) {
 	id, made := bullet_fire(world, resources, shot)
 	if !made do return

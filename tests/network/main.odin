@@ -374,3 +374,30 @@ round_delta :: proc(t: ^testing.T) {
 	over, is_ended = got.phase.(game.Ended)
 	testing.expect(t, ok && is_ended && over.winner == .Bravo && got.time_left == 899, "and whole")
 }
+
+// A Maybe tells nil from a 0 across the wire and a copy: a flag held by soldier 0, a
+// thing of nobody's taken whole from one that is somebody's.
+@(test)
+maybe_tags :: proc(t: ^testing.T) {
+	src, dst: game.Thing
+	src.holder = game.Soldier_Id(0)
+	src.owner = game.Soldier_Id(3)
+	net.fields_copy(net.THING_FIELDS, &dst, &src)
+	testing.expect_value(t, dst.holder, game.Soldier_Id(0))
+	testing.expect_value(t, dst.owner, game.Soldier_Id(3))
+	net.fields_copy(net.THING_FIELDS, &src, &game.Thing{})
+	testing.expect(t, src.holder == nil && src.owner == nil, "nil copied over a value")
+
+	buf: [1024]u8
+	for held in ([]Maybe(game.Thing_Id){game.Thing_Id(0), game.Thing_Id(5), nil}) {
+		base, now, got: game.Soldier
+		base.carrying.held = game.Thing_Id(2) if held == nil else nil
+		now.carrying.held = held
+		w := net.buffer_writer(buf[:])
+		net.fields_serialize(&w, net.SOLDIER_SERVED_FIELDS, &now, &base)
+		r := net.buffer_reader(buf[:net.buffer_bytes(&w)])
+		got = base
+		net.fields_serialize(&r, net.SOLDIER_SERVED_FIELDS, &got, &base)
+		testing.expectf(t, got.carrying.held == held, "held %v as a delta read back %v", held, got.carrying.held)
+	}
+}

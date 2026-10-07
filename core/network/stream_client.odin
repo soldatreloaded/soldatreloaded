@@ -227,6 +227,13 @@ frame_apply :: proc(c: ^Client_Stream, g: ^game.Game, me: game.Soldier_Id, frame
 			// from it for everyone alike
 			_, paused := g.round.phase.(game.Paused)
 			if placed || paused do soldier_take_owned(g.resources.animations, s, heard)
+			// A loadout picked while dead can reach the server after it has already
+			// respawned me with the previous one: my choice arms this new life, and the
+			// next client state carries it to the server as well
+			if placed && game.weapon_is_primary(loadout.primary) && game.weapon_is_secondary(loadout.secondary) &&
+			   (s.arsenal.primary.weapon != loadout.primary || s.arsenal.secondary.weapon != loadout.secondary) {
+				game.soldier_arm(&g.resources, s, loadout.primary, loadout.secondary)
+			}
 		}
 	}
 	for i in 0 ..< game.MAX_THINGS {

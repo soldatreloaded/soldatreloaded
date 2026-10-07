@@ -278,7 +278,14 @@ soldier_touch_polygon :: proc(
 			if soldier.vitals.health < 1 do self_hit(soldier, id, 10.0, out)
 		}
 		// lava throws up a spark now and then
-		if type == .Lava && rng_below(&world.rng, 3) == 0 do emit(out, Polygon_Effect{id, .Lava, pos - {0, 3}, true})
+		if type == .Lava && rng_below(&world.rng, 3) == 0 {
+			emit(out, Polygon_Effect{id, .Lava, pos - {0, 3}, true})
+			// the C game rolls once more here, with authority, for a flame the lava shoots at
+			// the soldier (soldier_shoot with the flamer): the flame went with the flamer,
+			// but the roll and the shot it counts stay, so the dice and the shot keys fall
+			// as they do there
+			if authority != nil && rng_below(&world.rng, 3) == 0 do soldier.arsenal.shot_count += 1
+		}
 	case .Regenerates:
 		if soldier.vitals.health < DEFAULT_HEALTH && world.tick % 12 == 0 {
 			self_hit(soldier, id, -2.0, out) // a negative wound heals

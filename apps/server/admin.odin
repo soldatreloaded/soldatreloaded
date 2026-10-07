@@ -176,7 +176,7 @@ admin_command :: proc(sv: ^Server, from: Caller, text: string) -> bool {
 		} else if !soldier.active || soldier.vitals.dead {
 			reply(sv, from, fmt.tprintf("%s isn't alive.", utils.short_string_text(&sv.players[slot].name)))
 		} else {
-			sv.suicides[slot] = true
+			sv.suicides[slot] = false // as a /kill of its own
 			log.infof("%s killed %s", by, utils.short_string_text(&sv.players[slot].name))
 		}
 	case "mute":

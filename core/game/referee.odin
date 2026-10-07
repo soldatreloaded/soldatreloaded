@@ -16,6 +16,21 @@ Authority :: struct {
 // authority the wound, before the next hit's shove (a soldier it kills is not shoved by
 // the next).
 judge :: proc(world: ^World, resources: ^Resources, authority: ^Authority, out: ^Tick_Output) {
+	// the deaths asked from outside land first, as the C game's mail is read before the
+	// tick's own
+	for asked in sa.slice(&world.kills_asked) {
+		soldier := &world.soldiers[asked.soldier]
+		if !soldier.active || soldier.vitals.dead do continue
+		hit_land(world, resources, authority, Hit{
+			shooter = asked.soldier,
+			target  = asked.soldier,
+			weapon  = soldier.arsenal.primary.weapon,
+			amount  = BRUTAL_KILL_WOUND if asked.brutal else KILL_WOUND,
+			pos     = soldier.body.pos,
+		}, out)
+	}
+	sa.clear(&world.kills_asked)
+
 	events := sa.slice(&out.events)
 	for event in events[out.judged:] {
 		#partial switch e in event {
@@ -83,6 +98,22 @@ hit_land :: proc(world: ^World, resources: ^Resources, authority: ^Authority, hi
 	if !world.soldiers[hit.target].active do return
 	soldier_shove(world, resources, hit)
 	if authority != nil do judge_hit(world, resources, hit, out)
+}
+
+// A death asked for from outside the step: by the player's own word (/kill), or an
+// admin's. The original's /kill is a wound of 150 by the gun in hand, which kills
+// without tearing the body apart; /brutalkill one of 3423, which does. Landed by the
+// referee at the next step; nothing for one not alive.
+Kill_Asked :: struct {
+	soldier: Soldier_Id,
+	brutal:  bool,
+}
+
+KILL_WOUND :: 150.0
+BRUTAL_KILL_WOUND :: 3423.0
+
+world_ask_kill :: proc(world: ^World, id: Soldier_Id, brutal: bool) {
+	if sa.space(world.kills_asked) > 0 do sa.push_back(&world.kills_asked, Kill_Asked{id, brutal})
 }
 
 // Suicide is a hit on oneself, applied like any other, and a brutal one.

@@ -89,9 +89,11 @@ input_stop :: proc(input: ^Input) {
 
 // Each frame: the mouse's motion, and the keys through the binds. The actions whose
 // keys went down this frame. With a `menu` open, the left button and the number keys
-// are its own (input_menu_keys), not their binds'. While `typing`, the keys are the
-// chat's: nothing going down reaches a bind, but a key held before is let go of.
-input_poll :: proc(input: ^Input, config: ^res.Client_Config, view: [2]f32, menu, typing: bool) -> (actions: Actions) {
+// are its own (input_menu_keys), not their binds'; with the radio menu open, its
+// `radio` calls' plain digits are its own (input_radio_digit) and the rest of the keys
+// go on to their binds, the mouse too. While `typing`, the keys are the chat's: nothing
+// going down reaches a bind, but a key held before is let go of.
+input_poll :: proc(input: ^Input, config: ^res.Client_Config, view: [2]f32, menu: bool, radio: int, typing: bool) -> (actions: Actions) {
 	if input.view != {} && input.view != view { // the same place in a window resized
 		input.cursor *= view / input.view
 		input.prev *= view / input.view
@@ -108,7 +110,7 @@ input_poll :: proc(input: ^Input, config: ^res.Client_Config, view: [2]f32, menu
 	for name, command in config.binds {
 		modifier, key, is_key := key_parse(name)
 		if !is_key || command == "" || !modifier_down(modifier) || overridden(config, modifier, name) do continue
-		if menu_owns(input, key, menu) do continue
+		if menu_owns(input, modifier, key, menu, radio) do continue
 
 		if button, is_button := button_of(command); is_button {
 			if key_down(key) do input.held += {button}
@@ -146,13 +148,28 @@ input_take_command :: proc(input: ^Input, sequence: u32, aim: [2]f32, legacy_fla
 	return command
 }
 
+// With the radio menu open, after input_poll: the call chosen this frame, a digit from
+// 1 to `calls` with no modifier held (ControlGame.pas).
+input_radio_digit :: proc(calls: int) -> (digit: int, chosen: bool) {
+	for m in Modifier {
+		if m != .None && modifier_down(m) do return
+	}
+	for d in 1 ..= calls {
+		if rl.IsKeyPressed(digit_key(d)) do return d, true
+	}
+	return
+}
+
 // The keys a menu has for its own: the left button, while open or while its click is
-// held; the number keys, while open.
+// held; the number keys, while open. The radio menu's: its calls' plain digits.
 @(private = "file")
-menu_owns :: proc(input: ^Input, key: Key, menu: bool) -> bool {
+menu_owns :: proc(input: ^Input, modifier: Modifier, key: Key, menu: bool, radio: int) -> bool {
 	#partial switch k in key {
 	case rl.MouseButton:  return k == .LEFT && (menu || input.clicked)
-	case rl.KeyboardKey: return menu && k >= .ZERO && k <= .NINE
+	case rl.KeyboardKey:
+		if menu do return k >= .ZERO && k <= .NINE
+		digit := int(k) - int(rl.KeyboardKey.ZERO)
+		return modifier == .None && digit >= 1 && digit <= radio
 	}
 	return false
 }

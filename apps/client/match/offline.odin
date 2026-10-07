@@ -25,8 +25,8 @@ offline_command :: proc(match: ^Match, text: string) {
 	me := &match.game.world.soldiers[match.me]
 	feed := &match.hud.feed
 	switch word {
-	case "kill", "brutalkill": // the Suicide button, which tears the body apart as brutalkill does
-		if me.active && !me.vitals.dead do match.suicide = true
+	case "kill", "brutalkill": // a death by my own hand; the brutal one tears the body apart
+		if me.active && !me.vitals.dead do match.suicide = word == "brutalkill"
 	case "team": // as the team menu offers it: 1 alpha, 2 bravo
 		n, _ := strconv.parse_int(strings.trim_space(rest))
 		switch n {
@@ -62,9 +62,9 @@ offline_step :: proc(match: ^Match, config: ^res.Client_Config) -> sim.Command {
 	match.sequence += 1
 	aim := draw.camera_to_world(match.camera, match.input.cursor)
 	commands[match.me] = input.input_take_command(&match.input, match.sequence, aim, config.controls.legacy_flag_throw)
-	if match.suicide { // /kill, as the server presses it for a player
-		commands[match.me].buttons += {.Suicide}
-		match.suicide = false
+	if brutal, asked := match.suicide.?; asked { // /kill, as a server asks it for a player
+		sim.world_ask_kill(&game.world, match.me, brutal)
+		match.suicide = nil
 	}
 	game.world.soldiers[match.me].player.typing = prompt_up(match)
 	names := soldier_names(match)

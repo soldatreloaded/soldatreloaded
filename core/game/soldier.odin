@@ -284,6 +284,12 @@ soldier_out_of_bounds :: proc(polymap: ^res.Poly_Map, pos: utils.Vec2) -> bool {
 	return abs(pos.x) > bound || abs(pos.y) > bound
 }
 
+// The guns in its hands changed for these, full.
+soldier_arm :: proc(resources: ^Resources, soldier: ^Soldier, primary, secondary: res.Weapon) {
+	soldier.arsenal.primary = weapon_state(resources, primary)
+	soldier.arsenal.secondary = weapon_state(resources, secondary)
+}
+
 // A new life at a spot: what a Respawn ruling does. All of the soldier is the life's but
 // its player's: the look, the tally, whose keys move it, and its randomness, seeded once
 // from where it first stood.

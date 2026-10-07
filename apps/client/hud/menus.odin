@@ -174,7 +174,7 @@ menu_buttons :: proc(menus: ^Menus, menu: Menu) -> (buttons: Buttons) {
 	case .Weapons:
 		for i in 0 ..< PRIMARIES + SECONDARIES {
 			row := f32(i + 1 if i >= PRIMARIES else i) // a row's gap before the secondaries
-			sa.append(&buttons, Button{{35, 154 + 18 * row, 235, 16}, true})
+			sa.append(&buttons, Button{{35, 154 + 18 * row, 235, 18}, true}) // as tall as the rows are apart: no dead strip between them
 		}
 	case .Kick, .Map:
 		b := WINDOW_BOX

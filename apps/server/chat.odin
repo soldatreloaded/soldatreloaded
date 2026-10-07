@@ -70,11 +70,11 @@ player_command :: proc(sv: ^Server, slot: game.Soldier_Id, text: string) {
 	case "tabac", "smoke", "takeoff", "victory", "piss", "mercy", "pwn":
 		game.soldier_taunt(&sv.game.world.soldiers[slot], word)
 	case "kill", "brutalkill":
-		// the original's: a death by one's own hand, a kill fewer. (The Suicide button is
-		// the game's way, which tears the body apart as the original's brutalkill does.)
+		// the original's: a death by one's own hand, a kill fewer; the brutal one tears
+		// the body apart
 		soldier := &sv.game.world.soldiers[slot]
 		if !soldier.active || soldier.vitals.dead do return
-		sv.suicides[slot] = true
+		sv.suicides[slot] = word == "brutalkill"
 	case:
 		if sv.hooks.command != nil && sv.hooks.command(sv.hooks.user, slot, text) do return
 		tell(sv, slot, fmt.tprintf("Unknown command: /%s", word))
