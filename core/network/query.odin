@@ -28,7 +28,12 @@ import "../utils"
 LOBBY_URL :: "https://soldatreloaded-lobby.fly.dev"
 
 QUERY_REQUEST_SIZE :: 128
-QUERY_REPLY_MAX :: 12 + 2 + 5 + 1 + 24 + 1 + 64
+// The longest strings the reply carries: the C game's NUL-terminated buffers less the NUL,
+// which the lobby holds a reply to. One longer and the lobby can't read it, and refuses
+// the server as if it couldn't be reached.
+QUERY_HOSTNAME_MAX :: 23
+QUERY_MAP_MAX :: 63
+QUERY_REPLY_MAX :: 12 + 2 + 5 + 1 + QUERY_HOSTNAME_MAX + 1 + QUERY_MAP_MAX
 QUERY_FLAG_PASSWORD :: 1
 QUERY_MODE_CTF :: 1 // capture the flag, as the C server and the lobby number the modes
 
@@ -87,10 +92,11 @@ query_read_request :: proc(data: []u8) -> (nonce: u32, ok: bool) {
 	return get_u32(data[8:]), true
 }
 
-// A string as its length and its bytes.
+// A string as its length and its bytes, cut to `max` bytes.
 @(private = "file")
-put_string :: proc(p: []u8, s: ^utils.Short_String($N)) -> int {
+put_string :: proc(p: []u8, s: ^utils.Short_String($N), max: int) -> int {
 	text := utils.short_string_text(s)
+	if len(text) > max do text = text[:max]
 	p[0] = u8(len(text))
 	copy(p[1:], text)
 	return 1 + len(text)
@@ -112,17 +118,18 @@ query_write_reply :: proc(out: []u8, nonce: u32, info: ^Server_Info) -> []u8 {
 	out[n + 5] = info.mode
 	out[n + 6] = QUERY_FLAG_PASSWORD if info.password else 0
 	n += 7
-	n += put_string(out[n:], &info.hostname)
-	n += put_string(out[n:], &info.map_name)
+	n += put_string(out[n:], &info.hostname, QUERY_HOSTNAME_MAX)
+	n += put_string(out[n:], &info.map_name, QUERY_MAP_MAX)
 	return out[:n]
 }
 
-// A string as put_string lays it: false if it runs past the end or past what `s` holds.
+// A string as put_string lays it: false if it runs past the end or past `max`, as the
+// lobby reads it.
 @(private = "file")
-get_string :: proc(p: ^[]u8, s: ^utils.Short_String($N)) -> bool {
+get_string :: proc(p: ^[]u8, s: ^utils.Short_String($N), max: int) -> bool {
 	if len(p) == 0 do return false
 	n := int(p[0])
-	if n > N || len(p) - 1 < n do return false
+	if n > max || len(p) - 1 < n do return false
 	utils.short_string_set(s, string(p[1:][:n]))
 	p^ = p[1 + n:]
 	return true
@@ -139,7 +146,7 @@ query_read_reply :: proc(data: []u8, nonce: u32) -> (info: Server_Info, ok: bool
 	info.mode = p[5]
 	info.password = p[6] & QUERY_FLAG_PASSWORD != 0
 	p = p[7:]
-	ok = get_string(&p, &info.hostname) && get_string(&p, &info.map_name) && len(p) == 0
+	ok = get_string(&p, &info.hostname, QUERY_HOSTNAME_MAX) && get_string(&p, &info.map_name, QUERY_MAP_MAX) && len(p) == 0
 	return
 }
 

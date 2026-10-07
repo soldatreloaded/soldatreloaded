@@ -362,6 +362,56 @@ lobby_list :: proc(t: ^testing.T) {
 	testing.expect_value(t, net.query_parse_list(text, list[:1]), 1)
 }
 
+// The query's reply, byte for byte the golden one the lobby tests (soldatreloaded-lobby,
+// internal/query/query_test.go) and the C game's: a layout that drifts fails here before
+// the lobby refuses the server. A name past what the lobby reads is cut to it.
+@(test)
+query_golden :: proc(t: ^testing.T) {
+	golden := [?]u8{
+		0xFF, 0xFF, 0xFF, 0xFF, 'B', 'S', 'R', 'i',
+		0x4D, 0x00, 0x00, 0x00, // nonce 77
+		0x09, 0x00, // protocol 9
+		3, 2, 32, 1, 1, // players, bots, max, CTF, password
+		14, 'Y', 'e', ' ', 'O', 'l', 'd', 'e', ' ', 'S', 'e', 'r', 'v', 'e', 'r',
+		7, 'c', 't', 'f', '_', 'A', 's', 'h',
+	}
+	info := net.Server_Info {
+		protocol    = 9,
+		players     = 3,
+		bots        = 2,
+		max_players = 32,
+		mode        = net.QUERY_MODE_CTF,
+		password    = true,
+		hostname    = utils.short_string(24, "Ye Olde Server"),
+		map_name    = utils.short_string(64, "ctf_Ash"),
+	}
+	out: [net.QUERY_REPLY_MAX]u8
+	reply := net.query_write_reply(out[:], 77, &info)
+	testing.expectf(t, string(reply) == string(golden[:]), "the reply is the golden bytes: %v", reply)
+
+	read, ok := net.query_read_reply(golden[:], 77)
+	testing.expect(t, ok, "the golden reply reads")
+	testing.expect_value(t, read.protocol, u16(9))
+	testing.expect_value(t, utils.short_string_text(&read.hostname), "Ye Olde Server")
+	testing.expect_value(t, utils.short_string_text(&read.map_name), "ctf_Ash")
+	testing.expect(t, read.password && read.mode == net.QUERY_MODE_CTF, "with its password and its mode")
+	_, other := net.query_read_reply(golden[:], 78)
+	testing.expect(t, !other, "not as the answer to another request")
+	_, short := net.query_read_reply(golden[:len(golden) - 1], 77)
+	testing.expect(t, !short, "not cut short")
+
+	// a hostname of 24 is cut to the lobby's 23, and the map to its 63
+	long := info
+	long.hostname = utils.short_string(24, "ABCDEFGHIJKLMNOPQRSTUVWX")
+	long.map_name = utils.short_string(64, "ctf_ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHI")
+	reply = net.query_write_reply(out[:], 77, &long)
+	testing.expect_value(t, int(reply[19]), net.QUERY_HOSTNAME_MAX)
+	testing.expect_value(t, int(reply[20 + net.QUERY_HOSTNAME_MAX]), net.QUERY_MAP_MAX)
+	cut, read_back := net.query_read_reply(reply, 77)
+	testing.expect(t, read_back, "the cut reply reads")
+	testing.expect_value(t, utils.short_string_text(&cut.hostname), "ABCDEFGHIJKLMNOPQRSTUVW")
+}
+
 // The round in a snapshot is a delta against the base's, as the soldiers are: read back as
 // it was, the ended phase's winner and countdown with it, and smaller than whole when only
 // the clock moved.
