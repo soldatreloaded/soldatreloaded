@@ -7,6 +7,7 @@ package server_test
 //
 //   odin test tests/server -define:ODIN_TEST_THREADS=1
 
+import "core:fmt"
 import "core:testing"
 import "core:time"
 
@@ -386,4 +387,25 @@ admin_commands :: proc(t: ^testing.T) {
 	testing.expect(t, sv.next_round && utils.short_string_text(&sv.chosen_map) == "ctf_Ash", "restart ends the round, the same map to follow")
 	testing.expect(t, server.admin_command(sv, nil, "help"), "help is everyone's")
 	testing.expect(t, !server.admin_command(sv, nil, "smoke"), "a player's command is none of the admin's")
+
+	// setteam and pkill, on a bot: a player as any other to them
+	bot, added := server.server_add_bot(sv, .Alpha)
+	testing.expect(t, added, "a bot to move about")
+	name := utils.short_string_text(&sv.players[bot].name)
+	testing.expect(t, server.admin_command(sv, nil, fmt.tprintf("setteam2 %s", name)))
+	testing.expect_value(t, sv.game.world.soldiers[bot].team, res.Team.Bravo)
+	testing.expect(t, server.admin_command(sv, nil, fmt.tprintf("pkill %d", bot)) && sv.suicides[bot], "pkill presses its Suicide at the next tick")
+	server.server_pump(sv, 0.05)
+	testing.expect(t, sv.game.world.soldiers[bot].vitals.dead, "and it dies by it")
+
+	// unbanlast lifts the ban made last, and no other
+	now := time.to_unix_seconds(time.now())
+	a, _ := lists.address_parse("1.2.3.4")
+	b, _ := lists.address_parse("5.6.7.8")
+	testing.expect(t, server.admin_command(sv, nil, "banip 1.2.3.4") && server.admin_command(sv, nil, "banip 5.6.7.8"))
+	testing.expect(t, server.admin_command(sv, nil, "unbanlast"))
+	_, a_banned := lists.lists_banned(&sv.lists, a, "", now)
+	_, b_banned := lists.lists_banned(&sv.lists, b, "", now)
+	testing.expect(t, a_banned && !b_banned, "unbanlast lifts the last ban alone")
+	testing.expect(t, server.admin_command(sv, nil, "kicklast"), "kicklast with nobody joined is answered")
 }

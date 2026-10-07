@@ -43,6 +43,7 @@ Game :: game.Game
 Rng :: game.Rng
 Bots :: bots.Bots
 Profile :: res.Bot_Profile
+Slot :: game.Soldier_Id
 
 TICK_SECONDS :: 1.0 / f64(game.TICK_RATE)
 MAX_STALL :: 0.25 // seconds: a stall never turns into a burst of ticks
@@ -108,7 +109,15 @@ Server :: struct {
 	ending_told: bool,                         // the countdown has begun and been announced
 	end_why:     string,                       // "limit", "nextmap" or "vote", for the hooks; "" until known
 	hooks:       Hooks,
-	suicides:    [MAX_PLAYERS]bool,       // asked for in the chat (/kill), pressed at the next tick
+	suicides:    [MAX_PLAYERS]bool,       // asked for in the chat (/kill) or by an admin (pkill), pressed at the next tick
+	last_joined: Maybe(Slot),             // the person who joined last, for kicklast
+	last_ban:    Maybe(Last_Ban),          // the ban made last, for unbanlast
+}
+
+// Whom the last ban named: an address, a machine, or both.
+Last_Ban :: struct {
+	host: u32,
+	hwid: lists.Hwid,
 }
 
 // Everything up on `options`: the map loaded, the port listening, the bots in. False,
@@ -196,6 +205,10 @@ server_pump :: proc(sv: ^Server, dt: f64) -> bool {
 		for &player, i in sv.players do names[i] = utils.short_string_text(&player.name)
 		line_commands(sv, &commands)
 		bots.bots_commands(&sv.bots, sv.game, &names, &commands)
+		for &asked, i in sv.suicides { // a player's /kill, or an admin's pkill of anyone, bots too
+			if asked do commands[i].buttons += {.Suicide}
+			asked = false
+		}
 		game.game_tick(sv.game, &commands)
 		if sv.hooks.ticked != nil do sv.hooks.ticked(sv.hooks.user)
 		bots.bots_hear(&sv.bots, sv.game)

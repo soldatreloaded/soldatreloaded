@@ -235,6 +235,7 @@ hello :: proc(sv: ^Server, peer: net.Peer, e: ^net.Event) {
 	sv.vote.answer[slot] = false
 	sv.vote_cooldown[slot] = VOTE_COOLDOWN_TICKS // no votes for two minutes after joining
 	if sv.vote.kind != .None do tell_vote(sv, peer)
+	sv.last_joined = slot
 	log.infof("%s joined as %d from %s", utils.short_string_text(&player.name), slot, lists.whom_text(host, utils.short_string_text(&hwid)))
 	if sv.hooks.joined != nil do sv.hooks.joined(sv.hooks.user, slot)
 }

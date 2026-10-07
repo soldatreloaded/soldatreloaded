@@ -35,16 +35,12 @@ line_poll :: proc(sv: ^Server) {
 }
 
 // The command each player's soldier steps on this tick: its last keys, or none once
-// quiet; and the suicide a player asked for in the chat.
+// quiet. (The suicides asked for are pressed after the bots', in server_pump.)
 line_commands :: proc(sv: ^Server, commands: ^[game.MAX_PLAYERS]game.Command) {
 	for &player, i in sv.players {
 		if !player.joined do continue
 		soldier := &sv.game.world.soldiers[i]
 		commands[i] = game.soldier_last_command(soldier, net.server_stream_quiet(&sv.streams[i], sv.game.world.tick))
-		if sv.suicides[i] {
-			commands[i].buttons += {.Suicide}
-			sv.suicides[i] = false
-		}
 	}
 }
 

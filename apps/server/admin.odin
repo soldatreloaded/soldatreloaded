@@ -17,11 +17,15 @@ import "lists"
 // logged in) and, to come, rcon all run. Said in the chat by an admin (`from` its slot)
 // or typed at the server's console (`from` nil), and answered to whoever said it:
 //
-//   kick <player> [reason]           off the server
+//   kick <player> [reason]           off the server; a bot taken out
+//   kicklast [reason]                the person who joined last, kicked
 //   ban <player> [minutes] [reason]  off it and barred by address and machine; no minutes, or 0, for ever
 //   banip <address> [minutes] [reason]
 //   banhw <hardware ID> [minutes] [reason]
 //   unban <address, hardware ID or the name banned>
+//   unbanlast                        the ban made last, lifted
+//   setteam1 / setteam2 / setteam5 <player>   moved to alpha, bravo, or to watch
+//   pkill <player>                   killed where it stands, a death by its own hand
 //   mute <player> / unmute <player, address, hardware ID or name>   their chat reaches nobody,
 //                                    rejoining or not, by address and machine
 //   map <name>                       the round ends, and that map follows
@@ -40,8 +44,9 @@ import "lists"
 // the script's) are in console.odin.
 
 ADMIN_COMMANDS :: [?]string {
-	"kick", "ban", "banip", "banhw", "unban", "mute", "unmute", "map", "nextmap", "restart",
-	"pause", "unpause", "addbot", "addbot1", "addbot2", "say", "bans", "mutes", "admins",
+	"kick", "kicklast", "ban", "banip", "banhw", "unban", "unbanlast", "mute", "unmute",
+	"setteam1", "setteam2", "setteam5", "pkill", "map", "nextmap", "restart", "pause",
+	"unpause", "addbot", "addbot1", "addbot2", "say", "bans", "mutes", "admins",
 }
 
 // What /help says, a line each, as the chat has room for.
@@ -55,8 +60,9 @@ PLAYER_HELP := [?]string {
 
 @(private = "file", rodata)
 ADMIN_HELP := [?]string {
-	"/kick <player> [reason]  /ban <player> [minutes] [reason]",
-	"/banip <address> ...  /banhw <hardware ID> ...  /unban <whom>",
+	"/kick <player> [reason]  /kicklast  /ban <player> [minutes] [reason]",
+	"/banip <address> ...  /banhw <hardware ID> ...  /unban <whom>  /unbanlast",
+	"/setteam1, /setteam2, /setteam5 <player> (alpha, bravo, spectator)  /pkill <player>",
 	"/servermute <player>  /serverunmute <whom>  /bans /mutes /admins",
 	"/map <name>  /nextmap  /restart  /pause  /unpause",
 	"/addbot [name] (/addbot1 alpha, /addbot2 bravo)  /say <text>",
@@ -98,9 +104,14 @@ admin_command :: proc(sv: ^Server, from: Maybe(game.Soldier_Id), text: string) -
 		case sv.players[slot].bot:
 			player_remove_bot(sv, slot)
 		case:
-			log.infof("%s kicked by %s", utils.short_string_text(&sv.players[slot].name), by)
-			sv.players[slot].kick_why = .Console
-			player_kick(sv, slot, reason if reason != "" else "Kicked by an admin")
+			kick(sv, slot, by, reason)
+		}
+	case "kicklast": // still on, and not since gone
+		slot, joined := sv.last_joined.?
+		if !joined || !sv.players[slot].joined || sv.players[slot].peer == nil {
+			reply(sv, from, "Nobody who joined last is still on.")
+		} else {
+			kick(sv, slot, by, rest)
 		}
 	case "ban", "banip", "banhw":
 		ban(sv, from, by, word, rest)
@@ -111,6 +122,40 @@ admin_command :: proc(sv: ^Server, from: Maybe(game.Soldier_Id), text: string) -
 			reply(sv, from, fmt.tprintf("%s unbanned.", arg))
 		} else {
 			reply(sv, from, fmt.tprintf("%s isn't banned.", arg))
+		}
+	case "unbanlast":
+		last, banned := sv.last_ban.?
+		hwid := utils.short_string_text(&last.hwid)
+		if banned && lists.lists_unban(&sv.lists, last.host, hwid) {
+			reply(sv, from, fmt.tprintf("%s unbanned.", lists.whom_text(last.host, hwid)))
+			log.infof("%s lifted the last ban, %s", by, lists.whom_text(last.host, hwid))
+		} else {
+			reply(sv, from, "No ban made since the server started is still on.")
+		}
+		sv.last_ban = nil
+	case "setteam1", "setteam2", "setteam5":
+		arg, _ := next_word(rest)
+		slot, found := player_named(sv, arg)
+		team := res_team(int(word[len(word) - 1] - '0'))
+		name := utils.short_string_text(&sv.players[slot].name)
+		if !found {
+			reply(sv, from, fmt.tprintf("No player %s.", arg))
+		} else if !player_set_team(sv, slot, team) {
+			reply(sv, from, fmt.tprintf("%s is on that team already.", name))
+		} else {
+			log.infof("%s moved %s to %v", by, name, team)
+		}
+	case "pkill":
+		arg, _ := next_word(rest)
+		slot, found := player_named(sv, arg)
+		soldier := &sv.game.world.soldiers[slot]
+		if !found {
+			reply(sv, from, fmt.tprintf("No player %s.", arg))
+		} else if !soldier.active || soldier.vitals.dead {
+			reply(sv, from, fmt.tprintf("%s isn't alive.", utils.short_string_text(&sv.players[slot].name)))
+		} else {
+			sv.suicides[slot] = true
+			log.infof("%s killed %s", by, utils.short_string_text(&sv.players[slot].name))
 		}
 	case "mute":
 		arg, _ := next_word(rest)
@@ -207,6 +252,14 @@ login :: proc(sv: ^Server, from: Maybe(game.Soldier_Id), password: string) {
 	}
 }
 
+// A person on the line kicked, by an admin.
+@(private = "file")
+kick :: proc(sv: ^Server, slot: game.Soldier_Id, by, reason: string) {
+	log.infof("%s kicked by %s", utils.short_string_text(&sv.players[slot].name), by)
+	sv.players[slot].kick_why = .Console
+	player_kick(sv, slot, reason if reason != "" else "Kicked by an admin")
+}
+
 // /help: what the caller may run. A player is told theirs, and an admin the admin's
 // too; the console, the admin's (its own it lists itself).
 @(private = "file")
@@ -249,6 +302,7 @@ ban :: proc(sv: ^Server, from: Maybe(game.Soldier_Id), by, word, rest: string) {
 	reason := said if said != "" else "Banned by an admin"
 	expires := time.to_unix_seconds(time.now()) + seconds if seconds > 0 else 0
 	lists.lists_ban(&sv.lists, host, hwid, expires, name, reason)
+	sv.last_ban = Last_Ban{host = host, hwid = lists.hwid_of(hwid)}
 	whom := lists.whom_text(host, hwid)
 	shown := name if name != "" else arg
 	reply(sv, from, fmt.tprintf("%s (%s) banned %s.", shown, whom, ban_length(expires)))

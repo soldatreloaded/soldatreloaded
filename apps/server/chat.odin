@@ -6,6 +6,7 @@ import "core:strings"
 
 import "../../core/game"
 import net "../../core/network"
+import res "../../core/resources"
 import "../../core/utils"
 
 // Chat: a player's line relayed to everyone, or its team, with the sender's slot. A
@@ -90,10 +91,17 @@ team_command :: proc(sv: ^Server, slot: game.Soldier_Id, rest: string) {
 		tell(sv, slot, "Teams: 1 alpha, 2 bravo, 5 spectator")
 		return
 	}
+	player_set_team(sv, slot, team)
+}
+
+// The player in `slot` on `team`, as its /team or an admin's setteam asks: placed anew
+// on it, and announced. False if it was already there.
+player_set_team :: proc(sv: ^Server, slot: game.Soldier_Id, team: res.Team) -> bool {
 	player := &sv.players[slot]
-	if player.chose_team && player.team == team do return // already there
+	if player.chose_team && player.team == team do return false
 	player.chose_team = true
 	player.team = team
 	player_place(sv, slot, team)
 	announce_join(sv, slot)
+	return true
 }
