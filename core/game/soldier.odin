@@ -26,6 +26,10 @@ Soldier :: struct {
 	loadout:  Loadout `net:"served loadout"`, // chosen in the weapons menu, for the next spawn
 	tally:    Tally `net:"served"`,
 	player:   Player_Info, // for showing; nothing in a step reads it
+	// What this tick's hits so far would take off the health, cleared at its update: a
+	// death the bullets foresee before the referee rules it. The original kills in place,
+	// so the next bullet or blast that tick finds a corpse.
+	foreseen: f32,
 }
 
 DEFAULT_HEALTH :: 150.0
@@ -220,6 +224,7 @@ Look :: struct {
 soldier_update :: proc(world: ^World, resources: ^Resources, id: Soldier_Id, command: Command, authority: ^Authority, out: ^Tick_Output) {
 	soldier := &world.soldiers[id]
 	if !soldier.active || soldier.team == .Spectator do return
+	soldier.foreseen = 0 // last tick's hits are ruled on
 	if soldier.vitals.dead {
 		// the spray goes with the life, so none is carried into the next
 		soldier.aim.hit_spray = 0
@@ -229,10 +234,6 @@ soldier_update :: proc(world: ^World, resources: ^Resources, id: Soldier_Id, com
 	armed := !soldier.remote
 	body := &soldier.body
 
-	parachute_catch(world, soldier)
-	soldier_integrate(soldier, world.gravity)
-	body.velocity += body.next_push
-	body.next_push = {}
 	if soldier.aim.hit_spray > 0 do soldier.aim.hit_spray -= 1
 
 	soldier.controls.sequence = command.sequence
@@ -265,6 +266,23 @@ soldier_update :: proc(world: ^World, resources: ^Resources, id: Soldier_Id, com
 }
 
 SOLDIER_DAMPING :: f32(0.99)
+
+// A living body moved: a parachute's catch, the integration, the knockback. Every
+// soldier's before any soldier's update (soldiers_move): the original's frame integrates
+// all its sprite particles first (ServerLoop UpdateFrame), so an update finds every
+// other soldier where it is this tick, whichever comes first.
+soldier_move :: proc(world: ^World, soldier: ^Soldier) {
+	if !soldier.active || soldier.team == .Spectator || soldier.vitals.dead do return
+	body := &soldier.body
+	parachute_catch(world, soldier)
+	soldier_integrate(soldier, world.gravity)
+	body.velocity += body.next_push
+	body.next_push = {}
+}
+
+soldiers_move :: proc(world: ^World) {
+	for &soldier in world.soldiers do soldier_move(world, &soldier)
+}
 
 // Euler on the body's one particle, before the controls.
 soldier_integrate :: proc(soldier: ^Soldier, gravity: f32) {
@@ -327,6 +345,7 @@ soldier_spawn :: proc(world: ^World, resources: ^Resources, id: Soldier_Id, resp
 	}
 	res.animation_start(resources.animations, &soldier.pose.legs, .Stand)
 	res.animation_start(resources.animations, &soldier.pose.body, .Stand)
+	world.corpses[id].blast_owed = {} // a throw the body never took
 
 	seed_from_position :: proc(pos: utils.Vec2) -> u64 {
 		x, y := transmute(u32)pos.x, transmute(u32)pos.y

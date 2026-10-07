@@ -297,6 +297,7 @@ candidates :: proc(world: ^World, authority: ^Authority, bullet: ^Bullet) -> (c:
 // upside down (the original's Norm).
 @(private = "file")
 wound :: proc(
+	world: ^World,
 	resources: ^Resources,
 	bullet: ^Bullet,
 	target: Soldier_Id,
@@ -307,6 +308,7 @@ wound :: proc(
 	spray: bool,
 	out: ^Tick_Output,
 ) {
+	world.soldiers[target].foreseen += hit_damage(world, Hit{shooter = bullet.owner, target = target, amount = amount}) // for the bullets and blasts still to come this tick
 	impact := (point - joints[part]) * 1.3
 	impact.y = -impact.y
 	// the shot's flight, for the killer's readout (TSprite.Die)
@@ -373,6 +375,9 @@ body_collide :: proc(
 		// A corpse is met where its body lies this tick, not where it was `lag` ticks ago:
 		// it moves slowly, and no history is kept of it.
 		corpse := live.vitals.dead
+		// Killed by a hit earlier this tick: a corpse to this one, as the original's Die
+		// in place leaves it, met in its live pose since its body has yet to fall.
+		doomed := !corpse && live.vitals.health - live.foreseen < 1.0
 		joints := corpse_joints(&world.corpses[ti]) if corpse else soldier_pose(resources.animations, target, target.body.pos)
 
 		// The part is the one met nearest the start; the point is the last one met, in
@@ -399,7 +404,7 @@ body_collide :: proc(
 		if target.vitals.cease_fire >= 0 do continue // spawn protection: it passes through
 
 		push: utils.Vec2
-		if !corpse && bullet.style != .Frag_Grenade {
+		if !corpse && !doomed && bullet.style != .Frag_Grenade {
 			push = bullet.velocity * stats.push
 		}
 		modifier := hitbox_modifier(stats, part)
@@ -410,8 +415,8 @@ body_collide :: proc(
 			blood(bullet, target_id, point, out)
 			speed := utils.length(bullet.velocity)
 			amount := speed * bullet.damage * modifier
-			kills := !corpse && live.vitals.health - hit_damage(world, Hit{shooter = bullet.owner, target = target_id, amount = amount}) < 1.0
-			wound(resources, bullet, target_id, amount, &joints, part, point, push, true, out)
+			kills := !corpse && !doomed && live.vitals.health - live.foreseen - hit_damage(world, Hit{shooter = bullet.owner, target = target_id, amount = amount}) < 1.0
+			wound(world, resources, bullet, target_id, amount, &joints, part, point, push, true, out)
 
 			// a punched enemy starts throwing its gun away
 			if bullet.style == .Punch && (live.team == .None || live.team != owner.team) {
@@ -419,9 +424,9 @@ body_collide :: proc(
 			}
 			bullet.last_hit = target_id
 
-			// through a corpse barely slowed; through the dead it made or anyone when fast;
-			// through anyone when still near its full speed
-			if corpse {
+			// through a corpse, or a body killed this tick, barely slowed; through the dead
+			// it made or anyone when fast; through anyone when still near its full speed
+			if corpse || doomed {
 				bullet.velocity *= 0.9
 				continue
 			}
@@ -445,14 +450,14 @@ body_collide :: proc(
 			explode(world, resources, id, .M79, target_id, part, authority, out)
 			bullet.pos = point
 			bullet_end(world, id, out)
-			wound(resources, bullet, target_id, utils.length(bullet.velocity) * bullet.damage, &joints, part, point, push, false, out)
+			wound(world, resources, bullet, target_id, utils.length(bullet.velocity) * bullet.damage, &joints, part, point, push, false, out)
 			return
 		case .Thrown_Knife:
 			// The hit's sound on whoever it meets, and its blood unless a teammate's. Through a
 			// corpse it hits it once (last_hit), so it is heard once.
 			friendly := owner.team != .None && owner.team == live.team && target_id != bullet.owner
 			emit(out, Blood{target = target_id, pos = point, velocity = bullet.velocity, bloodless = friendly})
-			wound(resources, bullet, target_id, utils.length(bullet.velocity) * bullet.damage * 0.01, &joints, part, point, push, false, out)
+			wound(world, resources, bullet, target_id, utils.length(bullet.velocity) * bullet.damage * 0.01, &joints, part, point, push, false, out)
 			if corpse { // it goes through a corpse rather than sticking in it
 				bullet.last_hit = target_id
 				return

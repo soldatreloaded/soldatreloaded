@@ -25,6 +25,8 @@ Setup :: struct {
 	flag:    game.Thing_Kind, // that flag moved, pole first, to `flag_at`
 	_:       [3]u8,
 	flag_at: [2]f32,
+	guns:    [2]res.Weapon, // guns laid at `guns_at`; .Punch none
+	guns_at: [2][2]f32,
 }
 
 @(rodata)
@@ -69,6 +71,10 @@ SCENARIOS := [?]Scenario {
 	{"kits", "ctf_Dropdown", 0, {.AK74, .AK74}, 600, kits, false, {placed = true, at = {{714, 280}, {600, 280}}, health = {40, 0}}},
 	{"gun_pickup", "ctf_Ash", 50, {.AK74, .Punch}, 1800, gun_pickup, false, {}},
 	{"parachute", "ctf_Dropdown", 120, {.AK74, .AK74}, 900, parachute, false, {}}, // the alpha spawn point is high
+	{"melee_run", "ctf_Ash", 40, {.AK74, .AK74}, 400, melee_run, false, {}},
+	{"spas_overkill", "ctf_Ash", 40, {.Spas12, .AK74}, 300, fire, false, {health = {0, 10}}}, // the first pellet kills; the rest go through a body killed this tick
+	{"grenade_kill", "ctf_Ash", 150, {.AK74, .AK74}, 600, throw_grenade, false, {health = {0, 10}}}, // the blast kills, and throws the body it killed
+	{"two_guns", "ctf_Ash", 0, {.Punch, .AK74}, 300, press_nothing, false, {placed = true, at = {{-1090, -100}, {-1000, -100}}, guns = {.AK74, .MP5}, guns_at = {{-1090, -95}, {-1091, -95}}}}, // two guns under an empty hand: one taken a tick, not both
 	// {"lava", "ctf_Blade", 0, {.AK74, .AK74}, 900, press_nothing, false, {placed = true, at = {{-30, -330}, {30, -330}}}}, // dropped onto the lava pool: hurt, sparks, the dice rolled for them. Parts at the flame the C game shoots at a soldier in lava (the flamer's bullet, not ported); in step up to it
 }
 
@@ -264,4 +270,10 @@ gun_pickup :: proc(tick: int) -> [2]game.Buttons {
 // Dead, and placed again high over the map: the parachute comes down and lies.
 parachute :: proc(tick: int) -> [2]game.Buttons {
 	return {{.Suicide} if tick == SETTLE else {}, {}}
+}
+
+// Soldier 1 runs at soldier 0, who holds fire: the rifle butt when they are near, judged
+// against where soldier 1 is this tick.
+melee_run :: proc(tick: int) -> [2]game.Buttons {
+	return {tick >= SETTLE + 10 ? {.Fire} : {}, tick >= SETTLE ? {.Left} : {}}
 }

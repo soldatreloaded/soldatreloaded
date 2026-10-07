@@ -12,13 +12,12 @@ judge_pickup :: proc(world: ^World, resources: ^Resources, authority: ^Authority
 	thing := &world.things[id]
 	taker, found := thing_taker(world, resources, thing)
 	if !found do return
-	soldier := &world.soldiers[taker]
 
 	switch {
 	case thing_is_flag(thing.kind):
 		judge_flag_touch(world, resources, id, taker, out)
 	case thing.kind == .Weapon:
-		if dropped_gun_wanted(thing, soldier) {
+		if dropped_gun_wanted(world, thing, taker) {
 			rule(world, resources, Pickup{soldier = taker, thing = id, kind = .Weapon, weapon = thing.weapon, ammo = thing.ammo}, out)
 		}
 	case thing_is_kit(thing.kind):

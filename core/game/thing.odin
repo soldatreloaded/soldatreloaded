@@ -301,8 +301,9 @@ thing_update :: proc(world: ^World, resources: ^Resources, id: Thing_Id, authori
 	}
 }
 
-// Before the things' turn: their counters on the soldiers, a flag just thrown and a
-// medikit just taken.
+// Before the things' turn, once the requests are taken: their counters on the soldiers,
+// a flag just thrown and a medikit just taken. The original counts a throw's cooldown
+// down in the same Update that set it.
 things_cool_down :: proc(world: ^World) {
 	for &soldier in world.soldiers {
 		if !soldier.active do continue

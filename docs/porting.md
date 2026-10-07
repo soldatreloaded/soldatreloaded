@@ -1,7 +1,7 @@
 # Porting the game from C
 
 `core/game` is a port of the C game's simulation (`apps/shared/game` in
-[soldatreloaded](../../bettersoldat), at commit `428713d`). It must play **exactly** as
+[soldatreloaded](../../bettersoldat), at commit `74fee85`). It must play **exactly** as
 the C game does: the same numbers, bit for bit, tick after tick. It does not keep the C
 game's structure: the logic is ported line by line, into the organization described in
 `core/game/world.odin`.
@@ -13,7 +13,7 @@ gun, no cluster grenades. What it keeps plays as the C game plays it.
 ## Checking it: tests/compare
 
 ```
-tests/compare/build.sh          # the C game at 428713d, built into tests/compare/build/reference.lib
+tests/compare/build.sh          # the C game at 74fee85, built into tests/compare/build/reference.lib
 odin run tests/compare          # every scenario, in both games, compared every tick
 odin run tests/compare -- jump  # only the scenarios whose name contains "jump"
 ```
@@ -115,3 +115,111 @@ tests are `tests/network`, `tests/server` (real sockets on the loopback, run wit
 have taken it (`heard_apply` in `world_step`). An owner's decisions leave the tick as
 events (`Shot_Fired`, `Gun_Thrown`, `Flag_Thrown`), which the wire collects; the
 server's decisions are its rulings.
+
+## The tick against OpenSoldat's frame
+
+An audit (October 2026) of `world_step` against OpenSoldat's server frame
+(`server/ServerLoop.pas` `UpdateFrame`), which the C game's passes rearranged. The shape
+is the same in all three: every soldier, then every bullet, then the bullets' flight,
+then every thing. Where the passes differed is listed here with what it reaches. "Port =
+C" means the port plays as the C game does and `tests/compare` holds; a change there is a
+change to both games, and needs a scenario that shows it first. The four differences
+worth it were fixed in both games (the C game's `74fee85`), each with such a scenario:
+`melee_run`, `spas_overkill`, `grenade_kill` and `two_guns`, the grab cooldown being
+pinned by `ctf_throw` already.
+
+**Integration.** OpenSoldat moves every sprite's particle (`DoEulerTimeStepFor`,
+`ServerLoop.pas:358`) before any sprite's `Update`; the port integrated each soldier at
+the top of its own update. A soldier reading a lower-numbered soldier saw the same thing
+in both; one reading a higher-numbered soldier saw it one Euler step behind OpenSoldat.
+Exactly two reads in the soldier pass look at another soldier's position, both distance
+thresholds:
+- the rifle butt, standing next to someone standing (`Control.pas:435`,
+  `soldier_combat.odin` "the rifle butt"), MELEE_DISTANCE;
+- the cover check, raising the gun over a crouching teammate (`Control.pas:1559`,
+  `cover_check` in `soldier_movement.odin`), SPRITE_RADIUS.
+Nothing in the pass reads another soldier's velocity or skeleton, so the push being
+added after the soldier's own integration (as OpenSoldat does, `Sprites.pas:505`) is
+the same in effect. **Fixed:** `soldiers_move` moves every body (the parachute's catch,
+the integration, the knockback) before the `soldier_update` loop; a client stepping one
+soldier on its word calls `soldier_move` first.
+
+**Bots** read the world before the step (`bots_commands`, then `game_tick`); OpenSoldat's
+`ControlBot` runs inside the sprite's `Update`, seeing this tick's positions. One tick of
+lag in a bot's aim. By design, port = C.
+
+**Corpses.** OpenSoldat steps a dead sprite's ragdoll inside the same `Update` loop; the
+port's corpse pass comes after every soldier. No living soldier's update reads a corpse's
+skeleton. Its position is read only by the cover check, which does not test for the dead:
+in OpenSoldat a corpse loses its crouch a tick after death (`ControlSprite` still runs for
+the dead), in the port `controls.stance` is frozen at death, so a teammate dead crouching
+is covered over until it respawns. Small, separate from the order; port = C.
+
+**Damage.** OpenSoldat hurts and kills in place, in the middle of the bullet loop
+(`CheckSpriteCollision` → `HealthHit` → `Die`); the port collects the tick's hits and
+`judge` rules on them after every bullet has flown. The same in effect for: two hits in
+one tick (each sees the health the one before left, `rule` applies as it goes), no second
+kill, no push on the dead, the knockback landing at the top of the victim's next update
+(`NextPush[0]`, the server's `MAX_PUSHTICK` is 0), the dropped gun's first thing update
+in the tick of the death, the ragdoll's first step the tick after, and the order hits
+are taken in (bullets by id, each bullet's targets nearest first). What differed was the
+tick of a death only: a second bullet reaching the soldier that tick saw them alive in
+the port and dead in OpenSoldat, so it took the live pierce rule (stopping, or ×0.75)
+where OpenSoldat always passes through a body at ×0.9; and an explosion that tick pushed
+the soldier (dropped at `judge`, dead by then) where OpenSoldat throws the skeleton,
+which it also does to a sprite the explosion itself killed (`ExplosionHit`'s dead branch
+follows its live one). **Fixed:** every Hit adds what it would take to the target's
+`foreseen`, cleared at its update, and a soldier whose health less that is below 1 is
+"doomed": a corpse to the bullets and blasts after it, met in its live pose, with no
+push; a blast's throw on it is kept in the corpse's `blast_owed` and taken when the
+corpse starts. The port also records a `Damage` ruling on a corpse where the C game
+emits none, a wire difference only.
+
+**Things.** The same order within the pass (physics and the carrier, the base and the
+capture, the pickup, the parachute, the timeout, the bounds), reading soldiers after
+their update as OpenSoldat does. A pickup writes the soldier at once in OpenSoldat; the
+port gives it at `soldiers_receive`, and `kit_receiver` counts the tick's queued gifts so
+a second kit is refused as it would be. Dropped guns did not: `dropped_gun_wanted` looked
+at the ungifted soldier, so two guns under one soldier were both taken in a tick, the
+second overwriting the first. **Fixed:** it looks for a gun among the turn's gifts too.
+What OpenSoldat does to things in the
+sprite and bullet passes (the dead's gun and flag, a thrown flag, a bullet's knock) the
+port queues (`things_asked`) and takes at the start of the things pass: the same tick,
+the same order.
+
+**The flag's grab cooldown.** OpenSoldat sets it on the throw and counts it down in the
+same `Update` (`Sprites.pas:588`), so the things pass sees one less; the port set it at
+`things_take_requests`, after `things_cool_down`, so a thrown flag was grabbed back one
+tick later than in OpenSoldat. **Fixed:** `things_cool_down` runs after the requests.
+
+**Respawn and cease fire** are the round's (`judge_lives`, after the step); OpenSoldat's
+are inside the sprite's `Update`. From the same counter, the port's new body takes its
+first step one tick before OpenSoldat's would (the port counts down in the tick of the
+death too, and the body is live for the whole next tick; OpenSoldat respawns in the dead
+branch and first moves the tick after). In OpenSoldat the respawned body is in the tick's
+bullet and things passes at once; in the port the next tick's. The cease fire counts down
+after the step, so a flag's grab and the parachute's release gate one tick longer. CTF in
+OpenSoldat respawns in waves (`WaveRespawnCounter + sv_respawntime_minwave`), which the
+port does not have, so the respawn tick differs by design before any of this. Port = C.
+
+**Network.** A client's snapshot lands on the sprite before the tick in OpenSoldat
+(`UDP.ProcessLoop` before the owed ticks); the port's `heard_apply` slots do the same, a
+shot taken at the bullets' turn being where OpenSoldat's net-made bullet first acts too.
+Matches.
+
+**The round.** A capture counts in place in OpenSoldat (`Thing.Update`); the port tallies
+the `Flag_Capture` rulings after the step. Nothing after the scoring thing in the same
+pass reads the score, and both freeze from the next tick. Unobservable. The history for
+lag compensation is recorded after the step and read in the bullet pass, as
+`OldSpritePos` is. Matches.
+
+**Not in the port, by design**, each sim-affecting where it applies: wave respawn, the
+bonus kits and their spawn roll (which also draws from the random stream), bullet time,
+the flag count repair every two seconds, the global medikit cooldown (the port's is per
+soldier, `kit.odin`). The client frame orders the entities as the server's does, with the
+sparks between the bullets and the things; the port's client steps the same `world_step`
+without authority.
+
+**Where that leaves it.** Every difference found was one the C game had too, so the port
+stayed faithful to its oracle, and the four fixed were fixed in both. What remains differs
+by design or is unobservable; the respawn tick is moot until wave respawn is decided.

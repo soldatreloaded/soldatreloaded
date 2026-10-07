@@ -40,10 +40,15 @@ explode :: proc(
 
 	for &soldier, i in world.soldiers {
 		if !soldier.active || soldier.team == .Spectator do continue
+		// the living are wounded and thrown; then the dead, those this blast or an earlier
+		// hit this tick killed among them, have their bodies thrown
+		if !soldier.vitals.dead {
+			blast_soldier(world, resources, bullet, Soldier_Id(i), bullet_target(world, authority, bullet, i), kind, hit_soldier, hit_part, out) // as the thrower saw it
+		}
 		if soldier.vitals.dead {
 			blast_corpse(world, resources, bullet, Soldier_Id(i), kind, out)
-		} else {
-			blast_soldier(world, resources, bullet, Soldier_Id(i), bullet_target(world, authority, bullet, i), kind, hit_soldier, hit_part, out) // as the thrower saw it
+		} else if soldier.vitals.health - soldier.foreseen < 1.0 {
+			blast_doomed(world, resources, bullet, Soldier_Id(i), kind, out)
 		}
 	}
 
@@ -136,26 +141,36 @@ blast_soldier :: proc(
 	a.y *= 2.0
 
 	amount: f32 = (1.0 / (distance + 1.0)) * stats.damage * modifier if soldier.vitals.cease_fire < 0 else 0
-	emit(out, Hit{shooter = bullet.owner, target = id, weapon = bullet.weapon, amount = amount, part = 0, pos = joints[part], push = a * -1.0, impact = a, spray = true})
+	hit := Hit{shooter = bullet.owner, target = id, weapon = bullet.weapon, amount = amount, part = 0, pos = joints[part], push = a * -1.0, impact = a, spray = true}
+	world.soldiers[id].foreseen += hit_damage(world, hit) // for the bullets and blasts still to come this tick
+	emit(out, hit)
 }
 
-// The dead: every point in reach is thrown, and the body takes a wound by the last of
-// them, which is what tears it apart.
+// The dead: every point of `points` in reach is thrown (its last place in `thrown`
+// pulled back, which the Verlet step turns into a kick), and the body takes a wound by
+// the last of them, which is what tears it apart.
 @(private = "file")
-blast_corpse :: proc(world: ^World, resources: ^Resources, bullet: ^Bullet, id: Soldier_Id, kind: Explosion_Kind, out: ^Tick_Output) {
-	corpse := &world.corpses[id]
-	if !corpse.active do return
+blast_body :: proc(
+	world: ^World,
+	resources: ^Resources,
+	bullet: ^Bullet,
+	id: Soldier_Id,
+	kind: Explosion_Kind,
+	points: []utils.Vec2,
+	thrown: []utils.Vec2,
+	out: ^Tick_Output,
+) {
 	stats := &resources.weapons[explosion_weapon(kind)].stats
 	radius := explosion_radius(kind)
 
 	reached := false
 	last: f32 = 0
 	for k in 0 ..< CORPSE_BLAST_POINTS {
-		a := bullet.pos - corpse.points[k]
+		a := bullet.pos - points[k]
 		distance2 := a.x * a.x + a.y * a.y
 		if distance2 >= radius * radius do continue
 		distance := math.sqrt(distance2)
-		corpse.old_points[k] = corpse.old_points[k] + a * ((1.0 / (distance + 1.0)) * EXPLOSION_DEADIMPACT_MULTIPLY)
+		thrown[k] = thrown[k] + a * ((1.0 / (distance + 1.0)) * EXPLOSION_DEADIMPACT_MULTIPLY)
 		reached = true
 		last = distance
 	}
@@ -163,4 +178,22 @@ blast_corpse :: proc(world: ^World, resources: ^Resources, bullet: ^Bullet, id: 
 
 	if kind == .M79 do last = max(last, 20.0000001)
 	emit(out, Hit{shooter = bullet.owner, target = id, weapon = bullet.weapon, amount = (1.0 / (last + 1.0)) * stats.damage, part = 0, pos = bullet.pos})
+}
+
+// A corpse: its body as it lies.
+@(private = "file")
+blast_corpse :: proc(world: ^World, resources: ^Resources, bullet: ^Bullet, id: Soldier_Id, kind: Explosion_Kind, out: ^Tick_Output) {
+	corpse := &world.corpses[id]
+	if !corpse.active do return
+	blast_body(world, resources, bullet, id, kind, corpse.points[:], corpse.old_points[:], out)
+}
+
+// A soldier killed this tick, by this blast or before it, whose body has yet to fall:
+// its live pose, the throw kept for the corpse when it starts. The original's sprite is
+// DeadMeat at once, its skeleton there to throw.
+@(private = "file")
+blast_doomed :: proc(world: ^World, resources: ^Resources, bullet: ^Bullet, id: Soldier_Id, kind: Explosion_Kind, out: ^Tick_Output) {
+	soldier := &world.soldiers[id]
+	joints := soldier_pose(resources.animations, soldier, soldier.body.pos)
+	blast_body(world, resources, bullet, id, kind, joints[:], world.corpses[id].blast_owed[:], out)
 }

@@ -67,6 +67,8 @@ typedef struct Setup {
     float health[2]; // 0 leaves it full
     int32_t flag;    // the flag of this kind (the port's number) moved, pole first, to `flag_at`; 0 none
     float flag_at[2];
+    int64_t guns[2]; // guns laid at `guns_at` (the port's numbers); 0 none
+    float guns_at[2][2];
 } Setup;
 
 // ---------------------------------------------------------------------------------
@@ -144,6 +146,11 @@ Game *ref_scene(const char *data, const char *map, float gap, int a_weapon, int 
             t->pos[k] = vec2_add(t->pos[k], move);
             t->old_pos[k] = vec2_add(t->old_pos[k], move);
         }
+    }
+    for (int i = 0; i < 2; i++) {
+        if (setup->guns[i] == 0) continue;
+        WeaponId gun = (WeaponId)c_id((int32_t)setup->guns[i], DROPPED(DROPPED_WEAPONS), WEAPON_COUNT);
+        thing_create(&g->ctx, &g->world, THING_WEAPON, vec2(setup->guns_at[i][0], setup->guns_at[i][1]), gun, 0, -1);
     }
     spawn[0] = at.x;
     spawn[1] = at.y;
