@@ -14,8 +14,9 @@ import "../../core/utils"
 import "lists"
 
 // The admin commands: the one table the server's console, an admin in the chat (once
-// logged in) and, to come, rcon all run. Said in the chat by an admin (`from` its slot)
-// or typed at the server's console (`from` nil), and answered to whoever said it:
+// logged in) and an admin over rcon (rcon.odin) all run. Said in the chat by an admin
+// (`from` its slot), typed at the server's console (`from` nil) or sent over rcon, and
+// answered to whoever said it:
 //
 //   kick <player> [reason]           off the server; a bot taken out
 //   kicklast [reason]                the person who joined last, kicked
@@ -68,9 +69,27 @@ ADMIN_HELP := [?]string {
 	"/addbot [name] (/addbot1 alpha, /addbot2 bravo)  /say <text>",
 }
 
+// Who runs an admin command: the server's console (nil), a player in the chat, or an
+// admin over rcon (rcon.odin). The console and rcon may run them all; a player, once an
+// admin. A player is answered in the chat; the console and rcon in the log, which rcon's
+// admins are sent.
+Caller :: union {
+	game.Soldier_Id,
+	Rcon_Caller,
+}
+
+Rcon_Caller :: struct {
+	address: string, // where the admin is, for the log: "1.2.3.4:5678"
+}
+
+caller_is_player :: proc(from: Caller) -> bool {
+	_, is_player := from.(game.Soldier_Id)
+	return is_player
+}
+
 // An admin command, if `text` (without its '/') is one: done, or refused, and answered.
 // False if it isn't one; then it is a player's to try as anything else.
-admin_command :: proc(sv: ^Server, from: Maybe(game.Soldier_Id), text: string) -> bool {
+admin_command :: proc(sv: ^Server, from: Caller, text: string) -> bool {
 	word, rest := next_word(text)
 	switch word {
 	case "servermute":   word = "mute"
@@ -87,12 +106,15 @@ admin_command :: proc(sv: ^Server, from: Maybe(game.Soldier_Id), text: string) -
 	known: bool
 	for command in ADMIN_COMMANDS do known |= word == command
 	if !known do return false
-	if slot, is_player := from.?; is_player && !sv.players[slot].admin {
+	if slot, is_player := from.(game.Soldier_Id); is_player && !sv.players[slot].admin {
 		reply(sv, from, fmt.tprintf("/%s is for admins.", word))
 		return true
 	}
 	by := "the console"
-	if slot, is_player := from.?; is_player do by = utils.short_string_text(&sv.players[slot].name)
+	switch c in from {
+	case game.Soldier_Id: by = utils.short_string_text(&sv.players[c].name)
+	case Rcon_Caller:     by = fmt.tprintf("rcon %s", c.address)
+	}
 
 	switch word {
 	case "kick":
@@ -219,7 +241,7 @@ admin_command :: proc(sv: ^Server, from: Maybe(game.Soldier_Id), text: string) -
 		bans := sa.slice(&sv.lists.bans)
 		reply(sv, from, fmt.tprintf("%d bans", len(bans)))
 		for &b, i in bans {
-			if from != nil && i >= 10 do break
+			if caller_is_player(from) && i >= 10 do break
 			expires := b.expires if b.expires != 0 && b.expires > now else 0
 			reply(sv, from, fmt.tprintf("%s %s %s: %s", lists.whom_text(b.host, utils.short_string_text(&b.hwid)), utils.short_string_text(&b.name), ban_length(expires), utils.short_string_text(&b.reason)))
 		}
@@ -227,7 +249,7 @@ admin_command :: proc(sv: ^Server, from: Maybe(game.Soldier_Id), text: string) -
 		entries := sa.slice(&sv.lists.mutes) if word == "mutes" else sa.slice(&sv.lists.admins)
 		reply(sv, from, fmt.tprintf("%d %s", len(entries), word))
 		for &entry, i in entries {
-			if from != nil && i >= 10 do break
+			if caller_is_player(from) && i >= 10 do break
 			whom := lists.whom_text(entry.host, utils.short_string_text(&entry.hwid)) if word == "mutes" else lists.address_text(entry.host)
 			reply(sv, from, fmt.tprintf("%s %s", whom, utils.short_string_text(&entry.name)))
 		}
@@ -237,8 +259,8 @@ admin_command :: proc(sv: ^Server, from: Maybe(game.Soldier_Id), text: string) -
 
 // /login <password>: said by a player, with the admin password set.
 @(private = "file")
-login :: proc(sv: ^Server, from: Maybe(game.Soldier_Id), password: string) {
-	slot, is_player := from.?
+login :: proc(sv: ^Server, from: Caller, password: string) {
+	slot, is_player := from.(game.Soldier_Id)
 	if !is_player do return
 	name := utils.short_string_text(&sv.players[slot].name)
 	wanted := sv.options.config.server.admin_password
@@ -263,8 +285,8 @@ kick :: proc(sv: ^Server, slot: game.Soldier_Id, by, reason: string) {
 // /help: what the caller may run. A player is told theirs, and an admin the admin's
 // too; the console, the admin's (its own it lists itself).
 @(private = "file")
-help :: proc(sv: ^Server, from: Maybe(game.Soldier_Id)) {
-	slot, is_player := from.?
+help :: proc(sv: ^Server, from: Caller) {
+	slot, is_player := from.(game.Soldier_Id)
 	if is_player do for line in PLAYER_HELP do reply(sv, from, line)
 	if is_player && !sv.players[slot].admin do return
 	for line in ADMIN_HELP do reply(sv, from, line)
@@ -273,7 +295,7 @@ help :: proc(sv: ^Server, from: Maybe(game.Soldier_Id)) {
 // ban <player>, banip <address>, banhw <hardware ID>, then [minutes] [reason]: a player
 // by address and machine both; an address alone; a machine alone.
 @(private = "file")
-ban :: proc(sv: ^Server, from: Maybe(game.Soldier_Id), by, word, rest: string) {
+ban :: proc(sv: ^Server, from: Caller, by, word, rest: string) {
 	arg, after := next_word(rest)
 	host: u32
 	hwid, name: string
@@ -317,8 +339,8 @@ ban :: proc(sv: ^Server, from: Maybe(game.Soldier_Id), by, word, rest: string) {
 
 // An answer to whoever ran an admin command: the player, or the server's console.
 @(private = "file")
-reply :: proc(sv: ^Server, from: Maybe(game.Soldier_Id), text: string) {
-	if slot, is_player := from.?; is_player {
+reply :: proc(sv: ^Server, from: Caller, text: string) {
+	if slot, is_player := from.(game.Soldier_Id); is_player {
 		tell(sv, slot, text)
 	} else {
 		log.info(text)
@@ -375,7 +397,7 @@ whom_named :: proc(word: string, entries: []$E) -> (host: u32, hwid: lists.Hwid,
 
 // The player a command names, a person on the line and not a bot; said, otherwise.
 @(private = "file")
-person_named :: proc(sv: ^Server, from: Maybe(game.Soldier_Id), name: string) -> (game.Soldier_Id, bool) {
+person_named :: proc(sv: ^Server, from: Caller, name: string) -> (game.Soldier_Id, bool) {
 	slot, found := player_named(sv, name)
 	if !found || sv.players[slot].peer == nil {
 		reply(sv, from, fmt.tprintf("No player %s.", name))

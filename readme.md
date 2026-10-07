@@ -52,8 +52,20 @@ cd assets && odin run ../apps/server
 The client and the server each make their config beside them the first time they run,
 with every setting at its default: `client.config.mjson` and `server.config.mjson`, each
 setting with a comment saying what it does. The server's weapons are `weapons.ini`, as
-Soldat's are. `assets/` holds the server's two at their defaults. The server takes `-map:<name>` and `-port:<port>` over its config, and commands typed at its
-console (`apps/server/console.odin` lists them).
+Soldat's are. `assets/` holds the server's two at their defaults. The server takes
+`-map:<name>` and `-port:<port>` over its config, and commands typed at its console
+(`apps/server/console.odin` lists them).
+
+Admins run the admin commands (`/help` lists them) from the game's chat after
+`/login <password>`, or from anywhere over rcon: with `admin_password` set, the server
+listens on TCP on its game port's number, as OpenSoldat's admin server does, so its admin
+tools work, and so does telnet. Send the password as the first line, then a command a
+line; what the server logs comes back. The password goes in the clear, so keep rcon to
+networks you trust (`rcon: false` turns it off).
+
+```bash
+telnet my.server 23073
+```
 
 ## Tests
 

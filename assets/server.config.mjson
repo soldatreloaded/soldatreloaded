@@ -17,6 +17,8 @@ server: {
   password: ""
   // the password a player says with /login to be an admin until they leave; empty for none
   admin_password: ""
+  // remote admins: TCP on the game's port number, OpenSoldat's admin protocol (its tools, or telnet), the admin password first and then the admin commands; off without an admin password. The password goes in the clear: keep it to networks you trust
+  rcon: true
   // minutes a round lasts
   time_limit: 15
   // the captures that win a round

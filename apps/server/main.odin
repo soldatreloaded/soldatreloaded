@@ -53,6 +53,7 @@ App :: struct {
 	config:  ^res.Server_Config,
 	weapons: res.Weapon_Table, // the weapons as they stand: weapons.ini's, and the `weapon` lines since
 	lobby:   lobby.Lobby,
+	rcon:    Rcon,   // remote admins (rcon.odin); held by its address, as the log reaches it
 	script:  Script, // held by its address while open
 	quit:    bool,
 }
@@ -67,6 +68,9 @@ main :: proc() {
 
 	app := new(App)
 	defer free(app)
+	// what the server logs goes to its console, and to the admins on rcon
+	context.logger = log.create_multi_logger(context.logger, rcon_logger(&app.rcon))
+	defer log.destroy_multi_logger(context.logger)
 	if !start(app, args) do os.exit(1)
 	libc.signal(libc.SIGINT, on_interrupt)
 	libc.signal(libc.SIGTERM, on_interrupt)
@@ -81,7 +85,9 @@ main :: proc() {
 		for line in stdin_take() do console_execute(app, line)
 		if !server_pump(&app.sv, dt) do app.quit = true
 		app_pump(app)
-		lobby.lobby_pump(&app.lobby, lobby_settings(app), time.duration_seconds(time.tick_since({})))
+		now := time.duration_seconds(time.tick_since({}))
+		rcon_pump(&app.rcon, &app.sv, app.config.server.admin_password, now)
+		lobby.lobby_pump(&app.lobby, lobby_settings(app), now)
 		free_all(context.temp_allocator)
 		time.sleep(SLEEP)
 	}
@@ -95,8 +101,7 @@ on_interrupt :: proc "c" (_: i32) {
 	sync.atomic_store(&interrupted, true)
 }
 
-// The config and the files beside it, the network, and the game hosted on them.
-// The config, the network, and the game hosted on them.
+// The config and the files beside it, the network, the game hosted on them, and rcon.
 @(private = "file")
 start :: proc(app: ^App, args: Arguments) -> bool {
 	app.config = res.server_config_load(SERVER_CONFIG, OLD_SERVER_CONFIG)
@@ -122,12 +127,17 @@ start :: proc(app: ^App, args: Arguments) -> bool {
 	}
 	app_start(app)
 	lobby.lobby_init(&app.lobby)
+	if app.config.server.rcon {
+		if app.config.server.admin_password == "" do log.info("rcon: off, as there is no admin password")
+		else do rcon_open(&app.rcon, app.config.server.ip, server_port(&app.sv))
+	}
 	return true
 }
 
 @(private = "file")
 stop :: proc(app: ^App) {
 	lobby.lobby_close(&app.lobby)
+	rcon_close(&app.rcon)
 	app_stop(app) // before the server it listens to
 	server_destroy(&app.sv)
 	net.net_shutdown()
