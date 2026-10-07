@@ -58,6 +58,7 @@ Options :: struct {
 	data_dir:    string, // maps/, anims/, objects/, bots/; game.DATA_DIR as a rule
 	first_map:   string, // the first round's; "" for the rotation's first
 	port:        u16,    // the port to listen on, over the config's; 0 for the config's
+	ip:          string, // the address to listen on, over the config's; "" for the config's
 	weapons:     res.Weapon_Table, // the weapons' numbers the game plays by: weapons.ini's over GatherWM's
 }
 
@@ -154,8 +155,9 @@ server_init :: proc(sv: ^Server, options: Options) -> bool {
 	sv.vote.starter = nil
 
 	port := server_port(sv)
-	if !net.net_listen(&sv.link, config.server.ip, port, game.MAX_PLAYERS) {
-		log.errorf("could not listen on %s%sport %d", config.server.ip, " " if config.server.ip != "" else "", port)
+	ip := server_ip(sv)
+	if !net.net_listen(&sv.link, ip, port, game.MAX_PLAYERS) {
+		log.errorf("could not listen on %s%sport %d", ip, " " if ip != "" else "", port)
 		server_destroy(sv)
 		return false
 	}
@@ -166,7 +168,7 @@ server_init :: proc(sv: ^Server, options: Options) -> bool {
 	sv.profiles = res.bot_profiles_load(options.data_dir)
 	add_bots(sv)
 
-	log.infof("hosting %s on %s%sport %d, %d ticks a second", first, config.server.ip, " " if config.server.ip != "" else "", port, game.TICK_RATE)
+	log.infof("hosting %s on %s%sport %d, %d ticks a second", first, ip, " " if ip != "" else "", port, game.TICK_RATE)
 	return true
 }
 
@@ -262,6 +264,12 @@ server_password :: proc(sv: ^Server) -> string {
 // The port it listens on: the one it was started with, else the config's.
 server_port :: proc(sv: ^Server) -> u16 {
 	return sv.options.port if sv.options.port != 0 else sv.options.config.server.port
+}
+
+// The address it listens on: the one it was started with, else the config's; "" for
+// every one.
+server_ip :: proc(sv: ^Server) -> string {
+	return sv.options.ip if sv.options.ip != "" else sv.options.config.server.ip
 }
 
 // The weapons' numbers changed while the game is on: the game takes them at once, and

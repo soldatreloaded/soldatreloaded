@@ -46,6 +46,7 @@ SLEEP :: time.Millisecond // between passes of the loop, so it never spins flat 
 Arguments :: struct {
 	map_name: string `args:"name=map" usage:"the first round's map; else the rotation's first"`,
 	port:     u16 `usage:"the UDP port to listen on, over server.config.mjson's"`,
+	ip:       string `usage:"the address to listen on, over server.config.mjson's (on fly.io, fly-global-services')"`,
 }
 
 App :: struct {
@@ -119,6 +120,7 @@ start :: proc(app: ^App, args: Arguments) -> bool {
 		data_dir    = game.DATA_DIR,
 		first_map   = args.map_name,
 		port        = args.port,
+		ip          = args.ip,
 		weapons     = app.weapons,
 	}
 	if !server_init(&app.sv, options) {
@@ -129,7 +131,7 @@ start :: proc(app: ^App, args: Arguments) -> bool {
 	lobby.lobby_init(&app.lobby)
 	if app.config.server.rcon {
 		if app.config.server.admin_password == "" do log.info("rcon: off, as there is no admin password")
-		else do rcon_open(&app.rcon, app.config.server.ip, server_port(&app.sv))
+		else do rcon_open(&app.rcon, server_ip(&app.sv), server_port(&app.sv))
 	}
 	return true
 }
