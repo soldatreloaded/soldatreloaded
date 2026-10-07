@@ -49,16 +49,19 @@ Rcon_Admin :: struct {
 	closing: bool,     // closed once what it is owed has gone
 }
 
-// Listening on `port` (and `address`, empty for every one). False, logged, if it can't.
+// Listening on `port` (and `address`, an IPv4 address or a name that resolves to one, as
+// the game's is; empty for every one). False, logged, if it can't.
 rcon_open :: proc(r: ^Rcon, address: string, port: u16) -> bool {
 	ip: net.Address = net.IP4_Any
 	if address != "" {
-		parsed, ok := net.parse_ip4_address(address)
-		if !ok {
-			log.errorf("rcon: %s isn't an IPv4 address to listen on", address)
+		if parsed, ok := net.parse_ip4_address(address); ok {
+			ip = parsed
+		} else if resolved, err := net.resolve_ip4(address); err == nil {
+			ip = resolved.address
+		} else {
+			log.errorf("rcon: %s isn't an IPv4 address or a name for one to listen on", address)
 			return false
 		}
-		ip = parsed
 	}
 	socket, err := net.listen_tcp({address = ip, port = int(port)}, backlog = RCON_MAX)
 	if err != nil {
