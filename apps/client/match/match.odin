@@ -77,6 +77,7 @@ Match :: struct {
 	hud:        hud.Hud,
 	limbo:      Limbo,
 	team_asked: Maybe(res.Team), // offline, chosen in the team menu, for the next tick to place me on
+	suicide:    bool, // offline, /kill said: my next command's Suicide button
 	bots:       ai.Bots,
 	profiles:   []res.Bot_Profile, // data/bots, the bots are dressed from
 	chat:       Chat,

@@ -67,7 +67,7 @@ player_command :: proc(sv: ^Server, slot: game.Soldier_Id, text: string) {
 	case "votemap", "votekick", "yes", "no":
 		vote_command(sv, slot, word, rest)
 	case "tabac", "smoke", "takeoff", "victory", "piss", "mercy", "pwn":
-		taunt(sv, slot, word)
+		game.soldier_taunt(&sv.game.world.soldiers[slot], word)
 	case "kill", "brutalkill":
 		// the original's: a death by one's own hand, a kill fewer. (The Suicide button is
 		// the game's way, which tears the body apart as the original's brutalkill does.)
@@ -96,19 +96,4 @@ team_command :: proc(sv: ^Server, slot: game.Soldier_Id, rest: string) {
 	player.team = team
 	player_place(sv, slot, team)
 	announce_join(sv, slot)
-}
-
-// CommandPlayerCommand: the taunts, asked of the soldier's idle machine by their number
-// (Idle.random's); a mercy costs a kill.
-@(private = "file")
-taunt :: proc(sv: ^Server, slot: game.Soldier_Id, word: string) {
-	TAUNTS :: [?]string{"tabac", "smoke", "", "", "takeoff", "victory", "piss", "mercy", "pwn"}
-	soldier := &sv.game.world.soldiers[slot]
-	if !soldier.active || soldier.vitals.dead do return
-	for name, i in TAUNTS {
-		if name == "" || name != word do continue
-		soldier.antics.asked = i8(i)
-		soldier.antics.asked_count += 1
-		if name == "mercy" && soldier.tally.kills > 0 do soldier.tally.kills -= 1
-	}
 }

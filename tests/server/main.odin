@@ -363,3 +363,27 @@ hardware_ids :: proc(t: ^testing.T) {
 	testing.expect(t, server.admin_command(sv, nil, "unmute ccccccccccc"))
 	testing.expect(t, !lists.lists_muted(&sv.lists, 0, "CCCCCCCCCCC"), "unmute by the hardware ID lifts it")
 }
+
+// The admin commands are one table, for the console and an admin in the chat: a player
+// not logged in is refused them, one logged in runs them as the console does.
+@(test)
+admin_commands :: proc(t: ^testing.T) {
+	testing.expect(t, net.net_init())
+	defer net.net_shutdown()
+	sv := new(server.Server)
+	defer free(sv)
+	config: res.Server_Config
+	testing.expect(t, open_server(sv, &config))
+	defer server.server_destroy(sv)
+
+	testing.expect(t, server.admin_command(sv, game.Soldier_Id(3), "pause"), "an admin command, though refused")
+	testing.expect(t, !server.server_paused(sv), "and refused to a player not logged in")
+	sv.players[3].admin = true
+	testing.expect(t, server.admin_command(sv, game.Soldier_Id(3), "pause") && server.server_paused(sv), "an admin pauses the game")
+	testing.expect(t, server.admin_command(sv, nil, "unpause") && !server.server_paused(sv), "and the console unpauses it")
+
+	testing.expect(t, server.admin_command(sv, nil, "restart"))
+	testing.expect(t, sv.next_round && utils.short_string_text(&sv.chosen_map) == "ctf_Ash", "restart ends the round, the same map to follow")
+	testing.expect(t, server.admin_command(sv, nil, "help"), "help is everyone's")
+	testing.expect(t, !server.admin_command(sv, nil, "smoke"), "a player's command is none of the admin's")
+}

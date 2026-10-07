@@ -24,6 +24,37 @@ ANTIC_PISS :: 6
 ANTIC_MERCY :: 7
 ANTIC_PWN :: 8
 
+// The taunts a player asks for in the chat, by the antic each is (CommandPlayerCommand);
+// none for the idle antics no one asks for.
+@(rodata)
+TAUNT_NAMES := [?]string {
+	ANTIC_TOBACCO  = "tabac",
+	ANTIC_CIGAR    = "smoke",
+	ANTIC_WIPE     = "",
+	ANTIC_GROIN    = "",
+	ANTIC_TAKE_OFF = "takeoff",
+	ANTIC_VICTORY  = "victory",
+	ANTIC_PISS     = "piss",
+	ANTIC_MERCY    = "mercy",
+	ANTIC_PWN      = "pwn",
+}
+
+// The taunt `name` asked of the soldier, by whoever decides its antics (the server, or
+// Offline Play): its machine runs it as it next stands. A mercy costs a kill. False if
+// there is no taunt by that name; a dead or absent soldier asks for nothing, and is
+// answered true.
+soldier_taunt :: proc(soldier: ^Soldier, name: string) -> bool {
+	for taunt, i in TAUNT_NAMES {
+		if taunt == "" || taunt != name do continue
+		if !soldier.active || soldier.vitals.dead do return true
+		soldier.antics.asked = i8(i)
+		soldier.antics.asked_count += 1
+		if i == ANTIC_MERCY && soldier.tally.kills > 0 do soldier.tally.kills -= 1
+		return true
+	}
+	return false
+}
+
 // One tick of the soldier's antics; `armed` as soldier_update's, for the mercy's shot.
 soldier_antics :: proc(world: ^World, resources: ^Resources, id: Soldier_Id, authority: ^Authority, out: ^Tick_Output, armed: bool) {
 	soldier := &world.soldiers[id]

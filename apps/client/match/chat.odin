@@ -220,6 +220,10 @@ say :: proc(match: ^Match, team, taunt: bool, text: string) {
 		match.vote.hidden = true
 		if text == "/no" do return
 	}
+	if strings.has_prefix(text, "/") && match.mode == .Offline { // no server to take it: done here
+		offline_command(match, text[1:])
+		return
+	}
 	if strings.has_prefix(text, "/") && on_server do vote_said(match, text)
 	if on_server && online.line_say(match.line, text, team, taunt) do return
 	chat_heard(match, match.me, team, taunt, text)

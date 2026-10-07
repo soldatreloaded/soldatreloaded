@@ -6,20 +6,19 @@ import "core:thread"
 
 import res "../../core/resources"
 
-// What is typed at the server, a line at a time:
+// What is typed at the server, a line at a time: the console's own commands, then the
+// admin commands (admin.odin), which an admin may also say in the chat:
 //
 //   quit                         stop the server
-//   say <text>                   say something to everyone, as the server
-//   nextmap                      end the round and begin the next
-//   addbot [name]                a bot on the emptier side; addbot1, addbot2 on alpha, bravo
-//   pause / unpause              the game stands where it is, or goes on
 //   weapon <weapon> <Key>=<n>... a weapon's numbers, as weapons.ini has them: weapon Desert
 //                                Eagles Damage=1.7 FireInterval=20; taken at once (not
 //                                saved), and everyone on is told
 //   weaponlist                   every weapon's numbers, as weapons.ini writes them
-//   kick, ban, banip, banhw, unban, mute, unmute, map, bans, mutes, admins
-//                                the admin commands (admin.odin)
 //   script_reload, lua <code>    the script (app_script.odin)
+//   help                         these, and the admin commands
+//   kick, ban, banip, banhw, unban, mute, unmute, map, nextmap, restart, pause, unpause,
+//   addbot, addbot1, addbot2, say, bans, mutes, admins
+//                                the admin commands (admin.odin)
 
 console_execute :: proc(app: ^App, typed: string) {
 	line := strings.trim_space(typed)
@@ -29,17 +28,9 @@ console_execute :: proc(app: ^App, typed: string) {
 	switch word {
 	case "quit":
 		app.quit = true
-	case "say":
-		if rest == "" do log.info("usage: say <text>")
-		else do server_say(sv, rest)
-	case "nextmap":
-		server_end_round(sv)
-	case "addbot", "addbot1", "addbot2":
-		team := res.Team.Alpha if word == "addbot1" else .Bravo if word == "addbot2" else .None
-		if _, added := server_add_bot(sv, team, rest); !added do log.info("no room for a bot, or no such bot")
-	case "pause", "unpause":
-		paused := word == "pause"
-		if server_pause(sv, paused) do server_say_kind(sv, .Game, {}, "Game paused" if paused else "Game unpaused")
+	case "help":
+		log.info("quit  weapon <weapon> <Key>=<n>...  weaponlist  script_reload  lua <code>")
+		admin_command(sv, nil, line) // and the admin's
 	case "weapon":
 		weapon_command(app, rest)
 	case "weaponlist":

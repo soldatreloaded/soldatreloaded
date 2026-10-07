@@ -9,11 +9,13 @@ import sa "core:container/small_array"
 
 import "../../core/game"
 import net "../../core/network"
+import res "../../core/resources"
 import "../../core/utils"
 import "lists"
 
-// The admin commands, said in the chat by an admin (`from` its slot) or typed at the
-// server's console (`from` nil), and answered to whoever said it:
+// The admin commands: the one table the server's console, an admin in the chat (once
+// logged in) and, to come, rcon all run. Said in the chat by an admin (`from` its slot)
+// or typed at the server's console (`from` nil), and answered to whoever said it:
 //
 //   kick <player> [reason]           off the server
 //   ban <player> [minutes] [reason]  off it and barred by address and machine; no minutes, or 0, for ever
@@ -23,15 +25,42 @@ import "lists"
 //   mute <player> / unmute <player, address, hardware ID or name>   their chat reaches nobody,
 //                                    rejoining or not, by address and machine
 //   map <name>                       the round ends, and that map follows
+//   nextmap                          the round ends, and the rotation's next follows
+//   restart                          the round ends, and the same map again
+//   pause / unpause                  the game stands where it is, or goes on
+//   addbot [name]                    a bot on the emptier side; addbot1, addbot2 on alpha, bravo
+//   say <text>                       said to everyone, as the server
 //   bans / mutes / admins            the lists
 //
 // A player names a slot, or a name or as much of one as is typed. Anyone may say
 // /login <password>, which with the admin password set makes them an admin until they
-// leave. In the chat /mute and /unmute are a player's own, kept by their client (the
-// original's), so an admin's, for everyone, are /servermute and /serverunmute; the
-// console's are both.
+// leave, and /help, which lists what they may run. In the chat /mute and /unmute are a
+// player's own, kept by their client (the original's), so an admin's, for everyone, are
+// /servermute and /serverunmute; the console's are both. The console's own (quit, weapon,
+// the script's) are in console.odin.
 
-ADMIN_COMMANDS :: [?]string{"kick", "ban", "banip", "banhw", "unban", "mute", "unmute", "map", "bans", "mutes", "admins"}
+ADMIN_COMMANDS :: [?]string {
+	"kick", "ban", "banip", "banhw", "unban", "mute", "unmute", "map", "nextmap", "restart",
+	"pause", "unpause", "addbot", "addbot1", "addbot2", "say", "bans", "mutes", "admins",
+}
+
+// What /help says, a line each, as the chat has room for.
+@(private = "file", rodata)
+PLAYER_HELP := [?]string {
+	"/team <1 alpha, 2 bravo, 5 spectator>  /kill  /brutalkill",
+	"/votemap <map>  /votekick <player> [reason]  /yes  /no",
+	"/tabac /smoke /takeoff /victory /piss /mercy /pwn",
+	"/login <password>: an admin until you leave",
+}
+
+@(private = "file", rodata)
+ADMIN_HELP := [?]string {
+	"/kick <player> [reason]  /ban <player> [minutes] [reason]",
+	"/banip <address> ...  /banhw <hardware ID> ...  /unban <whom>",
+	"/servermute <player>  /serverunmute <whom>  /bans /mutes /admins",
+	"/map <name>  /nextmap  /restart  /pause  /unpause",
+	"/addbot [name] (/addbot1 alpha, /addbot2 bravo)  /say <text>",
+}
 
 // An admin command, if `text` (without its '/') is one: done, or refused, and answered.
 // False if it isn't one; then it is a player's to try as anything else.
@@ -43,6 +72,10 @@ admin_command :: proc(sv: ^Server, from: Maybe(game.Soldier_Id), text: string) -
 	}
 	if word == "login" {
 		login(sv, from, rest)
+		return true
+	}
+	if word == "help" {
+		help(sv, from)
 		return true
 	}
 	known: bool
@@ -117,6 +150,25 @@ admin_command :: proc(sv: ^Server, from: Maybe(game.Soldier_Id), text: string) -
 			utils.short_string_set(&sv.vote_map, arg) // the round takes it as a passed vote
 			log.infof("%s changed the map to %s", by, arg)
 		}
+	case "nextmap":
+		server_end_round(sv)
+		log.infof("%s ended the round", by)
+	case "restart":
+		server_change_map(sv, server_map(sv))
+		log.infof("%s restarted %s", by, server_map(sv))
+	case "pause", "unpause":
+		paused := word == "pause"
+		if server_pause(sv, paused) {
+			server_say_kind(sv, .Game, {}, "Game paused" if paused else "Game unpaused")
+		} else {
+			reply(sv, from, "The game is already paused." if paused else "The game isn't paused.")
+		}
+	case "addbot", "addbot1", "addbot2":
+		team := res.Team.Alpha if word == "addbot1" else .Bravo if word == "addbot2" else .None
+		if _, added := server_add_bot(sv, team, rest); !added do reply(sv, from, "No room for a bot, or no bot by that name.")
+	case "say":
+		if rest == "" do reply(sv, from, "usage: say <text>")
+		else do server_say(sv, rest)
 	case "bans":
 		now := time.to_unix_seconds(time.now())
 		bans := sa.slice(&sv.lists.bans)
@@ -153,6 +205,16 @@ login :: proc(sv: ^Server, from: Maybe(game.Soldier_Id), password: string) {
 		reply(sv, from, "You are an admin until you leave.")
 		log.infof("%s logged in as an admin", name)
 	}
+}
+
+// /help: what the caller may run. A player is told theirs, and an admin the admin's
+// too; the console, the admin's (its own it lists itself).
+@(private = "file")
+help :: proc(sv: ^Server, from: Maybe(game.Soldier_Id)) {
+	slot, is_player := from.?
+	if is_player do for line in PLAYER_HELP do reply(sv, from, line)
+	if is_player && !sv.players[slot].admin do return
+	for line in ADMIN_HELP do reply(sv, from, line)
 }
 
 // ban <player>, banip <address>, banhw <hardware ID>, then [minutes] [reason]: a player

@@ -1,16 +1,48 @@
 package match
 
+import "core:strconv"
+import "core:strings"
 import "core:time"
 
 import ai "../../../core/bots"
 import sim "../../../core/game"
 import res "../../../core/resources"
 import "../draw"
+import "../hud"
 import "../input"
 
 // Offline Play: this machine decides. Me and the bots on the config's limits, the rounds
 // played on its maps in turn, everyone placed as a server would place them, and the
 // bots' chat heard here.
+
+// A command said in the chat, where there is no server to take it: what a server does
+// for its players (apps/server/chat.odin's player_command), done here for me. The taunts
+// (/tabac, /smoke, /takeoff, /victory, /piss, /mercy, /pwn), /kill and /brutalkill,
+// /team, and /help; the votes are a server's.
+@(private = "package")
+offline_command :: proc(match: ^Match, text: string) {
+	word, _, rest := strings.partition(text, " ")
+	me := &match.game.world.soldiers[match.me]
+	feed := &match.hud.feed
+	switch word {
+	case "kill", "brutalkill": // the Suicide button, which tears the body apart as brutalkill does
+		if me.active && !me.vitals.dead do match.suicide = true
+	case "team": // as the team menu offers it: 1 alpha, 2 bravo
+		n, _ := strconv.parse_int(strings.trim_space(rest))
+		switch n {
+		case 1: match.team_asked = .Alpha
+		case 2: match.team_asked = .Bravo
+		case:   hud.console_say(feed, hud.GAME_COLOR, "Teams: 1 alpha, 2 bravo")
+		}
+	case "votemap", "votekick", "yes", "no":
+		hud.console_say(feed, hud.GAME_COLOR, "There are no votes offline.")
+	case "help":
+		hud.console_say(feed, hud.GAME_COLOR, "/team <1 alpha, 2 bravo>  /kill  /brutalkill")
+		hud.console_say(feed, hud.GAME_COLOR, "/tabac /smoke /takeoff /victory /piss /mercy /pwn")
+	case:
+		if !sim.soldier_taunt(me, word) do hud.console_say(feed, hud.GAME_COLOR, "Unknown command: /%s", word)
+	}
+}
 
 // How the game is played: Offline Play's limits over the game's own settings.
 @(private = "package")
@@ -30,6 +62,10 @@ offline_step :: proc(match: ^Match, config: ^res.Client_Config) -> sim.Command {
 	match.sequence += 1
 	aim := draw.camera_to_world(match.camera, match.input.cursor)
 	commands[match.me] = input.input_take_command(&match.input, match.sequence, aim, config.controls.legacy_flag_throw)
+	if match.suicide { // /kill, as the server presses it for a player
+		commands[match.me].buttons += {.Suicide}
+		match.suicide = false
+	}
 	game.world.soldiers[match.me].player.typing = prompt_up(match)
 	names := soldier_names(match)
 	ai.bots_commands(&match.bots, game, &names, &commands)
