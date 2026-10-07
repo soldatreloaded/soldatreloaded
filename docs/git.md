@@ -111,12 +111,13 @@ always at the same addresses
 | `soldatreloaded-windows.zip` | `soldatreloaded.exe`, `soldatreloaded-launcher.exe`, `data/`, `mods/classic/`, `manifest.json` |
 | `soldatreloaded-linux.zip` | `soldatreloaded`, `soldatreloaded-launcher`, `data/`, `mods/classic/`, `manifest.json` |
 | `manifest.windows.json`, `manifest.linux.json` | every file of the game's install on that platform (below) |
-| `soldatreloaded-server.zip` | `soldatreloaded-server`, `data/`, `scripts/`, `server.config.mjson`, `weapons.ini`, for Linux |
+| `soldatreloaded-server.zip` | `soldatreloaded-server`, `data/`, `server.config.mjson`, `weapons.ini`, for Linux |
 
 Each holds `license.md` and `version.txt` too. Players start the launcher, which brings
-the install up to the newest release and starts the game. The game has no use for the
-server's scripts and the server draws nothing, so neither carries the other's. The game
-is released for Windows and Linux; the server, for those who host, for Linux alone, and
+the install up to the newest release and starts the game. The server draws nothing, so
+it carries no mods; nor any scripts, a host adding their own to `scripts/` (examples at
+[soldatreloaded-scripts](https://github.com/soldatreloaded/soldatreloaded-scripts)). The
+game is released for Windows and Linux; the server, for those who host, for Linux alone, and
 with no manifest: a host updates it by hand. A server runs on Windows built from the
 source, as it is developed.
 

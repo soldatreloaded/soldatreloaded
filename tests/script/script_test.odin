@@ -300,11 +300,15 @@ hosted :: proc(t: ^testing.T) {
 	testing.expect(t, sv.hooks.chat == nil && sv.hooks.ticked == nil, "closed, the script's ears are off the server")
 }
 
-// The game run from the chat, by the example that does it (scripts/match_controls.lua.disabled),
-// run as it ships: its count from 3.
+// The example that runs the game from the chat, as soldatreloaded-scripts has it
+// (match_controls.lua there; a copy beside this file, so the tests need no checkout of
+// it), run as it ships: its count from 3.
+@(private = "file")
+MATCH_CONTROLS :: #load("match_controls.lua", string)
+
 @(private = "file")
 match_controls :: proc(t: ^testing.T, sv: ^server.Server, s: ^server.Script) {
-	testing.expect(t, server.script_run(s, "dofile('scripts/match_controls.lua.disabled')", "match_controls"), "the match controls example is taken up")
+	testing.expect(t, server.script_run(s, MATCH_CONTROLS, "match_controls"), "the match controls example is taken up")
 	hooks := sv.hooks
 	testing.expect(t, !hooks.chat(hooks.user, 0, "!p", false), "!p goes to the chat like any line")
 	pump(sv, s)
@@ -325,22 +329,49 @@ match_controls :: proc(t: ^testing.T, sv: ^server.Server, s: ^server.Script) {
 		"!map ctf_run ends the round, and the next is on ctf_Run")
 }
 
-// The examples the server ships, each a .lua.disabled until renamed: every one of them
-// runs, side by side in one state as the scripts folder's would.
+// The API as docs/scripting.md has it, which the scripts of soldatreloaded-scripts are
+// written to: every call there, and every event server.on takes.
+@(private = "file")
+API :: `
+for _, name in ipairs({'say', 'say_to', 'print', 'command', 'pause', 'unpause', 'paused', 'next_map', 'maps',
+                       'map', 'round', 'tick', 'time_left', 'scores', 'players', 'player', 'kick', 'add_bot',
+                       'on', 'off'}) do
+  assert(type(server[name]) == 'function', 'server.' .. name)
+end
+for _, name in ipairs({'request', 'get', 'post'}) do assert(type(http[name]) == 'function', 'http.' .. name) end
+for _, name in ipairs({'encode', 'decode', 'array'}) do assert(type(json[name]) == 'function', 'json.' .. name) end
+assert(json.null ~= nil, 'json.null')
+for _, event in ipairs({'chat', 'command', 'join', 'leave', 'kill', 'capture', 'spawn', 'match_end', 'round_end',
+                        'round_start', 'tick', 'second'}) do
+  local fn = function() end
+  assert(server.on(event, fn) == fn and server.off(event, fn), event)
+end
+`
+
 @(test)
-examples :: proc(t: ^testing.T) {
-	entries, err := os.read_all_directory_by_path("scripts", context.temp_allocator)
-	testing.expect(t, err == nil, "scripts/ is there")
-	paths := make([dynamic]string, context.temp_allocator)
-	for entry in entries {
-		if strings.has_suffix(entry.name, ".lua.disabled") do append(&paths, strings.concatenate({"scripts/", entry.name}, context.temp_allocator))
-	}
-	testing.expectf(t, len(paths) >= 6, "the examples ship (%d)", len(paths))
+api :: proc(t: ^testing.T) {
+	path := write_scripts(t, "soldatreloaded_script_api", {{"api.lua", API}})
 	sv := new(server.Server)
 	defer free(sv)
 	s := new(server.Script)
 	defer free(s)
-	testing.expect(t, server.script_open(s, sv, ..paths[:]), "every example runs")
-	defer server.script_close(s)
-	testing.expect(t, sv.hooks.chat != nil && sv.hooks.command != nil && sv.hooks.joined != nil, "and hangs its handlers on the server")
+	testing.expect(t, server.script_open(s, sv, path), "every call and event docs/scripting.md has is there")
+	server.script_close(s)
+}
+
+// No scripts ship with the server: with its scripts folder not there, it runs with no
+// script, and says nothing of it unless the folder was set by hand.
+@(test)
+no_scripts :: proc(t: ^testing.T) {
+	testing.expect(t, !os.exists("scripts"), "the install ships no scripts/")
+	config := res.Server_Config {
+		server = {scripts = "scripts"},
+	}
+	app := new(server.App)
+	defer free(app)
+	app.config = &config
+	server.app_start(app)
+	testing.expect(t, app.script.L == nil, "no folder, no script, and nothing wrong")
+	server.app_pump(app)
+	server.app_stop(app)
 }

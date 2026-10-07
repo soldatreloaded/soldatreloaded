@@ -3,8 +3,8 @@ package server
 // A Lua script on the server: an admin's ears and voice on a hosted game. Every .lua in
 // the config's `scripts` folder (scripts/ by default) is read once, in name order, into
 // one state (app_script.odin), and from then on called when things happen, acting on the
-// game through a small API. docs/scripting.md is the reference; the examples beside them,
-// each a .lua.disabled until renamed, show it in use.
+// game through a small API. docs/scripting.md is the reference; none ship with the
+// server, and examples of it in use are at github.com/soldatreloaded/soldatreloaded-scripts.
 //
 // What the scripts hear, as they hand functions to server.on(event, fn): as many as they
 // like, from as many files as there are or they require, side by side. Each

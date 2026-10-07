@@ -49,7 +49,7 @@ the unpacked folder in a release:
 ```
 data/        what the game plays by: maps, animations, skeletons, objects, bots
 mods/        what it looks and sounds like: classic/, the game's own, and the player's beside it
-scripts/     the server's Lua
+scripts/     the server's Lua scripts, its host's own: none ship (docs/scripting.md)
 *.config.mjson  the configs, made with their defaults where they are missing
 weapons.ini     the server's weapons' numbers, as Soldat's are, made commented out where missing
 manifest.json   the release the install was last brought up to, which the launcher keeps

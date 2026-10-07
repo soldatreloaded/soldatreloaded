@@ -3,10 +3,11 @@ description: >
   One package of a release for the runner's platform, into build/dist/: the program,
   the part of assets/ it reads, its zip, and for the game its manifest
 
-# The game draws and plays mods/ and has no use for scripts/; the server plays by data/
-# and runs scripts/, and draws nothing. So each package holds only what its program
-# reads. The game's comes with the launcher, which players start and which keeps the
-# install at the newest release (apps/launcher). Into build/dist/:
+# The game draws and plays mods/; the server plays by data/ and draws nothing, and its
+# scripts are the host's own (none ship: soldatreloaded-scripts has examples). So each
+# package holds only what its program reads. The game's comes with the launcher, which
+# players start and which keeps the install at the newest release (apps/launcher). Into
+# build/dist/:
 #
 #   soldatreloaded-<platform>/           the game's install, unpacked
 #   soldatreloaded-<platform>.zip        what a player downloads
@@ -85,7 +86,6 @@ runs:
           mkdir -p "$stage/mods"
           cp -r assets/mods/classic "$stage/mods/" # the game's own look and sound; a player's mods sit beside it
         else
-          cp -r assets/scripts "$stage/"
           cp assets/server.config.mjson assets/weapons.ini "$stage/" # its config and weapons at their defaults, each setting explained
         fi
         cp license.md "$stage/"

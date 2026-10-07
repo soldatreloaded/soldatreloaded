@@ -16,7 +16,7 @@ package server
 //                        (core/resources/weapons.odin); made as it starts if it isn't
 //                        there, each number commented out
 //   scripts/             the Lua scripts, every .lua in the folder the config names
-//                        (app_script.odin); the examples ship as .lua.disabled
+//                        (app_script.odin); none ship, and the folder may be missing
 //
 //   server [-map:<name>] [-port:<port>]
 //

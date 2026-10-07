@@ -7,20 +7,20 @@ things happen (`server.on`), and calls the server back through the `server` tabl
 the scripts run side by side, each with its own handlers. Requests to the web go through
 `http`, with `json` for their bodies.
 
-The server ships examples in `scripts/`, each a `.lua.disabled`, which the server passes
-over: rename one to `.lua` to run it, and change the settings at its top. A script of
-your own goes beside them as a `.lua`. A file only to be `require`d, by several scripts,
-goes in a folder under `scripts/` (`scripts/lib/util.lua`, as `require("lib.util")`), so it
-isn't run as a script of its own.
+The server ships no scripts, and runs without any, its `scripts/` empty or not there at
+all. The examples, and the community's scripts, are at
+[soldatreloaded-scripts](https://github.com/soldatreloaded/soldatreloaded-scripts), which
+says what each does: copy one into `scripts/` to run it, and change the settings at its
+top. A script of your own goes beside them as a `.lua`; one renamed to `.lua.disabled` is
+passed over. A file only to be `require`d, by several scripts, goes in a folder under
+`scripts/` (`scripts/lib/util.lua`, as `require("lib.util")`), so it isn't run as a script
+of its own.
 
-| Example | What it does |
-|---|---|
-| `greeter.lua.disabled` | greets whoever joins, and says each map as it begins |
-| `stats.lua.disabled` | /stats and /top, kills called out every so many, captures and the winner said |
-| `chat_filter.lua.disabled` | keeps lines with the words given out of the chat |
-| `match_controls.lua.disabled` | !pause, !up (a count of 3, 2, 1), !restart and !map <name>, for gathers |
-| `admin.lua.disabled` | /hold, /go and /skip for the names given, for a game among friends |
-| `round_webhook.lua.disabled` | each round's result printed and sent to a webhook (Discord's, or any JSON one) |
+The examples there: `greeter.lua` (a welcome, and each map said), `stats.lua` (/stats and
+/top, kills called out, captures and the winner said), `chat_filter.lua` (words kept out
+of the chat), `match_controls.lua` (!pause, !up, !restart and !map for gathers),
+`admin.lua` (/hold, /go and /skip for the names given) and `round_webhook.lua` (each
+round's result sent to a webhook).
 
 The script runs on the server's thread, between ticks, so nothing it does races the
 game, and anything slow it does stalls the game: a request is sent from a thread of its
@@ -28,7 +28,7 @@ own and answered later, on the server's thread, for that reason. An error in the
 is printed on the console and the call is dropped; the game goes on.
 
 Console commands: `script_reload` reads the scripts again from the start, losing their
-state, and picks up any renamed since; `lua <code>` runs a line in their state.
+state, and picks up any added or renamed since; `lua <code>` runs a line in their state.
 
 ## What the script hears
 

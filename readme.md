@@ -107,7 +107,7 @@ core/bots        the bots
 apps/server      the hosted game and the dedicated server
 apps/client      the game a player runs
 apps/launcher    what a player starts: updates the install, then starts the game
-assets/          the install: data/, mods/ and scripts/
+assets/          the install: data/ and mods/
 tests/           a package of tests each
 ```
 
@@ -125,8 +125,10 @@ pinned, and its `txt/font.ini` the HUD's fonts. Players' mods are shared at
 [soldatreloaded-mods](https://github.com/soldatreloaded/soldatreloaded-mods), which says
 how to add one; the Mods page lists them, and installs or updates one in a click.
 
-A server is scripted in Lua: [docs/scripting.md](docs/scripting.md) is the API, and
-`assets/scripts/` is where its scripts live.
+A server is scripted in Lua: [docs/scripting.md](docs/scripting.md) is the API, and a
+script is a `.lua` in the server's `scripts/`. None ship with it; examples, and the
+community's, are at
+[soldatreloaded-scripts](https://github.com/soldatreloaded/soldatreloaded-scripts).
 
 ## Docs
 

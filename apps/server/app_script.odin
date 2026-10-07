@@ -7,10 +7,11 @@ import "core:strings"
 
 // The scripts beside the server (script.odin): every .lua in the folder server.config.mjson
 // names (`scripts`), read in name order into one state as the server starts, pumped with
-// it, and the console's script_reload and lua. A script is left out by its name: the
-// examples ship as .lua.disabled, and run once renamed to .lua. The folder is the
-// install's, from its root where the server runs; one set by hand that isn't there is
-// said, the default's absence is nothing.
+// it, and the console's script_reload and lua. A script is left out by its name: one
+// renamed to .lua.disabled is passed over. The folder is the install's, from its root
+// where the server runs. None ship with the server (the examples are in
+// soldatreloaded-scripts), so the default's absence is nothing: the server runs without
+// a script. One set by hand that isn't there is said.
 
 app_start :: proc(app: ^App) {
 	dir := app.config.server.scripts

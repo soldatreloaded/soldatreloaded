@@ -7,8 +7,8 @@
 --                      does any start of a map's name no other map shares
 --
 -- Each line goes to the chat like any other, and its command runs on the next tick, so the
--- answer follows the line rather than coming before it. An example: rename it to
--- match_controls.lua and the server runs it as it starts (or at script_reload).
+-- answer follows the line rather than coming before it. Copy it into the
+-- server's scripts/ and it runs as the server starts (or at script_reload).
 
 local options = {
     spectators = false, -- whether a spectator may run the game too
