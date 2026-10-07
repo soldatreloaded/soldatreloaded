@@ -10,7 +10,7 @@ import "../utils"
 // sent over and over, unreliably, a lost one replaced by the next; news goes once, in
 // order. The two streams' messages are stream.odin's.
 
-VERSION :: 3 // of the wire: a client of another can't join
+VERSION :: 4 // of the wire: a client of another can't join
 DEFAULT_PORT :: 23073
 
 Name :: utils.Short_String(24)     // a player's
@@ -20,6 +20,7 @@ Text :: utils.Short_String(128)    // a line of chat, a reason
 Map_Name :: utils.Short_String(64)
 Reason :: utils.Short_String(26)   // a kick vote's (the original's REASON_CHARS)
 MAP_HASH_SIZE :: 32                // a map's .pms, SHA-256
+Map_Art_Path :: utils.Short_String(96) // a map's art file, from the map's own folder: "scenery-gfx/tree.png"
 
 Msg_Kind :: enum u8 {
 	Invalid,
@@ -37,6 +38,7 @@ Msg_Kind :: enum u8 {
 	Weapons,      // server -> client: the weapons' numbers, on joining and as they change
 	Map_Fetch,    // client -> server: parts of the round's map, which it lacks
 	Map_Part,     // server -> client: a part of it
+	Map_Art,      // server -> client: one of the round's map's own art files, after its Map
 }
 
 // Every kind but the two streams, which are state sent anew every tick; so a kind added
@@ -142,6 +144,7 @@ Msg_Map :: struct {
 	hostname: Name,              // the server's, for the scoreboard
 	limit:    u16,               // the captures that win the round, for the HUD
 	hash:     [MAP_HASH_SIZE]u8, // the map's .pms, SHA-256: a copy with another isn't this map; zeros for any
+	art:      u8,                // its own art files, a Map_Art each to follow
 }
 
 msg_map :: proc(b: ^Buffer, m: ^Msg_Map) {
@@ -150,29 +153,35 @@ msg_map :: proc(b: ^Buffer, m: ^Msg_Map) {
 	net_string(b, &m.hostname)
 	net_u16(b, &m.limit)
 	for &byte in m.hash do net_u8(b, &byte)
+	net_u8(b, &m.art)
 }
 
-// A map the client lacks comes from the server, its .pms, in parts: the client asks for
-// `count` of them from `part` on, keeping a few in flight, and the server sends each.
-// Both name the round, so a fetch of a map since changed is dropped.
+// A map the client lacks comes from the server, its .pms and its own art, a file at a time
+// (`file` 0 the .pms, i + 1 the art's i-th, as its Map_Art numbered it), each in parts:
+// the client asks for `count` of them from `part` on, keeping a few in flight, and the
+// server sends each. Both name the round, so a fetch of a map since changed is dropped.
 MAP_PART :: 1000               // the bytes of a part, but the last
 MAP_MAX :: 64 * 1024 * 1024    // the largest map sent
 MAP_FETCH_MAX :: 64            // the parts one fetch asks for, at most
+MAP_ART_MAX :: 254              // the art files a map offers, at most: `file` is a byte
 
 Msg_Map_Fetch :: struct {
 	round:       u16,
+	file:        u8,
 	part, count: u32,
 }
 
 msg_map_fetch :: proc(b: ^Buffer, m: ^Msg_Map_Fetch) {
 	net_u16(b, &m.round)
+	net_u8(b, &m.file)
 	net_range(b, &m.part, MAP_MAX / MAP_PART)
 	net_range(b, &m.count, MAP_FETCH_MAX)
 }
 
 Msg_Map_Part :: struct {
 	round: u16,
-	total: u32, // the map's bytes
+	file:  u8,
+	total: u32, // the file's bytes
 	part:  u32,
 	size:  u16, // this part's bytes
 	data:  [MAP_PART]u8,
@@ -180,6 +189,7 @@ Msg_Map_Part :: struct {
 
 msg_map_part :: proc(b: ^Buffer, m: ^Msg_Map_Part) {
 	net_u16(b, &m.round)
+	net_u8(b, &m.file)
 	net_range(b, &m.total, MAP_MAX)
 	net_range(b, &m.part, MAP_MAX / MAP_PART)
 	size := u32(m.size)
@@ -189,6 +199,24 @@ msg_map_part :: proc(b: ^Buffer, m: ^Msg_Map_Part) {
 		if !buffer_ok(b) do break
 		net_u8(b, &m.data[i])
 	}
+}
+
+// One of the round's map's own art files, by where it goes in the map's folder, for a
+// client to have or fetch: told after the Map, as many as it said, `index` from 0.
+Msg_Map_Art :: struct {
+	round: u16,
+	index: u8,
+	path:  Map_Art_Path,
+	size:  u32,
+	hash:  [MAP_HASH_SIZE]u8, // SHA-256
+}
+
+msg_map_art :: proc(b: ^Buffer, m: ^Msg_Map_Art) {
+	net_u16(b, &m.round)
+	net_u8(b, &m.index)
+	net_string(b, &m.path)
+	net_range(b, &m.size, MAP_MAX)
+	for &byte in m.hash do net_u8(b, &byte)
 }
 
 // A vote as the HUD shows it: what is voted on and by whom, and how long it has. The

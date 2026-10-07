@@ -90,8 +90,8 @@ EDGE_SEE_THROUGH :: bit_set[res.Polygon_Type]{.Only_Bullets, .Only_Player, .Does
 // middle is in no other polygon that isn't see-through, and whose corners are both more
 // than half opaque (the original's LoadMapGraphics).
 @(private = "package")
-edges_load :: proc(art: ^Art, mod: res.Mod, polymap: ^res.Poly_Map) {
-	image, found := res.map_edge_texture_load(mod, polymap, context.temp_allocator)
+edges_load :: proc(art: ^Art, mod: res.Mod, polymap: ^res.Poly_Map, map_dirs: []string) {
+	image, found := res.map_edge_texture_load(mod, polymap, map_dirs, context.temp_allocator)
 	if !found do return
 	art.edge_texture = texture_upload(image)
 	rl.GenTextureMipmaps(&art.edge_texture)

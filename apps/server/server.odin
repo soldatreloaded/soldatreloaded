@@ -89,6 +89,7 @@ Server :: struct {
 	map_hash:    [net.MAP_HASH_SIZE]u8,        // its .pms's, told with the map; zeros for any
 	map_file:    []u8,                         // its .pms, read when a player who lacks it first asks; nil until then
 	map_missing: bool,                         // tried to read it this round, and couldn't
+	map_art:     [dynamic]Map_Art,             // the map's own art, offered with it (maps.odin)
 	maps:        [dynamic]string,              // the server's list of maps (the original's MapsList): the rotation, or every map under data/maps
 	in_turn:     bool,                         // `maps` is a rotation, played in turn; else the map plays again
 	vote:        Vote,
@@ -177,6 +178,8 @@ server_destroy :: proc(sv: ^Server) {
 	}
 	free(sv.streams)
 	delete(sv.map_file)
+	map_art_clear(sv)
+	delete(sv.map_art)
 	for name in sv.maps do delete(name)
 	delete(sv.maps)
 	delete(sv.profiles)

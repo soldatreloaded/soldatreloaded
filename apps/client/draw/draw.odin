@@ -36,18 +36,20 @@ Art :: struct {
 	sparks:        Spark_Art,
 }
 
-art_load :: proc(art: ^Art, mod: res.Mod, polymap: ^res.Poly_Map) {
+// The art for `polymap`: the mod's, the map's own in `map_dirs` (its folders of art, as it
+// shipped or was downloaded), and Classic's, in that order (res.map_image).
+art_load :: proc(art: ^Art, mod: res.Mod, polymap: ^res.Poly_Map, map_dirs: []string = nil) {
 	// a texture of its own: the polygons' texture coordinates run past 0..1, and it repeats
-	if pixels, found := res.map_texture_load(mod, polymap); found {
+	if pixels, found := res.map_texture_load(mod, polymap, map_dirs); found {
 		art.map_texture = texture_upload(pixels)
 		res.texture_destroy(&pixels)
 		rl.GenTextureMipmaps(&art.map_texture)
 		rl.SetTextureFilter(art.map_texture, .TRILINEAR)
 		rl.SetTextureWrap(art.map_texture, .REPEAT)
 	}
-	edges_load(art, mod, polymap)
+	edges_load(art, mod, polymap, map_dirs)
 
-	images := res.scenery_load(mod, polymap)
+	images := res.scenery_load(mod, polymap, map_dirs)
 	defer res.scenery_destroy(images)
 	art.scenery_atlas = {side = atlas_side_for(images)}
 	art.scenery = atlas_add_all(&art.scenery_atlas, images)

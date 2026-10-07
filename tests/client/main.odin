@@ -11,6 +11,7 @@ package client_test
 import sa "core:container/small_array"
 import "core:fmt"
 import "core:os"
+import "core:path/filepath"
 import "core:testing"
 import "core:time"
 
@@ -145,8 +146,9 @@ join_and_play :: proc(t: ^testing.T) {
 	testing.expect(t, s.n.map_reply.count >= 1 && s.n.map_reply.map_name.length > 0, "with a map")
 }
 
-// The server's ctf_Ash isn't the client's (one byte of its header differs): the client
-// fetches it, keeps it among its downloads, and plays on it.
+// The server's ctf_Ash isn't the client's (one byte of its header differs), and it has
+// a scenery image of its own: the client fetches both, keeps them among its downloads,
+// and plays on it. A file in the map's folder it doesn't draw with isn't offered.
 @(test)
 map_fetched :: proc(t: ^testing.T) {
 	SERVER_DATA :: "test_fetch_data"
@@ -156,8 +158,14 @@ map_fetched :: proc(t: ^testing.T) {
 	testing.expect(t, read == nil)
 	defer delete(ash)
 	ash[84] ~= 0xFF // the map's random id: the same map, another file
-	os.make_directory_all(SERVER_DATA + "/maps")
+	os.make_directory_all(SERVER_DATA + "/maps/ctf_Ash/scenery-gfx")
 	testing.expect(t, utils.write_file(SERVER_DATA + "/maps/ctf_Ash.pms", ash))
+	polymap, loaded := res.map_load(game.DATA_DIR, "ctf_Ash", context.temp_allocator)
+	testing.expect(t, loaded && len(polymap.scenery) > 0, "ctf_Ash draws with scenery")
+	image := fmt.tprintf("%s.png", filepath.stem(polymap.scenery[0]))
+	ART :: "the map's own image, as far as the line can tell"
+	testing.expect(t, utils.write_file(fmt.tprintf("%s/maps/ctf_Ash/scenery-gfx/%s", SERVER_DATA, image), transmute([]u8)string(ART)))
+	testing.expect(t, utils.write_file(SERVER_DATA + "/maps/ctf_Ash/scenery-gfx/unused.png", transmute([]u8)string("not drawn")))
 
 	s := new(Session)
 	defer free(s)
@@ -169,6 +177,13 @@ map_fetched :: proc(t: ^testing.T) {
 	kept, kept_read := os.read_entire_file(online.DOWNLOADS_DIR + "/maps/ctf_Ash.pms", context.allocator)
 	defer delete(kept)
 	testing.expect(t, kept_read == nil && string(kept) == string(ash), "the server's map, kept as it came")
+	art, art_read := os.read_entire_file(fmt.tprintf("%s/maps/ctf_Ash/scenery-gfx/%s", online.DOWNLOADS_DIR, image), context.allocator)
+	defer delete(art)
+	testing.expect(t, art_read == nil && string(art) == ART, "and its own image, in the map's folder of downloads")
+	testing.expect(t, !os.exists(online.DOWNLOADS_DIR + "/maps/ctf_Ash/scenery-gfx/unused.png"), "but nothing it doesn't draw with")
+	dirs := online.map_art_dirs("ctf_Ash")
+	found, has := res.map_image({fallback = "mods/classic"}, dirs[:], "scenery-gfx", polymap.scenery[0])
+	testing.expect(t, has && filepath.base(found) == image, "which the map's scenery is drawn with, before Classic's")
 }
 
 // A game recorded as it is played, then played back on the same line: the same map, as

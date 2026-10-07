@@ -147,7 +147,8 @@ match_start :: proc(match: ^Match, maps: []string, config: ^res.Client_Config, m
 		match_end(match)
 		return false
 	}
-	draw.art_load(&match.art, mod, &match.game.polymap)
+	dirs := map_art_dirs(match)
+	draw.art_load(&match.art, mod, &match.game.polymap, dirs[:])
 	view_open(match, sounds)
 	return true
 }
@@ -370,8 +371,17 @@ shown :: proc(match: ^Match, config: ^res.Client_Config, sounds: ^sound.Sound) {
 @(private = "package")
 art_reload :: proc(match: ^Match) {
 	draw.art_destroy(&match.art)
-	draw.art_load(&match.art, match.mod, &match.game.polymap)
+	dirs := map_art_dirs(match)
+	draw.art_load(&match.art, match.mod, &match.game.polymap, dirs[:])
 	draw.minimap_destroy(&match.minimap) // drawn again for the new map
+}
+
+// The folders of the map now played's own art: offline the map's name is the match's,
+// else the line's.
+@(private = "file")
+map_art_dirs :: proc(match: ^Match) -> [2]string {
+	name := match.map_name if match.mode == .Offline else utils.short_string_text(&match.line.map_name)
+	return online.map_art_dirs(name)
 }
 
 // Everyone's name, which the bots go by to know their friends and tell their kills, and

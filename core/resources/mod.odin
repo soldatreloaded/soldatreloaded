@@ -161,6 +161,19 @@ mod_has_image :: proc(mod: Mod, dir, name: string, listings: ^utils.Dir_Listings
 	return found
 }
 
+// An image a map draws with, in `dir` ("scenery-gfx"), as mod_image finds one: the mod's
+// if it has it, then the map's own (in each of `map_dirs`, the map's folders of art, as
+// it shipped or was downloaded with it), then Classic's.
+map_image :: proc(mod: Mod, map_dirs: []string, dir, name: string) -> (path: string, ok: bool) {
+	if mod.dir != "" {
+		if path, ok = utils.find_file_any_case(utils.temp_path(mod.dir, dir), name, ".png", context.temp_allocator); ok do return
+	}
+	for map_dir in map_dirs {
+		if path, ok = utils.find_file_any_case(utils.temp_path(map_dir, dir), name, ".png", context.temp_allocator); ok do return
+	}
+	return utils.find_file_any_case(utils.temp_path(mod.fallback, dir), name, ".png", context.temp_allocator)
+}
+
 mod_image :: proc(mod: Mod, dir, name: string, listings: ^utils.Dir_Listings = nil) -> (path: string, ok: bool) {
 	if mod.dir != "" {
 		path, ok = utils.find_file_any_case(utils.temp_path(mod.dir, dir), name, ".png", context.temp_allocator, listings)

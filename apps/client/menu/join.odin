@@ -1,7 +1,5 @@
 package menu
 
-import "core:fmt"
-
 import "../../../core/utils"
 import "../online"
 import "../ui"
@@ -53,6 +51,6 @@ page_join :: proc(menu: ^Menu) {
 // How the line is doing, in a line: the map coming, or what it last said.
 line_status :: proc(menu: ^Menu) -> string {
 	n := menu.line
-	if n.fetch.on do return fmt.tprintf("Downloading %s... %d%%", utils.short_string_text(&n.fetch.name), int(online.fetch_share(&n.fetch) * 100))
+	if status := online.fetch_status(&n.fetch); status != "" do return status
 	return utils.short_string_text(&n.status.text)
 }

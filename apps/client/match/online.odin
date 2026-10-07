@@ -91,9 +91,8 @@ take :: proc(match: ^Match) -> bool {
 	if !open do match.vote.asked = -1
 	match.vote.window = open
 	// a server's map coming, until the world is made of it
-	if n.fetch.on {
-		name := utils.short_string_text(&n.fetch.name)
-		hud.big_say(&match.hud.feed, {245, 245, 245, 255}, sim.TICK_RATE / 2, "Downloading %s... %d%%", name, int(online.fetch_share(&n.fetch) * 100))
+	if status := online.fetch_status(&n.fetch); status != "" {
+		hud.big_say(&match.hud.feed, {245, 245, 245, 255}, sim.TICK_RATE / 2, "%s", status)
 	}
 	return true
 }

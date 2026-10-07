@@ -252,7 +252,7 @@ line_say :: proc(n: ^Line, text: string, team, taunt: bool) -> bool {
 // After my tick: my decisions among its events, and my state, to the server. Nothing
 // while the round's map is still coming, nor of a soldier the server hasn't placed.
 line_tick :: proc(n: ^Line, game: ^sim.Game) {
-	if !line_live(n) || n.fetch.on do return
+	if !line_live(n) || fetch_busy(&n.fetch) do return
 	network.client_stream_collect(&n.stream, game, n.slot)
 	me := &game.world.soldiers[n.slot]
 	if !me.active do return
@@ -341,15 +341,13 @@ heard :: proc(n: ^Line, game: ^sim.Game, data: []u8) {
 		n.hostname = m.hostname
 		n.limit = i32(m.limit)
 		network.client_stream_reset(&n.stream, m.round)
-		// the world is made of the map here, or of the server's once it has come; a demo
-		// plays on whatever copy of its map is here
-		fetch_stop(&n.fetch)
-		if dir, here := map_here(utils.short_string_text(&m.map_name), m.hash, any_copy = n.playback); here {
-			n.map_dir = dir
-			n.mapped = true
-		} else {
-			fetch_start(n, &m)
-		}
+		// the world is made of the map here, or of the server's once it has come, and its
+		// own art with it; a demo plays on whatever copy of its map is here
+		fetch_map(n, &m)
+	case .Map_Art:
+		m: network.Msg_Map_Art
+		network.msg_map_art(&b, &m)
+		if network.buffer_done(&b) do fetch_art_told(n, &m)
 	case .Map_Part:
 		m := new(network.Msg_Map_Part, context.temp_allocator)
 		network.msg_map_part(&b, m)
@@ -389,7 +387,7 @@ heard :: proc(n: ^Line, game: ^sim.Game, data: []u8) {
 		if sa.len(n.inbox) == INBOX do sa.ordered_remove(&n.inbox, 0) // full: the oldest is lost
 		sa.append(&n.inbox, m)
 	case .Snapshot:
-		if n.state == .Joined && n.round != 0 && !n.mapped && !n.fetch.on && game != nil {
+		if n.state == .Joined && n.round != 0 && !n.mapped && !fetch_busy(&n.fetch) && game != nil {
 			network.client_stream_hear(&n.stream, game, n.slot, data)
 		}
 	}

@@ -60,10 +60,10 @@ texture_destroy :: proc(texture: ^Texture, allocator := context.allocator) {
 	texture^ = {}
 }
 
-// A map's texture, from the mod's textures/. False, logged, if it isn't there: the
-// polygons are drawn untextured then.
-map_texture_load :: proc(mod: Mod, m: ^Poly_Map, allocator := context.allocator) -> (texture: Texture, ok: bool) {
-	path, found := mod_image(mod, "textures", m.texture)
+// A map's texture, from textures/: the mod's, the map's own (`map_dirs`, map_image), or
+// Classic's. False, logged, if it isn't there: the polygons are drawn untextured then.
+map_texture_load :: proc(mod: Mod, m: ^Poly_Map, map_dirs: []string = nil, allocator := context.allocator) -> (texture: Texture, ok: bool) {
+	path, found := map_image(mod, map_dirs, "textures", m.texture)
 	if !found {
 		log.warnf("map texture '%s' not found; drawing the polygons untextured", m.texture)
 		return
@@ -72,10 +72,10 @@ map_texture_load :: proc(mod: Mod, m: ^Poly_Map, allocator := context.allocator)
 }
 
 // The texture a map's polygons' outer edges are drawn with (the original's smooth
-// edges): its texture's own in the mod's textures/edges/, else edges/default, green
-// keyed out. False, logged, if neither is there.
-map_edge_texture_load :: proc(mod: Mod, m: ^Poly_Map, allocator := context.allocator) -> (texture: Texture, ok: bool) {
-	path, found := mod_image(mod, "textures/edges", m.texture)
+// edges): its texture's own in textures/edges/ (the mod's, the map's own, Classic's), else
+// edges/default, green keyed out. False, logged, if neither is there.
+map_edge_texture_load :: proc(mod: Mod, m: ^Poly_Map, map_dirs: []string = nil, allocator := context.allocator) -> (texture: Texture, ok: bool) {
+	path, found := map_image(mod, map_dirs, "textures/edges", m.texture)
 	if !found do path, found = mod_image(mod, "textures/edges", "default.bmp")
 	if !found {
 		log.warn("no edge texture in textures/edges, nor its default; drawing no edges")
@@ -84,14 +84,14 @@ map_edge_texture_load :: proc(mod: Mod, m: ^Poly_Map, allocator := context.alloc
 	return texture_load(path, COLOR_KEY, allocator)
 }
 
-// A texture for each of a map's scenery names, from the mod's scenery-gfx/, in the
-// map's order; an empty one where an image is missing, as maps often ship scenery of
-// their own that the default mod hasn't got. Free with scenery_destroy.
-scenery_load :: proc(mod: Mod, m: ^Poly_Map, allocator := context.allocator) -> []Texture {
+// A texture for each of a map's scenery names, from scenery-gfx/ (the mod's, the map's
+// own, Classic's), in the map's order; an empty one where an image is missing, as a map
+// may draw with scenery that neither it nor the mods have. Free with scenery_destroy.
+scenery_load :: proc(mod: Mod, m: ^Poly_Map, map_dirs: []string = nil, allocator := context.allocator) -> []Texture {
 	textures := make([]Texture, len(m.scenery), allocator)
 	missing := 0
 	for name, i in m.scenery {
-		path, found := mod_image(mod, "scenery-gfx", name)
+		path, found := map_image(mod, map_dirs, "scenery-gfx", name)
 		if !found {
 			missing += 1
 			continue

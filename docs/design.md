@@ -68,6 +68,16 @@ laid out as OpenSoldat's are, so one of theirs works as it is: its `mod.ini` say
 its images are in the world and where the soldier's parts are pinned, and its
 `txt/font.ini` what the HUD is written in.
 
+**A map may carry its own art.** Beside `data/maps/<name>.pms`, a folder of the map's
+name holds the images it draws with that the mods may not have, laid out as a mod is:
+`data/maps/<name>/textures/`, `textures/edges/` and `scenery-gfx/`. An image is looked
+for in the player's mod, then in the map's own art, then in Classic, so a map's scenery
+needn't go into Classic for everyone to see it. A server offers a map's own art with it:
+after the round's Map it tells each file the map draws with, by its SHA-256, and a client
+fetches what it hasn't got, as it fetches a `.pms` it lacks, into
+`data/downloads/maps/<name>/` (`apps/server/maps.odin`, `apps/client/online/fetch.odin`).
+A download never takes the place of what the game ships.
+
 **The configs are MJSON, and the struct is the file.** `client.config.mjson` and
 `server.config.mjson` are `Client_Config` and `Server_Config`: each field a key, read over
 the defaults, so a key the file lacks keeps its default and a file that isn't there is
