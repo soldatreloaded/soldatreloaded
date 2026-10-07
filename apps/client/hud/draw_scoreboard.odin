@@ -116,7 +116,7 @@ draw_scoreboard_box :: proc(u: ^ui.Ui, art: ^Art, data: ^Hud_Data) -> f32 {
 
 @(private = "file") HEADING_COLOR :: rl.Color{255, 255, 230, 255}
 @(private = "file") HOST_COLOR :: rl.Color{233, 180, 12, 255}
-@(private = "file") CLOCK_COLOR :: rl.Color{170, 160, 200, 230}
+CLOCK_COLOR :: rl.Color{170, 160, 200, 230}
 @(private = "file") COUNT_COLOR :: rl.Color{200, 190, 180, 240}
 
 // Each team's kills by its caption, in its shirt's colour.

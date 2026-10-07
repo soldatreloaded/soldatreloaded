@@ -31,6 +31,7 @@ page_options :: proc(menu: ^Menu) {
 	ui.slider(k, "Kill log length", &config.interface.kill_log_length, 0, 50, 2, "%d lines")
 	ui.enum_select(k, "Kill log position", &config.interface.kill_log_position, KILL_LOG_PLACES[:])
 	ui.toggle(k, "Minimap", &config.interface.minimap)
+	ui.toggle(k, "Show time left", &config.interface.time_left)
 	ui.toggle(k, "Show FPS", &config.interface.show_fps)
 	ui.toggle(k, "Show ping", &config.interface.show_ping)
 	ui.toggle(k, "Show packet loss", &config.interface.show_loss)

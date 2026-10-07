@@ -5,12 +5,13 @@ import "core:math"
 
 import rl "vendor:raylib"
 
+import "../draw"
 import "../ui"
 
 // What the HUD says of where I stand beyond the game: the frame rate and the line's
 // numbers stacked in the top-right corner, each as the settings show it, with the demo
-// being recorded blinking over them; whom the camera follows while I watch; and the
-// demo playing, how far through it is.
+// being recorded blinking over them; whom the camera follows while I watch; the round's
+// time left, if it is shown; and the demo playing, how far through it is.
 
 // Each as it is set to show; off a server the line's read 0.
 Stat :: enum {
@@ -65,6 +66,18 @@ draw_watching :: proc(u: ^ui.Ui, data: ^Hud_Data) {
 	}
 	if text == "" do return
 	write(u, text, {(u.width - text_width(u, text, SMALL_FONT)) / 2, 430}, SMALL_FONT, color)
+}
+
+// The time left in the round, M:SS, in the middle at the top: under the respawn box, and
+// under the minimap while it is shown. Paused, it stands; once the round is over it is
+// gone, the scoreboard having the round's last word. The original shows the time only on
+// the scoreboard (InterfaceGraphics.pas, "Time %.2d:%.2d"), whose colour it keeps.
+draw_time_left :: proc(u: ^ui.Ui, data: ^Hud_Data, minimap: ^draw.Minimap) {
+	if data.ended do return
+	y: f32 = 26
+	if data.minimap && minimap.image.texture.id != 0 do y = max(y, MINIMAP_AT.y + minimap.size.y + 3)
+	text := fmt.tprintf("%d:%02d", data.time_left / 60, data.time_left % 60)
+	write(u, text, {(u.width - text_width(u, text, MENU_FONT)) / 2, y}, MENU_FONT, CLOCK_COLOR)
 }
 
 // A demo playing: how far through it is, where the original puts it, and whether it is

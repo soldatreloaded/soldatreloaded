@@ -120,6 +120,7 @@ Window_Mode :: enum {
 
 Interface_Settings :: struct {
 	minimap:           bool `jsoncomment:"the minimap"`,
+	time_left:         bool `jsoncomment:"the time left in the round, at the top of the screen"`,
 	show_fps:          bool `jsoncomment:"the frame rate, in the top right"`,
 	show_ping:         bool `jsoncomment:"your ping, under it"`,
 	show_loss:         bool `jsoncomment:"the share of the server's snapshots lost over the last second"`,

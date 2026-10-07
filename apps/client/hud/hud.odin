@@ -22,7 +22,7 @@ package hud
 //   draw_cursor.odin      the crosshair, the menus' pointer, my arrow
 //   draw_feed.odin        the big message, kill feed, console, respawn count, FPS, last shot
 //   draw_chat.odin        the prompt, what is said over heads, the vote's box, the radio
-//   draw_status.odin      my ping, whom I watch, the demo recorded or played
+//   draw_status.odin      my ping, whom I watch, the time left, the demo recorded or played
 //   draw_scoreboard.odin  the scoreboard, my weapon stats, who won
 //   draw_minimap.odin     the minimap
 //   draw_names.odin       teammates' names, out of view or always
@@ -115,6 +115,7 @@ hud_draw :: proc(u: ^ui.Ui, hud: ^Hud, data: ^Hud_Data, minimap: ^draw.Minimap) 
 	}
 	if !mine.dead && !team && !escape do draw_under_cursor(u, data)
 	draw_watching(u, data)
+	if data.clock && !hud.scoreboard && !hud.stats do draw_time_left(u, data, minimap)
 	draw_readouts(u, data)
 	draw_demo_marks(u, data)
 	draw_shot(u, feed, data.seconds)
