@@ -12,6 +12,10 @@ package menu
 // server, to play a demo or to ask the lobby for its servers again, and plays nothing
 // itself. It reads the line (how the joining goes) and the browser's list, to show them.
 //
+// Over a game (`in_game`, from the escape menu's Options) it is the settings alone that
+// take effect while the game plays (IN_GAME_PAGES): no background but the game's, and
+// Back to game where Quit is, which Escape does too.
+//
 // The menu is immediate, as the C client's: each frame its update gathers the keys and
 // the mouse, and its draw lays the page out anew in one pass of the ui's Kit, every
 // widget drawing itself and acting on what was gathered. What a pass asks of the client
@@ -30,6 +34,7 @@ package menu
 // line and the browser). From
 // the C client: ui/mainmenu.c, ui/taunts.c.
 
+import sa "core:container/small_array"
 import "core:math"
 import "core:mem"
 import "core:mem/virtual"
@@ -80,7 +85,13 @@ Menu :: struct {
 	demos:        Demos,
 	mods:         Mods,
 	taunts:       Taunt_Editor,
+	in_game:      bool, // over a game: its settings alone (IN_GAME_PAGES), and Back to game
 }
+
+// The pages the menu shows over a game: the settings that take effect while it plays.
+// The player's name and look are said to a server as it is joined, and a mod is loaded
+// with the game, so neither is among them.
+IN_GAME_PAGES :: bit_set[Page]{.Controls, .Taunts, .Options, .Graphics}
 
 // What the menu asks of the client.
 Request :: union {
@@ -91,6 +102,7 @@ Request :: union {
 	Refresh,
 	Use_Mod,
 	Quit,
+	Back,
 }
 
 // An offline game against bots, as the config's `offline` has it: `maps` in turn, the
@@ -123,26 +135,31 @@ Use_Mod :: struct {
 
 Quit :: struct {}
 
+// Over a game: the menu closed, and the game played on.
+Back :: struct {}
+
 // What the menu offers first, before anything has been played.
 FIRST_MAP :: "ctf_Ash"
 
 // The menu over `config`, its Offline Play on `last_map`: the map played last, or
 // FIRST_MAP. It shows how the client's line `n` joins, and the `browser`'s list, which
 // it asks for anew as it opens, as the C client's does. The Mods page lists, and
-// installs from, the mods' `catalog`.
-menu_init :: proc(menu: ^Menu, config: ^res.Client_Config, mod: res.Mod, last_map: string, n: ^online.Line, browser: ^online.Browser, catalog: ^online.Catalog) {
+// installs from, the mods' `catalog`. `in_game`, it is the settings over a game, on its
+// Options page.
+menu_init :: proc(menu: ^Menu, config: ^res.Client_Config, mod: res.Mod, last_map: string, n: ^online.Line, browser: ^online.Browser, catalog: ^online.Catalog, in_game := false) {
 	menu.config = config
 	menu.line = n
 	menu.browser = browser
 	menu.catalog = catalog
-	if browser.state != .Fetching && browser.state != .Querying do menu.request = Refresh{}
+	menu.in_game = in_game
+	if !in_game && browser.state != .Fetching && browser.state != .Querying do menu.request = Refresh{}
 	ui.kit_init(&menu.kit)
 	hud.art_load(&menu.art, mod)
-	draw.preview_load(&menu.preview, mod)
+	if !in_game do draw.preview_load(&menu.preview, mod) // the Player page's alone
 	for info, weapon in sim.weapons_default() do menu.weapon_names[weapon] = info.name
 	offline_init(&menu.offline, last_map)
 	menu.taunts.slot = -1
-	go_page(menu, .Servers)
+	go_page(menu, .Options if in_game else .Servers)
 }
 
 menu_destroy :: proc(menu: ^Menu) {
@@ -151,7 +168,7 @@ menu_destroy :: proc(menu: ^Menu) {
 	mods_destroy(&menu.mods)
 	delete(menu.servers.search)
 	delete(menu.taunts.text)
-	draw.preview_destroy(&menu.preview)
+	if !menu.in_game do draw.preview_destroy(&menu.preview)
 	hud.art_destroy(&menu.art)
 	menu^ = {}
 }
@@ -170,8 +187,12 @@ menu_draw :: proc(menu: ^Menu, u: ^ui.Ui) {
 	rlgl.DisableBackfaceCulling() // the shapes are wound either way
 	rl.EndBlendMode()
 
-	background(u, rl.GetTime())
-	ui.rect(u, 0, 0, u.width, VIEW_H, ui.SURFACE) // one ground for the rail and the page, the embers faint through it
+	if menu.in_game {
+		ui.rect(u, 0, 0, u.width, VIEW_H, {0, 0, 0, 90}) // the game, darkened
+	} else {
+		background(u, rl.GetTime())
+	}
+	ui.rect(u, 0, 0, u.width, VIEW_H, ui.SURFACE) // one ground for the rail and the page, the embers (or the game) faint through it
 
 	// the page beside the rail: as wide as the window allows, up to a width the rows
 	// read well at
@@ -199,9 +220,10 @@ menu_draw :: proc(menu: ^Menu, u: ^ui.Ui) {
 	case .Mods:     k.w = min(w, 520); page_mods(menu)
 	}
 	k.x, k.w = x, w
-	if note := PAGE_NOTES[menu.page]; note != "" do footer_text(menu, x, w, note, ui.MUTED) // a settings page: where its changes go
+	notes := &IN_GAME_NOTES if menu.in_game else &PAGE_NOTES
+	if note := notes[menu.page]; note != "" do footer_text(menu, x, w, note, ui.MUTED) // a settings page: where its changes go
 
-	if ui.kit_page_keys(k) do menu.side = int(menu.page) // up from the page's first widget: back out to the rail
+	if ui.kit_page_keys(k) do menu.side = rail_index(menu, menu.page) // up from the page's first widget: back out to the rail
 	ui.kit_page_scroll(k, {PANEL_X, BODY_TOP, panel_w, BODY_BOTTOM - BODY_TOP}, menu.bar_x.? or_else x + w + 8)
 	ui.popup_draw(k)
 	ui.kit_end(k)
@@ -271,6 +293,15 @@ PAGE_NOTES := #partial [Page]string {
 	.Graphics = "Changes take effect at once, and are saved in client.config.mjson when the game closes.",
 }
 
+// And over a game, which saves the config as it is gone back to.
+@(rodata)
+IN_GAME_NOTES := #partial [Page]string {
+	.Taunts   = "Saved in client.config.mjson as you go back to the game.",
+	.Controls = "Changes take effect at once, and are saved in client.config.mjson as you go back to the game.",
+	.Options  = "Changes take effect at once, and are saved in client.config.mjson as you go back to the game.",
+	.Graphics = "Changes take effect at once, and are saved in client.config.mjson as you go back to the game.",
+}
+
 // The footer's line: what the page says of where it stands.
 footer_text :: proc(menu: ^Menu, x, w: f32, text: string, color: rl.Color) {
 	ui.text_fit(&menu.kit, ui.BODY, text, x, ACTION_CY, w, color)
@@ -305,52 +336,83 @@ go_page :: proc(menu: ^Menu, page: Page) {
 	if page == .Demos && menu.page != .Demos do menu.demos.listed = false // demos/ as it is now
 	if page == .Mods && menu.page != .Mods do menu.mods.listed = false // mods/ as it is now
 	menu.page = page
-	menu.side = int(page)
+	menu.side = rail_index(menu, page)
 	ui.kit_reset_page(&menu.kit)
 }
 
-// The rail's items, in the keys' order: the pages, then Quit.
-RAIL_COUNT :: len(Page) + 1
+// The rail's pages, in its order: every one, or over a game its settings alone.
+Rail_Pages :: sa.Small_Array(len(Page), Page)
+
+rail_pages :: proc(menu: ^Menu) -> (pages: Rail_Pages) {
+	for page in Page {
+		if !menu.in_game || page in IN_GAME_PAGES do sa.append(&pages, page)
+	}
+	return
+}
+
+// Where `page` is on the rail, which its keys go by: its pages, then Quit (or Back to
+// game) after them.
+rail_index :: proc(menu: ^Menu, page: Page) -> int {
+	pages := rail_pages(menu)
+	for p, i in sa.slice(&pages) {
+		if p == page do return i
+	}
+	return 0
+}
 
 @(private = "file")
 rail_activate :: proc(menu: ^Menu, item: int) {
-	if item < len(Page) {
-		if int(menu.page) != item do go_page(menu, Page(item))
+	pages := rail_pages(menu)
+	if item < sa.len(pages) {
+		if page := sa.get(pages, item); menu.page != page do go_page(menu, page)
 		menu.kit.in_page = true
 		menu.kit.nav = 0
 	} else {
-		menu.request = Quit{}
+		rail_leave(menu)
 	}
+}
+
+// The rail's last item: the game closed, or over a game, the game gone back to.
+@(private = "file")
+rail_leave :: proc(menu: ^Menu) {
+	menu.request = Back{} if menu.in_game else Quit{}
 }
 
 // The keys while the rail has them: up and down go along it (a page is shown as its
 // item is reached), right or Enter goes into the page. In the page, Escape (or up from
 // its first widget) comes back out here; Q and E, or a controller's shoulders, turn the
-// pages from anywhere.
+// pages from anywhere. Over a game, Escape goes back to it from anywhere.
 @(private = "file")
 rail_keys :: proc(menu: ^Menu) {
 	k := &menu.kit
+	pages := rail_pages(menu)
+	count := sa.len(pages)
 	if k.page != 0 {
-		to := (int(menu.page) + k.page + len(Page)) %% len(Page)
+		to := (rail_index(menu, menu.page) + k.page + count) %% count
 		in_page := k.in_page
-		go_page(menu, Page(to))
+		go_page(menu, sa.get(pages, to))
 		k.in_page = in_page
 		k.page = 0
+	}
+	if menu.in_game && k.back {
+		rail_leave(menu)
+		k.back = false
+		return
 	}
 	if k.in_page {
 		if k.back {
 			k.in_page = false
-			menu.side = int(menu.page)
+			menu.side = rail_index(menu, menu.page)
 			k.back = false
 		}
 		return
 	}
-	menu.side = clamp(menu.side, 0, RAIL_COUNT - 1)
+	menu.side = clamp(menu.side, 0, count) // the pages, then the last item
 	if k.move != 0 {
-		menu.side = clamp(menu.side + k.move, 0, RAIL_COUNT - 1)
-		if menu.side < len(Page) && int(menu.page) != menu.side do go_page(menu, Page(menu.side))
+		menu.side = clamp(menu.side + k.move, 0, count)
+		if menu.side < count && menu.page != sa.get(pages, menu.side) do go_page(menu, sa.get(pages, menu.side))
 	}
-	if k.enter || (k.side > 0 && menu.side < len(Page)) do rail_activate(menu, menu.side)
+	if k.enter || (k.side > 0 && menu.side < count) do rail_activate(menu, menu.side)
 	k.enter, k.back = false, false
 	k.side, k.move = 0, 0
 }
@@ -372,13 +434,18 @@ rail :: proc(menu: ^Menu) {
 		first, last: Page,
 	}
 	groups := [?]Group{{"PLAY", .Servers, .Demos}, {"SETTINGS", .Player, .Mods}}
+	pages := rail_pages(menu)
 	for group in groups {
+		shown := false
+		for page in sa.slice(&pages) do shown ||= page >= group.first && page <= group.last
+		if !shown do continue
 		// the group's label: small, faint and set apart, so it reads as a heading and not
 		// as one more item
 		ui.text_at(k, ui.GROUP, group.name, x, y, ui.with_alpha(ui.FAINT, 200))
 		y += ui.height_of(u, ui.GROUP) + 6
-		for page in group.first ..= group.last {
-			chosen, focused := menu.page == page, focus_rail && menu.side == int(page)
+		for page, index in sa.slice(&pages) {
+			if page < group.first || page > group.last do continue
+			chosen, focused := menu.page == page, focus_rail && menu.side == index
 			ix, iw := f32(RAIL_PAD), f32(RAIL_W - 2 * RAIL_PAD)
 			hot := ui.over(k, ix, y, iw, RAIL_ITEM_H)
 			if chosen {
@@ -402,7 +469,8 @@ rail :: proc(menu: ^Menu) {
 	vy := VIEW_H - 14 - ui.height_of(u, ui.TINY)
 	ui.text_at(k, ui.TINY, VERSION_LABEL, x, vy, ui.FAINT)
 	bw, by := f32(RAIL_W - 2 * RAIL_PAD), vy - 10 - ui.CTRL_H
-	if rail_button(k, RAIL_PAD, by, bw, ui.CTRL_H, "Quit", focus_rail && menu.side == RAIL_COUNT - 1) do menu.request = Quit{}
+	caption := "Back to game" if menu.in_game else "Quit"
+	if rail_button(k, RAIL_PAD, by, bw, ui.CTRL_H, caption, focus_rail && menu.side == sa.len(pages)) do rail_leave(menu)
 }
 
 // A button of the rail, outside the page's order (the rail's keys reach it).

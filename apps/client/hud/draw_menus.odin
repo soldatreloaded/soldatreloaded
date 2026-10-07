@@ -19,6 +19,7 @@ ESCAPE_CAPTIONS := [Escape_Choice]string {
 	.Change_Map  = "2 Change map",
 	.Kick        = "3 Kick player",
 	.Change_Team = "4 Change team",
+	.Settings    = "5 Options",
 }
 
 // And the team menu's, by the team.

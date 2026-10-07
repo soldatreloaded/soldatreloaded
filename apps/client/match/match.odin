@@ -90,6 +90,7 @@ Match :: struct {
 	record:     Record_Asked,
 	windowed:   res.Window_Mode, // the fullscreen togglewindow left, to go back to
 	request:    Request, // what a command asked of the client, handed over at the frame's end
+	settings:   bool, // the escape menu's Options chosen: the settings asked of the client at the frame's end
 }
 
 // What the match asks of the client.
@@ -98,6 +99,7 @@ Request :: union {
 	Quit,
 	Connect,
 	Play_Demo,
+	Open_Settings,
 }
 
 // Back to the main menu: the line, if any, closed.
@@ -105,6 +107,10 @@ Leave :: struct {}
 
 // The game closed.
 Quit :: struct {}
+
+// The settings shown over the match, which plays on under them (the main menu's,
+// in_game); my keys are held until they close.
+Open_Settings :: struct {}
 
 // Off to the server at `address` (host:port), from here.
 Connect :: struct {
@@ -210,8 +216,10 @@ match_pace :: proc(match: ^Match) -> f64 {
 }
 
 // A frame: what the line brought taken, my keys and an open menu's, the ticks owed, the
-// world `alpha` of the way into the next tick, and the camera after them.
-match_update :: proc(match: ^Match, config: ^res.Client_Config, sounds: ^sound.Sound, ticks: int, alpha, dt: f32) -> Request {
+// world `alpha` of the way into the next tick, and the camera after them. `held` (the
+// settings are over the match), my keys are let go and none are read: the match plays
+// on, my soldier standing.
+match_update :: proc(match: ^Match, config: ^res.Client_Config, sounds: ^sound.Sound, ticks: int, alpha, dt: f32, held := false) -> Request {
 	match.request = nil
 	draw.camera_fit(&match.camera)
 	if match.mode != .Offline {
@@ -219,7 +227,11 @@ match_update :: proc(match: ^Match, config: ^res.Client_Config, sounds: ^sound.S
 		if !take(match) do return Leave{} // a map that couldn't be loaded
 		recording_follow(match)
 	}
-	keys(match, config, sounds)
+	if held {
+		input.input_release_all(&match.input)
+	} else {
+		keys(match, config, sounds)
+	}
 	if match.request != nil do return match.request
 
 	if match.mode == .Demo && match.playback.seeking do demo_seek_run(match, sounds)
@@ -237,6 +249,10 @@ match_update :: proc(match: ^Match, config: ^res.Client_Config, sounds: ^sound.S
 	}
 	draw.frame_build(&match.frame, &match.before, match.game, alpha, offsets)
 	match.seen = draw.camera_between(match.camera, alpha)
+	if match.request == nil && match.settings { // after the ticks, which the settings don't stop
+		match.settings = false
+		return Open_Settings{}
+	}
 	return match.request
 }
 

@@ -50,6 +50,7 @@ Menu_Action :: union {
 	Pick_Team,
 	Kick_Player,
 	Vote_Map,
+	Open_Settings,
 	Menu_Changed,
 }
 
@@ -79,6 +80,9 @@ Vote_Map :: struct {
 	index: int,
 }
 
+// The settings, over the game (the main menu's, in_game).
+Open_Settings :: struct {}
+
 // A menu opened or closed, and nothing more: the click is used up.
 Menu_Changed :: struct {}
 
@@ -88,6 +92,7 @@ Escape_Choice :: enum {
 	Change_Map, // online: the map window
 	Kick,       // online: the kick window
 	Change_Team,
+	Settings,   // the settings, over the game
 }
 
 // The windows' buttons, by their order.
@@ -252,6 +257,9 @@ choose :: proc(menus: ^Menus, menu: Menu, button: int) -> Menu_Action {
 		case .Change_Team:
 			menus_show(menus, .Team, true)
 			return Menu_Changed{}
+		case .Settings:
+			menus_close_all(menus)
+			return Open_Settings{}
 		}
 	case .Team:
 		menus_show(menus, .Team, false)
@@ -295,11 +303,12 @@ choose :: proc(menus: ^Menus, menu: Menu, button: int) -> Menu_Action {
 	return nil
 }
 
-// Leaving and changing team always; the windows online, where there is a server to vote with.
+// Leaving, changing team and the settings always; the windows online, where there is a
+// server to vote with.
 @(private = "file")
 escape_offered :: proc(menus: ^Menus, choice: Escape_Choice) -> bool {
 	switch choice {
-	case .Leave, .Change_Team: return true
+	case .Leave, .Change_Team, .Settings: return true
 	case .Change_Map, .Kick:   return menus.online
 	}
 	return false

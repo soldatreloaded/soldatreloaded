@@ -202,6 +202,8 @@ menu_choice :: proc(match: ^Match, config: ^res.Client_Config, sounds: ^sound.So
 		if offered := utils.short_string_text(&match.line.map_reply.map_name); offered != "" {
 			say(match, false, false, fmt.tprintf("/votemap %s", offered))
 		}
+	case hud.Open_Settings:
+		match.settings = true
 	case hud.Menu_Changed:
 	}
 	return false

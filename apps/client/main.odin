@@ -8,7 +8,9 @@ package main
 // the screens:
 // the sound, which a match plays into; the line to a server, which the menu opens and a
 // match plays on, polled here each frame; the server browser's list; and what Discord
-// shows I'm playing (online/discord.odin), pumped each frame.
+// shows I'm playing (online/discord.odin), pumped each frame. Over a match, the escape
+// menu's Options brings up the main menu's settings pages (settings_open), the match
+// playing on under them.
 //
 //   menu    the main menu                        match   being in a game
 //   draw    the world, drawn                     hud     what is drawn over it
@@ -57,6 +59,7 @@ Client :: struct {
 	line:          online.Line, // the line to a server, or a demo's
 	browser:       online.Browser, // the server browser's list
 	catalog:       online.Catalog, // the mods' catalogue, and the mod being installed from it
+	settings:      ^menu.Menu, // the settings over a match, while they are up (the escape menu's Options)
 	last_map:      string, // Offline Play's last, which the menu offers again
 	discord:       online.Discord, // the pipe to the Discord app here
 	showing:       Maybe(Showing), // what Discord was last shown (discord_update), none before the first
@@ -190,6 +193,7 @@ update :: proc(client: ^Client, dt: f32) {
 			online.browser_refresh(&client.browser, client.config.network.lobby)
 		case menu.Use_Mod:
 			mod_use(client, request.name)
+		case menu.Back: // the settings over a game's alone
 		case menu.Quit:
 			screen_switch(client, nil)
 		}
@@ -204,8 +208,14 @@ update :: proc(client: ^Client, dt: f32) {
 			}
 		}
 	case ^match.Match:
+		// the settings over it, if they are up, have the keys and the mouse; the match
+		// plays on under them
+		held := client.settings != nil
+		if held do settings_update(client)
 		ticks := ticks_owed(client, dt * f32(match.match_pace(screen)))
-		switch request in match.match_update(screen, client.config, &client.sound, ticks, tick_fraction(client), dt) {
+		switch request in match.match_update(screen, client.config, &client.sound, ticks, tick_fraction(client), dt, held) {
+		case match.Open_Settings:
+			settings_open(client)
 		case match.Leave:
 			leave(client)
 		case match.Quit:
@@ -225,8 +235,41 @@ update :: proc(client: ^Client, dt: f32) {
 draw :: proc(client: ^Client) {
 	switch screen in client.screen {
 	case ^menu.Menu:   menu.menu_draw(screen, &client.ui)
-	case ^match.Match: match.match_draw(screen, &client.ui, client.config)
+	case ^match.Match:
+		match.match_draw(screen, &client.ui, client.config)
+		if client.settings != nil {
+			ui.ui_fit(&client.ui, {0, 0, f32(rl.GetScreenWidth()), f32(rl.GetScreenHeight())}) // the whole window, not the match's view
+			menu.menu_draw(client.settings, &client.ui)
+		}
 	}
+}
+
+// The settings over the match (the main menu's own pages, in_game), from its escape
+// menu: the mouse let go for them, as the main menu has it.
+settings_open :: proc(client: ^Client) {
+	if client.settings != nil do return
+	client.settings = new(menu.Menu)
+	menu.menu_init(client.settings, client.config, client.mod, client.last_map, &client.line, &client.browser, &client.catalog, in_game = true)
+	cursor_follow(client.settings)
+}
+
+// The settings' frame: the keys and the mouse, and Back to game (or Escape) taken.
+settings_update :: proc(client: ^Client) {
+	#partial switch _ in menu.menu_update(client.settings) {
+	case menu.Back:
+		settings_close(client)
+	}
+}
+
+// The settings closed, and saved now rather than as the game closes; the mouse the
+// match's again.
+settings_close :: proc(client: ^Client) {
+	if client.settings == nil do return
+	menu.menu_destroy(client.settings)
+	free(client.settings)
+	client.settings = nil
+	config_save(client.config)
+	cursor_follow(client.screen)
 }
 
 // The main menu, its Offline Play on the map played last.
@@ -299,6 +342,7 @@ line_game :: proc(client: ^Client) -> ^sim.Game {
 // The screen closed and `next` shown in its place, its time starting now, with the
 // system cursor as it wants it.
 screen_switch :: proc(client: ^Client, next: Screen) {
+	settings_close(client) // the settings over a match go with it
 	switch screen in client.screen {
 	case ^menu.Menu:
 		menu.menu_destroy(screen)
