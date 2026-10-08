@@ -477,20 +477,31 @@ window_windowed :: proc(wanted: [2]i32) {
 	screen := [2]i32{rl.GetMonitorWidth(monitor), rl.GetMonitorHeight(monitor)}
 	size := [2]i32{min(wanted.x, screen.x), min(wanted.y, screen.y)}
 	at := rl.GetMonitorPosition(monitor)
-	rl.ClearWindowState({.WINDOW_UNDECORATED})
+	when ODIN_OS == .Linux {
+		if rl.IsWindowState({.BORDERLESS_WINDOWED_MODE}) do rl.ToggleBorderlessWindowed() // out of the fullscreen, its borders back
+	} else {
+		rl.ClearWindowState({.WINDOW_UNDECORATED})
+	}
 	rl.SetWindowSize(size.x, size.y)
 	rl.SetWindowPosition(i32(at.x) + (screen.x - size.x) / 2, i32(at.y) + (screen.y - size.y) / 2)
 }
 
-// Fullscreen: an ordinary window, undecorated and over the whole of its display, so it
-// goes behind another as any window does. raylib's own fullscreen is GLFW's, which holds
-// the window over every other on Windows, even after Alt+Tab.
+// Fullscreen. On Windows an ordinary window, undecorated and over the whole of its
+// display, so it goes behind another as any window does: raylib's own fullscreen is
+// GLFW's, which holds the window over every other there, even after Alt+Tab. On Linux
+// such a window is still an ordinary one to the desktop, which keeps its panels and bars
+// over it; only the window manager's fullscreen covers them, which raylib's borderless
+// mode asks for, at the display's own mode, so nothing flickers.
 window_fullscreen :: proc() {
-	monitor := rl.GetCurrentMonitor()
-	at := rl.GetMonitorPosition(monitor)
-	rl.SetWindowState({.WINDOW_UNDECORATED})
-	rl.SetWindowPosition(i32(at.x), i32(at.y))
-	rl.SetWindowSize(rl.GetMonitorWidth(monitor), rl.GetMonitorHeight(monitor))
+	when ODIN_OS == .Linux {
+		if !rl.IsWindowState({.BORDERLESS_WINDOWED_MODE}) do rl.ToggleBorderlessWindowed()
+	} else {
+		monitor := rl.GetCurrentMonitor()
+		at := rl.GetMonitorPosition(monitor)
+		rl.SetWindowState({.WINDOW_UNDECORATED})
+		rl.SetWindowPosition(i32(at.x), i32(at.y))
+		rl.SetWindowSize(rl.GetMonitorWidth(monitor), rl.GetMonitorHeight(monitor))
+	}
 }
 
 // The system cursor as `screen` wants it. The menu draws its own pointer where the
