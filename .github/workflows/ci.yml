@@ -29,7 +29,9 @@ jobs:
           mkdir -p build/ci
           ext=""; if [ "$RUNNER_OS" = Windows ]; then ext=.exe; fi
           for app in client server launcher; do
-            odin build apps/$app -vet $ODIN_FLAGS -out:build/ci/$app$ext
+            # the game's and the launcher's Windows resources too, as a release builds them
+            res=""; if [ "$RUNNER_OS" = Windows ] && [ -f apps/resources/$app.rc ]; then res=-resource:apps/resources/$app.rc; fi
+            odin build apps/$app -vet $ODIN_FLAGS $res -out:build/ci/$app$ext
           done
 
       # tests/compare is left out: it needs the C game and a C toolchain (docs/porting.md).

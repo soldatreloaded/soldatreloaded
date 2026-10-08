@@ -1,6 +1,7 @@
 tests/compare/build/
 tests/opensoldat/build/
 build/
+apps/resources/*.res
 assets/*.exe
 assets/*.config.json
 assets/client.config.mjson

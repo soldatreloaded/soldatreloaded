@@ -107,6 +107,7 @@ core/bots        the bots
 apps/server      the hosted game and the dedicated server
 apps/client      the game a player runs
 apps/launcher    what a player starts: updates the install, then starts the game
+apps/resources   on Windows, the game's and the launcher's icon, manifest and version
 assets/          the install: data/ and mods/
 tests/           a package of tests each
 ```

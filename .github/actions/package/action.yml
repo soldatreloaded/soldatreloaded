@@ -57,12 +57,22 @@ runs:
         # setup action). The game on Windows is a windowed program, without a console of
         # its own; the server and the launcher are consoles. The version is the one the
         # menu shows and the client names itself by to the web (SOLDATRELOADED_VERSION).
+        # On Windows each program carries its resources (apps/resources): the icon, the
+        # manifest, and what it is and its version, the release's numbers written into
+        # version.h first (0.2.0-beta is 0,2,0,0 and says "0.2.0-beta").
         flags=(-o:speed -vet -define:SOLDATRELOADED_VERSION="$VERSION" ${ODIN_FLAGS:-})
+        launcher_flags=(-o:speed -vet ${ODIN_FLAGS:-})
         programs=("$program")
-        if [ "$APP" = client ] && [ "$platform" = windows ]; then flags+=(-subsystem:windows); fi
+        if [ "$APP" = client ] && [ "$platform" = windows ]; then
+          IFS=. read -r major minor patch _ <<< "${VERSION%%[-+]*}"
+          printf '#define SR_VERSION_NUMBER %d,%d,%d,0\n#define SR_VERSION_TEXT "%s"\n' \
+            "${major:-0}" "${minor:-0}" "${patch:-0}" "$VERSION" > apps/resources/version.h
+          flags+=(-subsystem:windows -resource:apps/resources/client.rc)
+          launcher_flags+=(-resource:apps/resources/launcher.rc)
+        fi
         odin build "apps/$APP" "${flags[@]}" -out:"$stage/$program"
         if [ "$APP" = client ]; then
-          odin build apps/launcher -o:speed -vet ${ODIN_FLAGS:-} -out:"$stage/soldatreloaded-launcher$exe"
+          odin build apps/launcher "${launcher_flags[@]}" -out:"$stage/soldatreloaded-launcher$exe"
           programs+=("soldatreloaded-launcher$exe")
         fi
         rm -f "$stage"/*.pdb "$stage"/*.exp "$stage"/*.lib

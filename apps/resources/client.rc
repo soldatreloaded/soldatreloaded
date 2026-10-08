@@ -1,0 +1,36 @@
+// The game's resources on Windows, built in with -resource:apps/resources/client.rc: the
+// game's icon, which Explorer shows; the manifest; and what the file is, by whom, and
+// its version (version.h). Numbers stand for winver.h's names, which rc isn't given.
+#include "version.h"
+
+1 ICON "../../assets/data/icon.ico"
+1 24 "windows.manifest" // RT_MANIFEST, CREATEPROCESS_MANIFEST_RESOURCE_ID
+
+1 VERSIONINFO
+FILEVERSION SR_VERSION_NUMBER
+PRODUCTVERSION SR_VERSION_NUMBER
+FILEFLAGSMASK 0x3F
+FILEFLAGS 0x0
+FILEOS 0x40004 // VOS_NT_WINDOWS32
+FILETYPE 0x1   // VFT_APP
+FILESUBTYPE 0x0
+BEGIN
+	BLOCK "StringFileInfo"
+	BEGIN
+		BLOCK "040904B0" // US English, Unicode
+		BEGIN
+			VALUE "CompanyName", "Soldat Reloaded"
+			VALUE "FileDescription", "Soldat Reloaded"
+			VALUE "FileVersion", SR_VERSION_TEXT
+			VALUE "InternalName", "soldatreloaded"
+			VALUE "LegalCopyright", "Copyright 2020 Transhuman Design, 2026 Annabelle Roshal. MIT License."
+			VALUE "OriginalFilename", "soldatreloaded.exe"
+			VALUE "ProductName", "Soldat Reloaded"
+			VALUE "ProductVersion", SR_VERSION_TEXT
+		END
+	END
+	BLOCK "VarFileInfo"
+	BEGIN
+		VALUE "Translation", 0x409, 1200
+	END
+END

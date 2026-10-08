@@ -40,6 +40,7 @@ network.
 | `apps/server` | The hosted game and the dedicated server around it, one package, with the `lists` and `lobby` packages beneath it. |
 | `apps/client` | The game a player runs: a screen at a time, each screen and system a package of its own. |
 | `apps/launcher` | What a player starts: it brings the install up to the newest release, then starts the game. |
+| `apps/resources` | Not a package: the Windows resources the release builds into the game and the launcher (`-resource:`), their icon, manifest and version information. |
 
 ## The install
 
