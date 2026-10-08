@@ -384,34 +384,59 @@ chip :: proc(k: ^Kit, x, y: f32, caption: string, on: bool) -> bool {
 // ---------------------------------------------------------------------------------
 // Key
 
-// A key's row: what it does, and its key (`bound`, "" for none) on a chip; a click, or
-// Enter, waits for the next key (capture.odin), and the row is lit while it does. The
-// key pressed, once it is. `owner` names the row to the wait, the same each pass.
-key_row :: proc(k: ^Kit, label: string, owner: int, bound: string) -> (key: string, rebound: bool) {
+// A control's row: what it does, and its two keys (`bound`, "" for none) on two chips, the
+// main and another, either doing it. A click on a chip, or Enter on it, waits for the next
+// key (capture.odin), and the chip is lit while it does; a right-click, or Delete on it,
+// lets its key go. What changed, once it has: the chip (0 or 1), and its key, "" for none.
+// `owner` names the row to the wait, the same each pass; its chips wait as owner * 2 and
+// owner * 2 + 1.
+key_row :: proc(k: ^Kit, label: string, owner: int, bound: [2]string) -> (chip: int, key: string, changed: bool) {
 	ui := k.ui
-	r := row(k, 24, true)
-	key, rebound = capture_take(k, owner)
-	if (r.shown && take(k, r.id, r.x, r.y, r.w, r.h)) || take_enter(k, r.focused) do capture_start(k, owner)
-	if !r.shown do return
-	waiting := capturing(k, owner)
-	shown: string
-	current := key if rebound else bound
-	switch {
-	case waiting && capture_modifier(k) != "": shown = fmt.tprintf("%s + ...", capture_modifier(k)) // alone, or with the next
-	case waiting:                              shown = "Press a key"
-	case current == "":                        shown = "unbound"
-	case:                                      shown = strings.to_upper(current, context.temp_allocator)
-	}
+	r := row(k, 24, false)
+	KEY_W :: f32(72) // each chip's, so the two line up row under row
+	KEY_GAP :: f32(6)
 	kh := f32(18)
-	kw := max(width_of(ui, BOLD, shown) + 18, 54)
-	kx, ky := r.x + r.w - 8 - kw, r.y + (r.h - kh) / 2
-	text_fit(k, LABEL, label, r.x + 10, r.y + r.h / 2, kx - r.x - 20, TEXT)
-	if waiting {
-		pulse := 0.5 + 0.5 * math.sin(f32(k.time) * 6)
-		rrect(ui, kx, ky, kw, kh, RADIUS, with_alpha(ACCENT, u8(110 + 120 * pulse)))
-	} else {
-		box(ui, kx, ky, kw, kh, CONTROL_HOT if r.hot else CONTROL, BORDER_HOT if r.hot else BORDER)
+	ky := r.y + (r.h - kh) / 2
+	first_x := r.x + r.w - 8 - 2 * KEY_W - KEY_GAP
+	if r.shown do text_fit(k, LABEL, label, r.x + 10, r.y + r.h / 2, first_x - r.x - 20, TEXT)
+
+	for i in 0 ..< 2 {
+		waits := owner * 2 + i
+		kx := first_x + f32(i) * (KEY_W + KEY_GAP)
+		id := nav_next(k)
+		focused := nav_focused(k, id, r.y, r.h)
+		if got, taken := capture_take(k, waits); taken {
+			chip, key, changed = i, got, true
+		}
+		if (r.shown && take(k, id, kx, ky, KEY_W, kh)) || take_enter(k, focused) do capture_start(k, waits)
+		if r.shown && k.right_click && over(k, kx, ky, KEY_W, kh) {
+			k.right_click = false
+			chip, key, changed = i, "", true
+		}
+		if focused && k.erase {
+			k.erase = false
+			chip, key, changed = i, "", true
+		}
+		if !r.shown do continue
+
+		waiting := capturing(k, waits)
+		current := key if changed && chip == i else bound[i]
+		shown: string
+		switch {
+		case waiting && capture_modifier(k) != "": shown = fmt.tprintf("%s + ...", capture_modifier(k)) // alone, or with the next
+		case waiting:                              shown = "Press a key"
+		case current == "":                        shown = "-"
+		case:                                      shown = strings.to_upper(current, context.temp_allocator)
+		}
+		hot := over(k, kx, ky, KEY_W, kh)
+		focus_ring(k, focused, kx, ky, KEY_W, kh, RADIUS)
+		if waiting {
+			pulse := 0.5 + 0.5 * math.sin(f32(k.time) * 6)
+			rrect(ui, kx, ky, KEY_W, kh, RADIUS, with_alpha(ACCENT, u8(110 + 120 * pulse)))
+		} else {
+			box(ui, kx, ky, KEY_W, kh, CONTROL_HOT if hot else CONTROL, BORDER_HOT if hot else BORDER)
+		}
+		text_fit(k, BOLD, shown, kx + (KEY_W - min(width_of(ui, BOLD, shown), KEY_W - 8)) / 2, ky + kh / 2, KEY_W - 8, TEXT if waiting || current != "" else FAINT)
 	}
-	text_mid(k, BOLD, shown, kx + (kw - width_of(ui, BOLD, shown)) / 2, ky + kh / 2, TEXT if waiting || current != "" else FAINT)
 	return
 }

@@ -49,6 +49,7 @@ Kit :: struct {
 
 	// the pass's
 	click:         bool, // used up by the first widget that takes it
+	right_click:   bool, // the right button's, likewise: a key box lets its key go
 	held:          bool, // the left button is down: a slider follows the cursor
 	blocked:       bool, // a popup is open: nothing under it is hovered or clicked
 	block:         rl.Rectangle,
@@ -67,6 +68,7 @@ Kit :: struct {
 
 Gathered :: struct {
 	click:       bool,
+	right_click: bool,
 	wheel:       int,
 	move, side:  int,
 	page:        int,
@@ -85,6 +87,7 @@ kit_input :: proc(k: ^Kit) {
 	if capture_input(k) do return
 	k.mouse_down = rl.IsMouseButtonDown(.LEFT)
 	if rl.IsMouseButtonPressed(.LEFT) do g.click = true
+	if rl.IsMouseButtonPressed(.RIGHT) do g.right_click = true
 	g.wheel += int(math.round(rl.GetMouseWheelMove()))
 	if edit_input(k) do return
 
@@ -155,6 +158,7 @@ kit_begin :: proc(k: ^Kit, ui: ^Ui, time: f64) {
 	k.last_mouse = ui.mouse
 	if !k.mouse_down do k.drag, k.scroll_drag = -1, -1
 	k.click, k.held = g.click, k.mouse_down
+	k.right_click = g.right_click
 	k.blocked = false
 	k.move, k.side, k.page = g.move, g.side, g.page
 	k.enter, k.back, k.erase = g.enter, g.back, g.erase

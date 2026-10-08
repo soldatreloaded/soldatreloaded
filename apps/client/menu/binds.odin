@@ -10,22 +10,31 @@ import res "../../../core/resources"
 // by binding it to nothing. From the C client's ui/mainmenu.c (key_of, rebind) and
 // ui/taunts.c.
 
-// The key bound to `command`, the first by name if several; "" if none.
-key_of :: proc(config: ^res.Client_Config, command: string) -> string {
-	found := ""
-	for key, bound in config.binds {
-		if bound == command && (found == "" || key < found) do found = key
+// The keys bound to `command`, two of them, "" where there are fewer: what the controls
+// page shows on a control's two chips. The game's own key for it comes first while it is
+// still bound to it, so a key added beside it doesn't take its place; the rest by name.
+keys_of :: proc(config: ^res.Client_Config, command: string) -> (keys: [2]string) {
+	first := ""
+	for bind in res.DEFAULT_BINDS {
+		if bind[1] == command && config.binds[bind[0]] == command do first = bind[0]
 	}
-	return found
+	for key, bound in config.binds {
+		if bound != command || key == first do continue
+		switch {
+		case keys[0] == "" || key < keys[0]: keys[1], keys[0] = keys[0], key
+		case keys[1] == "" || key < keys[1]: keys[1] = key
+		}
+	}
+	if first != "" do keys[1], keys[0] = keys[0], first
+	return
 }
 
-// `key` does `command` now, and nothing else does.
-rebind :: proc(menu: ^Menu, key, command: string) {
-	binds := &menu.config.binds
-	old := make([dynamic]string, context.temp_allocator)
-	for k, bound in binds do if bound == command do append(&old, k)
-	for k in old do binds[k] = ""
-	bind(menu, key, command)
+// A control's chip set: its key, `was`, let go, and `key` ("" for none) doing `command`
+// in its place. A key doing something else does this instead; the other chip's key, and
+// any further key of `command`'s written in the config by hand, stay as they are.
+set_key :: proc(menu: ^Menu, was, key, command: string) {
+	if was != "" && was != key do bind(menu, was, "")
+	if key != "" do bind(menu, key, command)
 }
 
 // `key` bound to `command`; "" unbinds it.

@@ -2,8 +2,9 @@ package menu
 
 import "../ui"
 
-// The keys: what each control does and the key that does it, by what it is for, in two
-// columns where there is room. A click on a row, or Enter, waits for the next key.
+// The keys: what each control does and the two keys that can do it, by what it is for, in
+// two columns where there is room. A click on a key, or Enter on it, waits for the next
+// key; a right-click, or Delete, lets it go.
 // Under them, the flag thrown the old way, by jump and crouch together, and how the
 // radio sits with the weapons menu.
 
@@ -41,7 +42,7 @@ CONTROL_GROUPS := [?]Control_Group {
 page_controls :: proc(menu: ^Menu) {
 	k := &menu.kit
 	x, w, top_y := k.x, k.w, k.y
-	two := w >= 400
+	two := w >= 600 // below that a label and its two keys would be too narrow side by side
 	col_w := (w - 20) / 2 if two else w
 	ends := [2]f32{top_y, top_y}
 	for group in CONTROL_GROUPS {
@@ -52,8 +53,9 @@ page_controls :: proc(menu: ^Menu) {
 		ui.section(k, group.title)
 		for i in group.first ..< group.first + group.count {
 			control := CONTROLS[i]
-			if key, rebound := ui.key_row(k, control.label, i, key_of(menu.config, control.command)); rebound {
-				rebind(menu, key, control.command)
+			keys := keys_of(menu.config, control.command)
+			if chip, key, changed := ui.key_row(k, control.label, i, keys); changed {
+				set_key(menu, keys[chip], key, control.command)
 			}
 		}
 		ui.gap(k, 6)
