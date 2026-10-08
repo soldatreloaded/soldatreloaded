@@ -170,6 +170,31 @@ old_json_config :: proc(t: ^testing.T) {
 	testing.expect(t, again.player.name == "Old", "the MJSON read from then on")
 }
 
+// A config that still names the lobby of before is moved to the lobby now, the client's
+// and the server's; one naming a lobby of its own keeps it.
+@(test)
+old_lobby :: proc(t: ^testing.T) {
+	dir := scratch(t, "lobby")
+	defer os.remove_all(dir)
+	client_path := utils.temp_path(dir, "client.config.mjson")
+	server_path := utils.temp_path(dir, "server.config.mjson")
+
+	write(client_path, "network: {lobby: \"https://soldatreloaded-lobby.fly.dev/\"}\n")
+	client := res.client_config_load(client_path)
+	defer res.client_config_destroy(client)
+	testing.expect_value(t, client.network.lobby, res.LOBBY_URL)
+
+	write(server_path, "lobby: {url: \"https://soldatreloaded-lobby.fly.dev\"}\n")
+	server := res.server_config_load(server_path)
+	defer res.server_config_destroy(server)
+	testing.expect_value(t, server.lobby.url, res.LOBBY_URL)
+
+	write(server_path, "lobby: {url: \"https://lobby.example.org\"}\n")
+	own := res.server_config_load(server_path)
+	defer res.server_config_destroy(own)
+	testing.expect_value(t, own.lobby.url, "https://lobby.example.org")
+}
+
 @(test)
 weapons_ini :: proc(t: ^testing.T) {
 	dir := scratch(t, "weapons")

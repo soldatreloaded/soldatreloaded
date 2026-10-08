@@ -199,7 +199,8 @@ Mute_Settings :: struct {
 	players:    []string `jsoncomment:"these players', by name in any case, until unmuted"`,
 }
 
-LOBBY_URL :: "https://soldatreloaded-lobby.fly.dev"
+LOBBY_URL :: "https://sr-lobby.fly.dev"
+OLD_LOBBY_URL :: "https://soldatreloaded-lobby.fly.dev" // the lobby before; a config naming it is moved to LOBBY_URL as it is read
 MODS_INDEX_URL :: "https://github.com/soldatreloaded/soldatreloaded-mods/releases/download/index/mods.json"
 
 @(rodata)
@@ -322,6 +323,7 @@ client_config_load :: proc(path: string, old_path := "") -> ^Client_Config {
 	}
 	switch config_read(from, config, virtual.arena_allocator(&config.arena)) {
 	case .Read:
+		if lobby_moved(&config.network.lobby) do log.infof("%s: the lobby is %s now", path, LOBBY_URL)
 		if from != path do client_config_save(config, path)
 	case .Missing:
 		client_config_save(config, path)
@@ -330,6 +332,15 @@ client_config_load :: proc(path: string, old_path := "") -> ^Client_Config {
 		config.broken = true
 	}
 	return config
+}
+
+// A lobby address of a config read, moved to LOBBY_URL if it is still the old lobby's
+// (OLD_LOBBY_URL, with or without its last slash). True if it was. The client's and the
+// server's alike.
+lobby_moved :: proc(url: ^string) -> bool {
+	if url^ != OLD_LOBBY_URL && url^ != OLD_LOBBY_URL + "/" do return false
+	url^ = LOBBY_URL
+	return true
 }
 
 // The command a key is bound to; none for a key the player has let go.

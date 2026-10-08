@@ -120,6 +120,7 @@ server_config_load :: proc(path: string, old_path := "") -> ^Server_Config {
 	}
 	switch config_read(from, config, virtual.arena_allocator(&config.arena)) {
 	case .Read:
+		if lobby_moved(&config.lobby.url) do log.infof("%s: the lobby is %s now", path, LOBBY_URL)
 		if from != path do server_config_save(config, path)
 	case .Missing:
 		server_config_save(config, path)

@@ -23,7 +23,7 @@ import "../../../core/http"
 
 // The lobby a server talks to unless sv_lobby names another; network.LOBBY_URL
 // (core/network/query.odin), repeated here so the lobby needs none of the game.
-DEFAULT_URL :: "https://soldatreloaded-lobby.fly.dev"
+DEFAULT_URL :: "https://sr-lobby.fly.dev"
 
 TIMEOUT :: 10         // seconds a heartbeat may take
 GOODBYE_TIMEOUT :: 3  // and the goodbye, which a stopping server waits for

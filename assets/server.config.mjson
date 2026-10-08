@@ -56,7 +56,7 @@ lobby: {
   // the server lists itself with the lobby
   public: false
   // the lobby it lists itself with
-  url: "https://soldatreloaded-lobby.fly.dev"
+  url: "https://sr-lobby.fly.dev"
   // the IPv4 address the lobby lists; empty for the one the server reaches it from
   ip: ""
 }

@@ -25,7 +25,7 @@ import "../utils"
 
 // The lobby that lists the servers (the soldatreloaded-lobby repository): where a server
 // says it is up and where the browser asks for the list.
-LOBBY_URL :: "https://soldatreloaded-lobby.fly.dev"
+LOBBY_URL :: "https://sr-lobby.fly.dev"
 
 QUERY_REQUEST_SIZE :: 128
 // The longest strings the reply carries: the C game's NUL-terminated buffers less the NUL,
