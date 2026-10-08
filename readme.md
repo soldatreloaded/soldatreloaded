@@ -53,7 +53,7 @@ The client and the server each make their config beside them the first time they
 with every setting at its default: `client.config.mjson` and `server.config.mjson`, each
 setting with a comment saying what it does. The server's weapons are `weapons.ini`, as
 Soldat's are. `assets/` holds the server's two at their defaults. The server takes
-`-map:<name>`, `-port:<port>`, `-ip:<address>`, `-hostname:<name>` and `-lobby_ip:<IPv4>` over its config, and commands typed at its console
+`-map:<name>`, `-port:<port>`, `-ip:<address>`, `-hostname:<name>` and `-lobby-ip:<IPv4>` over its config, and commands typed at its console
 (`apps/server/console.odin` lists them).
 
 Admins run the admin commands (`/help` lists them) from the game's chat after
