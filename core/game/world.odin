@@ -94,7 +94,6 @@ world_step :: proc(world: ^World, resources: ^Resources, commands: ^[MAX_PLAYERS
 
 	heard_apply(world, resources, authority, out, .Soldiers)
 
-	soldiers_move(world) // every body moved before any soldier's turn
 	for &soldier, id in world.soldiers {
 		if soldier.active do soldier_update(world, resources, Soldier_Id(id), commands[id], authority, out)
 	}
@@ -115,9 +114,9 @@ world_step :: proc(world: ^World, resources: ^Resources, commands: ^[MAX_PLAYERS
 	judge(world, resources, authority, out) // the wounds: who is hurt, who dies
 	heard_apply(world, resources, authority, out, .Wounds)
 
+	things_cool_down(world)
 	heard_apply(world, resources, authority, out, .Things)
 	things_take_requests(world, resources, authority, out)
-	things_cool_down(world) // after the requests: a flag thrown this tick counts its cooldown down at once
 	for &thing, id in world.things {
 		if thing.kind != .None do thing_update(world, resources, Thing_Id(id), authority, out)
 	}

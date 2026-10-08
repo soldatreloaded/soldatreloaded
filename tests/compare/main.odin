@@ -129,9 +129,6 @@ odin_scene :: proc(port: ^game.Game, scenario: ^Scenario, spawn: [2]f32) -> bool
 	for i in 0 ..< 2 {
 		if setup.health[i] > 0 do port.world.soldiers[i].vitals.health = setup.health[i]
 	}
-	for gun, i in setup.guns {
-		if gun != .Punch do game.thing_create(&port.world, &port.resources, .Weapon, setup.guns_at[i], gun)
-	}
 	for &thing in port.world.things {
 		if setup.flag == .None || thing.kind != setup.flag do continue
 		move := setup.flag_at - thing.points[0]

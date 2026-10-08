@@ -1,7 +1,7 @@
 # Porting the game from C
 
 `core/game` is a port of the C game's simulation (`apps/shared/game` in
-[soldatreloaded](../../bettersoldat), at commit `583b7ea`). It must play **exactly** as
+[soldatreloaded](../../bettersoldat), at commit `d5009c2`). It must play **exactly** as
 the C game does: the same numbers, bit for bit, tick after tick. It does not keep the C
 game's structure: the logic is ported line by line, into the organization described in
 `core/game/world.odin`.
@@ -13,7 +13,7 @@ gun, no cluster grenades. What it keeps plays as the C game plays it.
 ## Checking it: tests/compare
 
 ```
-tests/compare/build.sh          # the C game at 583b7ea, built into tests/compare/build/reference.lib
+tests/compare/build.sh          # the C game at d5009c2, built into tests/compare/build/reference.lib
 odin run tests/compare          # every scenario, in both games, compared every tick
 odin run tests/compare -- jump  # only the scenarios whose name contains "jump"
 ```
@@ -127,6 +127,12 @@ change to both games, and needs a scenario that shows it first. The four differe
 worth it were fixed in both games (the C game's `74fee85`), each with such a scenario:
 `melee_run`, `spas_overkill`, `grenade_kill` and `two_guns`, the grab cooldown being
 pinned by `ctf_throw` already.
+
+**Taken back out.** Players reported more hits shown that the server didn't count after
+the release that carried them (the C game's v0.9.0), so all four came out of both games
+whole (the C game's `d5009c2`, v0.9.1), scenarios too, while that is looked into. A
+reading of them found no path that drops a wound. The differences below stand as found;
+where a paragraph says **Fixed**, read: fixed once, and taken back out.
 
 **Integration.** OpenSoldat moves every sprite's particle (`DoEulerTimeStepFor`,
 `ServerLoop.pas:358`) before any sprite's `Update`; the port integrated each soldier at

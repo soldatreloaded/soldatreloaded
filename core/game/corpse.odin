@@ -40,9 +40,6 @@ Corpse :: struct {
 	landings:   u8,   // so far, which quiet the thud
 	dead_time:  i32,  // ticks since it fell, which dry the bleeding up
 	on_ground:  bool, // its last point checked touched the map: a parachute lets go
-	// A blast's throw on a body killed the same tick, kept for the corpse it starts as
-	// (the original throws the skeleton of a sprite just made DeadMeat at once).
-	blast_owed: [CORPSE_POINTS]utils.Vec2,
 }
 
 // The corpses' turn for one soldier: its body started the first turn it is dead, torn as
@@ -52,7 +49,6 @@ corpse_update :: proc(world: ^World, resources: ^Resources, id: Soldier_Id, out:
 	corpse := &world.corpses[id]
 	if !soldier.active || !soldier.vitals.dead || soldier.team == .Spectator {
 		corpse.active = false
-		if !soldier.active do corpse.blast_owed = {}
 		return
 	}
 	if !corpse.active do corpse_start(corpse, soldier, resources)
@@ -62,14 +58,13 @@ corpse_update :: proc(world: ^World, resources: ^Resources, id: Soldier_Id, out:
 
 // The body as it died: the pose at the death, and the pose a tick before it.
 corpse_start :: proc(corpse: ^Corpse, soldier: ^Soldier, resources: ^Resources) {
-	owed := corpse.blast_owed // a blast's throw in the tick of the death
 	corpse^ = {active = true}
 	death := &soldier.vitals.death
 	now := soldier_pose(resources.animations, soldier, death.pos)
 	before := soldier_pose(resources.animations, soldier, death.pos - death.velocity)
 	for i in 0 ..< res.MAX_ANIMATION_POINTS {
 		corpse.points[i] = now[i]
-		corpse.old_points[i] = before[i] + owed[i]
+		corpse.old_points[i] = before[i]
 	}
 	// the chain's and the hair's points hang off the neck and the head
 	corpse.points[20], corpse.points[21], corpse.old_points[20], corpse.old_points[21] = now[8], now[8], now[8], now[8]

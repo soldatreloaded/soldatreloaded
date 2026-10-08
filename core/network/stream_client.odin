@@ -272,7 +272,6 @@ soldier_apply :: proc(c: ^Client_Stream, g: ^game.Game, id: game.Soldier_Id, fra
 	asked := sa.len(w.things_asked)
 	for _ in 0 ..< steps_left {
 		game.clear_output(scratch) // what the steps would say is said by nobody
-		game.soldier_move(w, s)
 		game.soldier_update(w, &g.resources, id, game.soldier_last_command(s, false), nil, scratch)
 	}
 	sa.resize(&w.things_asked, asked) // nor asked of the things (a parachute steered), as the C game's scratch mail isn't read

@@ -1,7 +1,5 @@
 package game
 
-import sa "core:container/small_array"
-
 import res "../resources"
 
 // Guns on the ground: thrown from a hand, let go of by a death, a thrown knife that
@@ -27,16 +25,10 @@ thrown_knife_land :: proc(world: ^World, resources: ^Resources, land: Knife_Land
 	thing_create(world, resources, .Weapon, land.pos, .Knife, owner = land.owner)
 }
 
-// Whether the soldier would take the gun: empty-handed, with no gun among this turn's
-// gifts for it yet (the original hands a gun over at once, so a second lying with it
-// finds the hand full), not changing guns, once the gun has lain past its resistance.
-dropped_gun_wanted :: proc(world: ^World, thing: ^Thing, id: Soldier_Id) -> bool {
-	soldier := &world.soldiers[id]
-	if soldier.arsenal.primary.weapon != .Punch || soldier.pose.body.id == .Change do return false
-	for gift in sa.slice(&world.gifts) {
-		if gift.soldier == id && gift.kind == .Weapon do return false
-	}
-	return thing.timeout < PICKUP_RESIST
+// Whether the soldier would take the gun: empty-handed and not changing guns, once the
+// gun has lain past its resistance.
+dropped_gun_wanted :: proc(thing: ^Thing, soldier: ^Soldier) -> bool {
+	return soldier.arsenal.primary.weapon == .Punch && soldier.pose.body.id != .Change && thing.timeout < PICKUP_RESIST
 }
 
 // Taken: the gun is gone from the ground.
