@@ -23,9 +23,10 @@ CHAIN_NAMES := [?]string{"None", "Dog tags", "Gold chain"}
 @(rodata)
 SECONDARY_NAMES := [?]string{"USSOCOM", "Combat Knife", "Chainsaw", "LAW"}
 
-// The rat and the furry wear only army, punk and Mr. T, and no headgear.
+// The rat and the furry wear only dreadlocks, punk, Mr. T, mullet and wolfcut, and no
+// headgear.
 @(rodata)
-FURRED_HAIR_LOCKED := [?]bool{false, true, false, false, true, true, true, true, true, true, true, true}
+FURRED_HAIR_LOCKED := [?]bool{false, false, false, false, true, true, true, false, false, true, true, true}
 @(rodata)
 FURRED_HEAD_LOCKED := [?]bool{false, true, true, true}
 
