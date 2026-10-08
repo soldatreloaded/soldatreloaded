@@ -14,7 +14,7 @@
 
 def notes:
   gsub("\r"; "")
-  | sub("^Soldat Reloaded [^\n]*\n+"; "")
+  | sub("^Soldat Reloaded v?[0-9][^\n]*\n+"; "")
   | gsub("\n +(?<rest>[^ \n-])"; " \(.rest)")
   | gsub("(?m)^(?<h>Added|Changed|Fixed|Removed|Notes|Features|Bug fixes|Breaking changes|For hosts|Download this version by hand)$"; "**\(.h)**")
   | gsub("(?m)^(?<l>Changes since [^\n]+)$"; "-# \(.l)")
