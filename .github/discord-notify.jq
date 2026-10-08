@@ -8,9 +8,9 @@
 # their lines are wrapped with an indent under each "- ", which Discord would show as
 # broken lines, so they are joined; their headings (Added, Fixed, For hosts...) are made
 # bold, and "Changes since 0.10.1" small. An embed's description holds 4096 characters:
-# a longer one is cut, and the rest is a link away. $ENV.NOTES and $ENV.TITLE, when
-# set, stand in for the notes and the title: an announcement written by hand
-# (discord-notify.yml's notes and title inputs).
+# a longer one is cut, and the rest is a link away. $ENV.NOTES, $ENV.TITLE and
+# $ENV.DOWNLOAD, when set, stand in for the notes, the title and the line under the
+# downloads: an announcement written by hand (discord-notify.yml's inputs).
 
 def notes:
   gsub("\r"; "")
@@ -48,7 +48,8 @@ def downloads:
       fields: [{
         name: "Download",
         value: ((($r | downloads) | if . == "" then "" else . + "\n" end)
-                + "Already playing? Run soldatreloaded-launcher: it updates the game to this version.")
+                + (if ($ENV.DOWNLOAD // "") != "" then $ENV.DOWNLOAD
+                   else "Already playing? Run soldatreloaded-launcher: it updates the game to this version." end))
       }],
       footer: {text: "soldatreloaded/soldatreloaded"},
       timestamp: $r.publishedAt

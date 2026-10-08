@@ -37,6 +37,9 @@ on:
       notes:
         description: "the notes, over the release's"
         required: false
+      download:
+        description: "the line under the downloads, over \"Already playing? Run soldatreloaded-launcher...\""
+        required: false
 
 jobs:
   announce:
@@ -70,6 +73,7 @@ jobs:
           REPO_RAW: https://raw.githubusercontent.com/${{ github.repository }}/${{ steps.release.outputs.tag }}
           TITLE: ${{ github.event.inputs.title }}
           NOTES: ${{ github.event.inputs.notes }}
+          DOWNLOAD: ${{ github.event.inputs.download }}
         run: |
           if [ -z "$WEBHOOK" ]; then
             echo "::warning::no DISCORD_RELEASE_WEBHOOK secret: $TAG is not announced"
