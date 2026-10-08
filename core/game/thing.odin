@@ -500,7 +500,7 @@ thing_taker :: proc(world: ^World, resources: ^Resources, thing: ^Thing) -> (tak
 		distance := utils.length(pos - soldier.body.pos)
 		if distance >= radius || distance >= closest do continue
 		if thing.kind == .Medical_Kit || thing.kind == .Grenade_Kit { // as this turn's kits leave it
-			given := kit_receiver(world, Soldier_Id(j))
+			given := gift_receiver(world, resources, Soldier_Id(j))
 			if thing.kind == .Medical_Kit && given.vitals.health == DEFAULT_HEALTH do continue
 			if thing.kind == .Grenade_Kit && given.arsenal.grenades == world.rules.max_grenades do continue
 		}

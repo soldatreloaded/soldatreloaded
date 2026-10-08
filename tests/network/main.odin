@@ -401,6 +401,34 @@ grenades_counted_by_server :: proc(t: ^testing.T) {
 	sa.push_back(&server.world.heard, game.Hearing{word = game.Shot{owner = 0, weapon = .Frag_Grenade, pos = mine_there.body.pos - {0, 20}, damage = 1}})
 	run(server, 1, {})
 	testing.expect_value(t, mine_there.arsenal.grenades, full - 1)
+
+	// A gun given there is held against my word, still empty-handed, so a second lying
+	// alongside isn't mine too; my word with the gun lets it go, and so does its hold
+	// running out (a gun thrown straight away)
+	give_gun :: proc(server: ^game.Game, streams: ^[game.MAX_PLAYERS]net.Server_Stream) {
+		mine_there := &server.world.soldiers[0]
+		mine_there.arsenal.primary.weapon = .AK74
+		sa.clear(&server.output.rulings)
+		sa.push_back(&server.output.rulings, game.Pickup{soldier = 0, kind = .Weapon, weapon = .AK74})
+		net.server_stream_gifts(streams, server)
+	}
+	say := proc(t: ^testing.T, client_stream: ^net.Client_Stream, server: ^game.Game, streams: ^[game.MAX_PLAYERS]net.Server_Stream, words: ^net.Wire_Queue, me: ^game.Soldier, weapon: res.Weapon) {
+		buf: [net.MTU]u8
+		me.arsenal.primary.weapon = weapon
+		state := net.client_stream_state(client_stream, me, buf[:])
+		testing.expect(t, net.server_stream_receive(&streams[0], server, 0, state, words))
+	}
+	give_gun(server, streams)
+	say(t, &client_stream, server, streams, &words, me, .Punch)
+	testing.expect_value(t, mine_there.arsenal.primary.weapon, res.Weapon.AK74)
+	say(t, &client_stream, server, streams, &words, me, .AK74)
+	say(t, &client_stream, server, streams, &words, me, .Punch) // thrown, once mine
+	testing.expect_value(t, mine_there.arsenal.primary.weapon, res.Weapon.Punch)
+
+	give_gun(server, streams)
+	run(server, net.GUN_GIVEN_HOLD + 1, {})
+	say(t, &client_stream, server, streams, &words, me, .Punch)
+	testing.expect_value(t, mine_there.arsenal.primary.weapon, res.Weapon.Punch)
 }
 
 // The lobby's list: an address and a port a line; what isn't one is passed over, and no

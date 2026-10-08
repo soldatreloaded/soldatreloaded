@@ -56,13 +56,18 @@ kit_take :: proc(world: ^World, resources: ^Resources, pickup: Pickup) {
 	thing_respawn(world, resources, pickup.thing)
 }
 
-// The soldier as the end of the turn will leave it, given the kits it has taken so far
-// this turn: what the next kit is judged against, so two lying together aren't both taken
-// by one the first filled (the original gives at once).
-kit_receiver :: proc(world: ^World, id: Soldier_Id) -> Soldier {
+// The soldier as the end of the turn will leave it, given the kits and guns it has taken
+// so far this turn: what the next is judged against, so two lying together aren't both
+// taken by one the first filled (the original gives at once).
+gift_receiver :: proc(world: ^World, resources: ^Resources, id: Soldier_Id) -> Soldier {
 	soldier := world.soldiers[id]
 	for gift in sa.slice(&world.gifts) {
-		if gift.soldier == id && gift.kind != .Weapon do kit_give(world, &soldier, gift.kind)
+		if gift.soldier != id do continue
+		if gift.kind == .Weapon {
+			dropped_gun_give(resources, &soldier, gift.weapon, gift.ammo)
+		} else {
+			kit_give(world, &soldier, gift.kind)
+		}
 	}
 	return soldier
 }

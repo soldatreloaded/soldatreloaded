@@ -51,6 +51,7 @@ line_snapshots :: proc(sv: ^Server) {
 	vote_tick(sv)
 	flood_tick(sv)
 	net.wire_collect(&sv.words, &sv.game.output, sv.game.world.tick - 1, nil) // the tick just run
+	net.server_stream_gifts(sv.streams, sv.game) // its guns given, held for their owners' word
 	names: [game.MAX_PLAYERS]net.Name
 	for &player, i in sv.players {
 		if player_present(&player) do names[i] = player.name

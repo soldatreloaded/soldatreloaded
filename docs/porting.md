@@ -184,7 +184,7 @@ emits none, a wire difference only.
 **Things.** The same order within the pass (physics and the carrier, the base and the
 capture, the pickup, the parachute, the timeout, the bounds), reading soldiers after
 their update as OpenSoldat does. A pickup writes the soldier at once in OpenSoldat; the
-port gives it at `soldiers_receive`, and `kit_receiver` counts the tick's queued gifts so
+port gives it at `soldiers_receive`, and `gift_receiver` counts the tick's queued gifts so
 a second kit is refused as it would be. Dropped guns did not: `dropped_gun_wanted` looked
 at the ungifted soldier, so two guns under one soldier were both taken in a tick, the
 second overwriting the first. **Fixed:** it looks for a gun among the turn's gifts too.

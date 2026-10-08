@@ -1,6 +1,9 @@
 package network
 
+import sa "core:container/small_array"
+
 import "../game"
+import res "../resources"
 import "../utils"
 
 // The server's end of the two streams, one per player (stream.odin).
@@ -18,8 +21,23 @@ Server_Stream :: struct {
 	sent_tick:       [STREAM_RING]u32,
 	event_ack:       u32,                       // the newest of the server's words the client has heard
 	event_last:      u32,                       // the newest of the client's words heard here
+	gun_given:       Gun_Given,                 // the gun last put in its soldier's hands, held for its word
 	stats:           Server_Stream_Stats,
 }
+
+// A gun the server put in a player's soldier's hands, held there against the owner's word
+// until the word shows it: sent before the owner heard of the pickup, the word's empty
+// hands would let it take a second gun lying alongside. The original's client takes the
+// gun itself at once, so its word is never behind. Held GUN_GIVEN_HOLD at most, should
+// the owner have thrown or switched it straight away, and for that life only.
+Gun_Given :: struct {
+	weapon:  res.Weapon,
+	life:    u8,
+	tick:    u32,
+	pending: bool,
+}
+
+GUN_GIVEN_HOLD :: game.TICK_RATE
 
 // What the server's end has seen of the line, counted: none of it steers the stream.
 Server_Stream_Stats :: struct {
@@ -88,13 +106,37 @@ server_stream_receive :: proc(s: ^Server_Stream, g: ^game.Game, slot: game.Soldi
 		// but the grenades, which the server counts, as OpenSoldat's does: a kit fills them
 		// here a round trip before the owner hears of it, and its word, still short, would
 		// let it take a second kit lying alongside. Its throws empty them as they are heard.
-		grenades := soldier.arsenal.grenades
+		grenades, primary := soldier.arsenal.grenades, soldier.arsenal.primary
 		soldier_take_owned(g.resources.animations, soldier, &m.owned)
 		soldier.arsenal.grenades = grenades
+		if gun_held(s, soldier, &m.owned, g.world.tick) do soldier.arsenal.primary = primary // (Gun_Given)
 	}
 	soldier.player.typing = m.typing
 	soldier.loadout = game.loadout_allowed(m.owned.loadout)
 	return true
+}
+
+// Whether the gun given is still held against `word`: not once the word has it, nor past
+// its hold or its life.
+@(private = "file")
+gun_held :: proc(s: ^Server_Stream, soldier: ^game.Soldier, word: ^game.Soldier, tick: u32) -> bool {
+	given := &s.gun_given
+	if !given.pending do return false
+	if word.arsenal.primary.weapon == given.weapon || given.life != soldier.vitals.life || tick - given.tick > GUN_GIVEN_HOLD {
+		given.pending = false
+		return false
+	}
+	return true
+}
+
+// After the tick: the guns it gave, each held for its owner's word (Gun_Given).
+server_stream_gifts :: proc(streams: ^[game.MAX_PLAYERS]Server_Stream, g: ^game.Game) {
+	for ruling in sa.slice(&g.output.rulings) {
+		pickup, is_pickup := ruling.(game.Pickup)
+		if !is_pickup || pickup.kind != .Weapon do continue
+		life := g.world.soldiers[pickup.soldier].vitals.life
+		streams[pickup.soldier].gun_given = {weapon = pickup.weapon, life = life, tick = g.world.tick, pending = true}
+	}
 }
 
 // Nothing heard for STREAM_RELEASE_TICKS.
