@@ -31,8 +31,9 @@ Figure :: struct {
 }
 
 Frame :: struct {
-	alpha:   f32, // how far from the tick before to the latest, 0 to 1
-	figures: [sim.MAX_PLAYERS]Figure,
+	alpha:      f32, // how far the world is drawn from the tick before to the latest, 0 to 1
+	tick_alpha: f32, // how far the clock is into the next tick: alpha but while the round stands
+	figures:    [sim.MAX_PLAYERS]Figure,
 }
 
 // Before each tick: the world as the frames after it blend from.
@@ -42,9 +43,13 @@ snapshot_take :: proc(snapshot: ^Snapshot, world: ^sim.World) {
 }
 
 // The frame `alpha` of the way from `before` to the game as it is now, each soldier moved
-// by its `offsets`, if any: what a correction still has to show of it.
+// by its `offsets`, if any: what a correction still has to show of it. While the round
+// stands (paused, or over) the world is drawn as its latest tick, as the original's
+// InterpolateState does when paused: the bullets and the things keep the last positions
+// of the step that froze, which would otherwise be run through again every tick.
 frame_build :: proc(frame: ^Frame, before: ^Snapshot, game: ^sim.Game, alpha: f32, offsets: ^[sim.MAX_PLAYERS]utils.Vec2 = nil) {
-	frame.alpha = clamp(alpha, 0, 1)
+	frame.tick_alpha = clamp(alpha, 0, 1)
+	frame.alpha = 1 if sim.round_standing(&game.round) else frame.tick_alpha
 	world := &game.world
 	for id in 0 ..< sim.MAX_PLAYERS {
 		frame.figures[id] = figure_between(

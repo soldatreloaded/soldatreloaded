@@ -205,10 +205,11 @@ cursor_aimed :: proc(match: ^Match) -> [2]f32 {
 	return match.input.cursor
 }
 
-// The cursor as drawn: as cursor_aimed, but mine between the last tick's start and now.
+// The cursor as drawn: as cursor_aimed, but mine between the last tick's start and now,
+// gliding on while the round stands.
 cursor_shown :: proc(match: ^Match) -> [2]f32 {
 	if recorders_cursor(match) do return match.playback.tick.cursor
-	return input.input_cursor_between(&match.input, match.frame.alpha)
+	return input.input_cursor_between(&match.input, match.frame.tick_alpha)
 }
 
 @(private = "file")
