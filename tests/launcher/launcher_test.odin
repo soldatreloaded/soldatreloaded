@@ -38,6 +38,18 @@ zip_reads_stored_and_deflated :: proc(t: ^testing.T) {
 	testing.expect(t, !not_zip, "what isn't a zip is said so")
 }
 
+// A release's file is found in its zip's Soldat Reloaded folder, and only there.
+@(test)
+archive_folder :: proc(t: ^testing.T) {
+	entries := make(map[string]utils.Zip_Entry, context.temp_allocator)
+	entries[launcher.ARCHIVE_FOLDER + "data/in_folder.txt"] = {size = 1}
+	entries["data/at_top.txt"] = {size = 2}
+	in_folder, found_in_folder := launcher.archive_entry(entries, "data/in_folder.txt")
+	_, found_at_top := launcher.archive_entry(entries, "data/at_top.txt")
+	testing.expect(t, found_in_folder && in_folder.size == 1, "a file in the folder")
+	testing.expect(t, !found_at_top, "and not one outside it")
+}
+
 @(test)
 plan_from_two_manifests_and_the_disk :: proc(t: ^testing.T) {
 	// a scratch install, entered as the launcher enters its own

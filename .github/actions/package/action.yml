@@ -129,11 +129,29 @@ runs:
           cp "$manifest" "$stage/manifest.json"
         fi
 
-        # The zip, its files at its root, as the install is laid out.
-        (
-          cd "$stage"
-          if command -v zip > /dev/null; then zip -qr -9 "../$name.zip" .
-          else 7z a -tzip -mx=9 -bso0 "../$name.zip" . > /dev/null
-          fi
-        )
+        # The zip. The game's files are in a "Soldat Reloaded" folder, so a player who
+        # unpacks it gets the install as one folder; the launcher reads them from there
+        # (apps/launcher, ARCHIVE_FOLDER). The server's are at its root, which the hosted
+        # servers' image unpacks as the server's directory.
+        if [ "$APP" = client ]; then
+          folder="Soldat Reloaded"
+          wrap="$dist/wrap-$name"
+          rm -rf "$wrap"
+          mkdir -p "$wrap"
+          cp -r "$stage" "$wrap/$folder"
+          (
+            cd "$wrap"
+            if command -v zip > /dev/null; then zip -qr -9 "../$name.zip" "$folder"
+            else 7z a -tzip -mx=9 -bso0 "../$name.zip" "$folder" > /dev/null
+            fi
+          )
+          rm -rf "$wrap"
+        else
+          (
+            cd "$stage"
+            if command -v zip > /dev/null; then zip -qr -9 "../$name.zip" .
+            else 7z a -tzip -mx=9 -bso0 "../$name.zip" . > /dev/null
+            fi
+          )
+        fi
         echo "$dist/$name.zip: $(find "$stage" -type f | wc -l) files"

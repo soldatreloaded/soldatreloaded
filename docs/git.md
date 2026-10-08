@@ -101,9 +101,10 @@ A tag whose tests fail releases nothing; delete it, fix, and tag again.
 
 ### What a release ships
 
-Each package is a program and the part of `assets/` it reads, unpacked flat so that the
-install's root is the zip's. Their names carry no version, so the newest release's are
-always at the same addresses
+Each package is a program and the part of `assets/` it reads. The game's zips hold the
+install in a `Soldat Reloaded` folder, which the launcher reads its files from; the
+server's is unpacked flat, so that its root is the server's directory. Their names carry
+no version, so the newest release's are always at the same addresses
 (`https://github.com/soldatreloaded/soldatreloaded-odin/releases/latest/download/<name>`):
 
 | File | Holds |

@@ -17,6 +17,7 @@ import "core:encoding/hex"
 import "core:fmt"
 import "core:os"
 import "core:path/filepath"
+import "core:strings"
 
 import res "../../core/resources"
 import "../../core/utils"
@@ -83,13 +84,23 @@ apply_fetch :: proc(plan: Plan, archive: []byte) -> string {
 	if !readable do return "the release's zip couldn't be read"
 
 	for file in plan.fetch {
-		entry, found := entries[file.path]
+		entry, found := archive_entry(entries, file.path)
 		if !found do return fmt.tprintf("%s isn't in the release's zip", file.path)
 		data, extracted := utils.zip_extract(archive, entry)
 		if !extracted || sha256(data) != file.sha256 do return fmt.tprintf("%s came out of the zip damaged", file.path)
 		if !install_file(file.path, data) do return fmt.tprintf("%s couldn't be written", file.path)
 	}
 	return ""
+}
+
+// The zip's folder the install's files are in, so a player unpacking it by hand gets one
+// folder rather than the install strewn about.
+ARCHIVE_FOLDER :: "Soldat Reloaded/"
+
+// A file of the install in the release's zip, in its folder.
+archive_entry :: proc(entries: map[string]utils.Zip_Entry, path: string) -> (utils.Zip_Entry, bool) {
+	entry, found := entries[strings.concatenate({ARCHIVE_FOLDER, path}, context.temp_allocator)]
+	return entry, found
 }
 
 apply_remove :: proc(plan: Plan) {
