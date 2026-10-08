@@ -143,6 +143,7 @@ draw_scoreboard :: proc(u: ^ui.Ui, data: ^Hud_Data, bottom: f32) {
 	write(u, "Ping:", {x + 530, 40}, MENU_FONT, HEADING_COLOR)
 	write(u, data.hostname, {x + 30, 15}, SMALL_FONT, HOST_COLOR)
 	write(u, fmt.tprintf("Time %02d:%02d", data.time_left / 60, data.time_left % 60), {x + 485, 15}, SMALL_FONT, CLOCK_COLOR)
+	write(u, data.time_of_day, {x + 485, 30}, SMALL_FONT, CLOCK_COLOR)
 	write(u, "Players", {x + 330, 15}, SMALL_FONT, COUNT_COLOR)
 	for team, i in ([2]res.Team{.Alpha, .Bravo}) {
 		count := 0

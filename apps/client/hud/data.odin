@@ -13,6 +13,7 @@ import res "../../../core/resources"
 Hud_Data :: struct {
 	// the round
 	time_left:    i32,  // seconds
+	time_of_day:  string, // the local clock, h:mm:ss AM, as the scoreboard shows it under the time left
 	limit:        i32,  // the captures that win
 	captures:     [res.Team]i32,
 	flags_home:   [res.Team]bool, // each team's flag at its base, and nobody's
@@ -53,6 +54,7 @@ Hud_Data :: struct {
 	// the settings
 	minimap:      bool,
 	clock:        bool, // the time left, at the top
+	clocks:       bool, // the time left and the time of day, in a row left of the stats
 	stats:        Stats, // which of the frame rate and the line's numbers stack in the top right
 	player_names: bool,
 	team_names:   bool, // teammates' names by them always, not only out of view

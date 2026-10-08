@@ -117,6 +117,7 @@ hud_draw :: proc(u: ^ui.Ui, hud: ^Hud, data: ^Hud_Data, minimap: ^draw.Minimap) 
 	draw_watching(u, data)
 	if data.clock && !hud.scoreboard && !hud.stats do draw_time_left(u, data, minimap)
 	draw_readouts(u, data)
+	draw_clocks(u, data)
 	draw_demo_marks(u, data)
 	draw_shot(u, feed, data.seconds)
 

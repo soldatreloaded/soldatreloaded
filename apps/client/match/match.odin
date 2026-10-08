@@ -31,6 +31,8 @@ package match
 import sa "core:container/small_array"
 import "core:fmt"
 import "core:strings"
+import "core:time/datetime"
+import "core:time/timezone"
 
 import rl "vendor:raylib"
 import "vendor:raylib/rlgl"
@@ -92,6 +94,7 @@ Match :: struct {
 	record:     Record_Asked,
 	request:    Request, // what a command asked of the client, handed over at the frame's end
 	settings:   bool, // the escape menu's Options chosen: the settings asked of the client at the frame's end
+	zone:       ^datetime.TZ_Region, // the local time zone, the HUD clock's; nil, and the clock is UTC
 }
 
 // What the match asks of the client.
@@ -198,6 +201,7 @@ match_end :: proc(match: ^Match) {
 	draw.canvas_destroy(&match.canvas)
 	draw.art_destroy(&match.art)
 	hud.hud_destroy(&match.hud)
+	timezone.region_destroy(match.zone)
 	delete(match.profiles)
 	if match.game != nil {
 		sim.game_destroy(match.game)
@@ -296,6 +300,7 @@ match_draw :: proc(match: ^Match, u: ^ui.Ui, config: ^res.Client_Config) {
 match_open :: proc(match: ^Match) {
 	draw.sparks_init(&match.sparks)
 	hud.hud_init(&match.hud, match.mod)
+	match.zone, _ = timezone.region_load("local")
 	match.chat.big_scroll = 0
 }
 

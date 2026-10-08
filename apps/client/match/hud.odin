@@ -2,6 +2,9 @@ package match
 
 import "core:fmt"
 import "core:math"
+import "core:time"
+import "core:time/datetime"
+import "core:time/timezone"
 
 import rl "vendor:raylib"
 
@@ -43,6 +46,7 @@ hud_data :: proc(match: ^Match, config: ^res.Client_Config) -> (data: hud.Hud_Da
 	settings := &game.settings
 
 	data.time_left = round.time_left / sim.TICK_RATE
+	data.time_of_day = time_of_day(match.zone)
 	data.limit = settings.capture_limit
 	data.captures = round.captures
 	for &home in data.flags_home do home = true
@@ -129,6 +133,7 @@ hud_data :: proc(match: ^Match, config: ^res.Client_Config) -> (data: hud.Hud_Da
 	graphics := &config.graphics
 	data.minimap = interface.minimap
 	data.clock = interface.time_left
+	data.clocks = interface.clocks
 	if interface.show_fps do data.stats += {.FPS}
 	if interface.show_ping do data.stats += {.Ping}
 	if interface.show_loss do data.stats += {.Loss}
@@ -353,4 +358,18 @@ flag_team :: proc(kind: sim.Thing_Kind) -> res.Team {
 	case .Bravo_Flag: return .Bravo
 	}
 	return .None
+}
+
+// The time of day in `zone`, as the original's scoreboard has it ('h:nn:ss ampm'): the
+// hour without its 0, and AM or PM. For this frame.
+@(private = "file")
+time_of_day :: proc(zone: ^datetime.TZ_Region) -> string {
+	at, ok := time.time_to_datetime(time.now())
+	if !ok do return ""
+	if zone != nil {
+		if shifted, shifted_ok := timezone.datetime_to_tz(at, zone); shifted_ok do at = shifted
+	}
+	hour := at.hour % 12
+	if hour == 0 do hour = 12
+	return fmt.tprintf("%d:%02d:%02d %s", hour, at.minute, at.second, "PM" if at.hour >= 12 else "AM")
 }
