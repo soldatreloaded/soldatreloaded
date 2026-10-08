@@ -28,28 +28,28 @@ Client_Config :: struct {
 	sound:     Sound_Settings,
 	network:   Network_Settings `jsoncomment:"the server to join, the lists to ask, and how the others are shown"`,
 	demos:     Demo_Settings,
-	offline:   Offline_Settings `jsoncomment:"a game against bots on this machine, alone"`,
-	radio:     Radio_Settings `jsoncomment:"the radio menu's calls, and the places each can name"`,
-	mutes:     Mute_Settings `jsoncomment:"the chat kept off your screen: kinds of it, and players by name"`,
-	binds:     map[string]string `jsoncomment:"your keys: a key to a command; an empty command lets one of the game's own go (client_config_bind)"`,
+	offline:   Offline_Settings `jsoncomment:"a game against bots on this machine, alone"`,
+	radio:     Radio_Settings `jsoncomment:"the radio menu's calls, and the places each can name"`,
+	mutes:     Mute_Settings `jsoncomment:"the chat kept off your screen: kinds of it, and players by name"`,
+	binds:     map[string]string `jsoncomment:"your keys: a key to a command; an empty command lets one of the game's own go (client_config_bind)"`,
 
 	arena:     virtual.Arena `json:"-"`, // everything the config's strings and binds are allocated in
 	broken:    bool `json:"-"`,          // its file couldn't be read, so it is never written over
 }
 
 Player_Settings :: struct {
-	name:             string `jsoncomment:"your name"`,
-	gostek:           Gostek `jsoncomment:"male, female, waifu, rat or furry"`,
-	shirt:            utils.Rgba `jsoncomment:"the shirt's colour, RRGGBB"`,
-	pants:            utils.Rgba `jsoncomment:"the pants' colour, RRGGBB"`,
-	skin:             utils.Rgba `jsoncomment:"the skin's colour, RRGGBB"`,
-	hair:             utils.Rgba `jsoncomment:"the hair's colour, RRGGBB"`,
-	jet:              utils.Rgba `jsoncomment:"the jet flame's colour, RRGGBB"`,
-	hair_style:       Hair_Style `jsoncomment:"army; the male's dreadlocks, punk, mr_t or normal; the waifu's fringe or bob. The rat and the furry wear only army, punk and mr_t."`,
-	head_style:       Head_Style `jsoncomment:"none; the male's helmet or hat; the waifu's own. The rat and the furry wear none."`,
-	chain_style:      Chain_Style `jsoncomment:"none, dog_tags or gold_chain"`,
-	primary_weapon:   Weapon `jsoncomment:"the primary at the next spawn: desert_eagles to minigun"`,
-	secondary_weapon: Weapon `jsoncomment:"the secondary at the next spawn: ussocom, knife, chainsaw or law"`,
+	name:             string `jsoncomment:"your name"`,
+	gostek:           Gostek `jsoncomment:"male, female, waifu, rat or furry"`,
+	shirt:            utils.Rgba `jsoncomment:"the shirt's colour, RRGGBB"`,
+	pants:            utils.Rgba `jsoncomment:"the pants' colour, RRGGBB"`,
+	skin:             utils.Rgba `jsoncomment:"the skin's colour, RRGGBB"`,
+	hair:             utils.Rgba `jsoncomment:"the hair's colour, RRGGBB"`,
+	jet:              utils.Rgba `jsoncomment:"the jet flame's colour, RRGGBB"`,
+	hair_style:       Hair_Style `jsoncomment:"army; the male's dreadlocks, punk, mr_t or normal; the waifu's fringe or bob. The rat and the furry wear only army, punk and mr_t."`,
+	head_style:       Head_Style `jsoncomment:"none; the male's helmet or hat; the waifu's own. The rat and the furry wear none."`,
+	chain_style:      Chain_Style `jsoncomment:"none, dog_tags or gold_chain"`,
+	primary_weapon:   Weapon `jsoncomment:"the primary at the next spawn: desert_eagles to minigun"`,
+	secondary_weapon: Weapon `jsoncomment:"the secondary at the next spawn: ussocom, knife, chainsaw or law"`,
 }
 
 Gostek :: enum {
@@ -84,32 +84,32 @@ Chain_Style :: enum {
 }
 
 Control_Settings :: struct {
-	sensitivity:       f32 `jsoncomment:"the mouse's speed"`,
-	legacy_flag_throw: bool `jsoncomment:"jump and crouch held together (w+s) throw the flag too, as older versions did"`,
+	sensitivity:       f32 `jsoncomment:"the mouse's speed"`,
+	legacy_flag_throw: bool `jsoncomment:"jump and crouch held together (w+s) throw the flag too, as older versions did"`,
 }
 
 Graphics_Settings :: struct {
-	mod:               string `jsoncomment:"the mod the game looks and sounds like, over Classic (mods/classic/): one of mods/; empty for Classic alone. Chosen on the Mods page, which uses it at once."`,
-	screen_width:      i32 `jsoncomment:"the resolution's width: windowed, the window's; fullscreen, the world is drawn at it and scaled to the screen"`,
-	screen_height:     i32 `jsoncomment:"the resolution's height"`,
-	window_mode:       Window_Mode `jsoncomment:"windowed, or fullscreen: a window without borders over the whole screen"`,
-	vsync:             bool `jsoncomment:"wait for the display's refresh"`,
-	fps_limit:         bool `jsoncomment:"draw at most max_fps frames a second; false draws them as fast as they come"`,
-	max_fps:           i32 `jsoncomment:"the frames drawn a second at most, while fps_limit is on"`,
-	scenery:           bool `jsoncomment:"the scenery behind the map; false leaves it out, the middle and front scenery stay"`,
-	trails:            bool `jsoncomment:"the streaks behind the bullets, grenades and rockets"`,
-	smooth_polygons:   bool `jsoncomment:"the map's polygons with plain edges, without the edge texture along their outsides"`,
-	weather:           bool `jsoncomment:"the map's weather: its rain, sandstorm or snow, and the wind"`,
-	force_sky:         bool `jsoncomment:"the sky in forced_sky_top and forced_sky_bottom on every map instead of the map's own"`,
-	forced_sky_top:    utils.Rgba `jsoncomment:"the forced sky's colour at the top, RRGGBB"`,
-	forced_sky_bottom: utils.Rgba `jsoncomment:"the forced sky's colour at the bottom, RRGGBB"`,
-	grenade_color:     Maybe(utils.Rgba) `jsoncomment:"the grenades in this colour, RRGGBB, flat and solid; empty for their own art"`,
-	crosshair_color:   utils.Rgba `jsoncomment:"the aiming crosshair's colour, RRGGBB"`,
-	crosshair_size:    i32 `jsoncomment:"the aiming crosshair's size, percent"`,
-	cursor_color:      utils.Rgba `jsoncomment:"the menu cursor's colour, RRGGBB"`,
-	cursor_size:       i32 `jsoncomment:"the menu cursor's size, percent"`,
-	track_shot:        bool `jsoncomment:"the camera follows a Barrett shot fired scoped, until you stand up"`,
-	screen_shake:      bool `jsoncomment:"others' shots in view shake the camera too, not only yours (cl_screenshake)"`,
+	mod:               string `jsoncomment:"the mod the game looks and sounds like, over Classic (mods/classic/): one of mods/; empty for Classic alone. Chosen on the Mods page, which uses it at once."`,
+	screen_width:      i32 `jsoncomment:"the resolution's width: windowed, the window's; fullscreen, the world is drawn at it and scaled to the screen"`,
+	screen_height:     i32 `jsoncomment:"the resolution's height"`,
+	window_mode:       Window_Mode `jsoncomment:"windowed, or fullscreen: a window without borders over the whole screen"`,
+	vsync:             bool `jsoncomment:"wait for the display's refresh"`,
+	fps_limit:         bool `jsoncomment:"draw at most max_fps frames a second; false draws them as fast as they come"`,
+	max_fps:           i32 `jsoncomment:"the frames drawn a second at most, while fps_limit is on"`,
+	scenery:           bool `jsoncomment:"the scenery behind the map; false leaves it out, the middle and front scenery stay"`,
+	trails:            bool `jsoncomment:"the streaks behind the bullets, grenades and rockets"`,
+	smooth_polygons:   bool `jsoncomment:"the map's polygons with plain edges, without the edge texture along their outsides"`,
+	weather:           bool `jsoncomment:"the map's weather: its rain, sandstorm or snow, and the wind"`,
+	force_sky:         bool `jsoncomment:"the sky in forced_sky_top and forced_sky_bottom on every map instead of the map's own"`,
+	forced_sky_top:    utils.Rgba `jsoncomment:"the forced sky's colour at the top, RRGGBB"`,
+	forced_sky_bottom: utils.Rgba `jsoncomment:"the forced sky's colour at the bottom, RRGGBB"`,
+	grenade_color:     Maybe(utils.Rgba) `jsoncomment:"the grenades in this colour, RRGGBB, flat and solid; empty for their own art"`,
+	crosshair_color:   utils.Rgba `jsoncomment:"the aiming crosshair's colour, RRGGBB"`,
+	crosshair_size:    i32 `jsoncomment:"the aiming crosshair's size, percent"`,
+	cursor_color:      utils.Rgba `jsoncomment:"the menu cursor's colour, RRGGBB"`,
+	cursor_size:       i32 `jsoncomment:"the menu cursor's size, percent"`,
+	track_shot:        bool `jsoncomment:"the camera follows a Barrett shot fired scoped, until you stand up"`,
+	screen_shake:      bool `jsoncomment:"others' shots in view shake the camera too, not only yours (cl_screenshake)"`,
 }
 
 Window_Mode :: enum {
@@ -118,21 +118,21 @@ Window_Mode :: enum {
 }
 
 Interface_Settings :: struct {
-	minimap:           bool `jsoncomment:"the minimap"`,
+	minimap:           bool `jsoncomment:"the minimap"`,
 	time_left:         bool `jsoncomment:"the time left in the round, at the top of the screen"`,
 	clocks:            bool `jsoncomment:"the time left in the round and the time of day, in a row left of the frame rate and the line's numbers, always"`,
-	show_fps:          bool `jsoncomment:"the frame rate, in the top right"`,
-	show_ping:         bool `jsoncomment:"your ping, under it"`,
-	show_loss:         bool `jsoncomment:"the share of the server's snapshots lost over the last second"`,
-	show_jitter:       bool `jsoncomment:"how much the round trip varies"`,
-	player_names:      bool `jsoncomment:"teammates' names at the screen's edge when out of view (everyone's, spectating)"`,
-	team_names:        bool `jsoncomment:"teammates' names by them always, not only at the screen's edge when out of view (with player_names)"`,
-	typing:            Typing_Style `jsoncomment:"over a player typing: off, dots (the original's) or typing, the word"`,
+	show_fps:          bool `jsoncomment:"the frame rate, in the top right"`,
+	show_ping:         bool `jsoncomment:"your ping, under it"`,
+	show_loss:         bool `jsoncomment:"the share of the server's snapshots lost over the last second"`,
+	show_jitter:       bool `jsoncomment:"how much the round trip varies"`,
+	player_names:      bool `jsoncomment:"teammates' names at the screen's edge when out of view (everyone's, spectating)"`,
+	team_names:        bool `jsoncomment:"teammates' names by them always, not only at the screen's edge when out of view (with player_names)"`,
+	typing:            Typing_Style `jsoncomment:"over a player typing: off, dots (the original's) or typing, the word"`,
 	typing_size:       i32 `jsoncomment:"the typing indicator's size, percent, 50 to 200"`,
-	kill_log_length:   i32 `jsoncomment:"the kill log's lines, two a kill, 0 to 50; 0 shows none"`,
-	kill_log_position: Kill_Log_Position `jsoncomment:"where the kill log is: top_right (the original's), lower_right, or top_left, under the chat"`,
-	console_lines:     i32 `jsoncomment:"how many console lines the HUD shows"`,
-	discord:           bool `jsoncomment:"Playing Soldat Reloaded on your Discord profile, with the map and the server, while the Discord app runs here"`,
+	kill_log_length:   i32 `jsoncomment:"the kill log's lines, two a kill, 0 to 50; 0 shows none"`,
+	kill_log_position: Kill_Log_Position `jsoncomment:"where the kill log is: top_right (the original's), lower_right, or top_left, under the chat"`,
+	console_lines:     i32 `jsoncomment:"how many console lines the HUD shows"`,
+	discord:           bool `jsoncomment:"Playing Soldat Reloaded on your Discord profile, with the map and the server, while the Discord app runs here"`,
 }
 
 Typing_Style :: enum {
@@ -148,31 +148,31 @@ Kill_Log_Position :: enum {
 }
 
 Sound_Settings :: struct {
-	volume:            i32 `jsoncomment:"0 to 100"`,
-	battle_effects:    bool `jsoncomment:"a far shot or blast also plays its distant sound"`,
-	explosion_effects: bool `jsoncomment:"a blast next to you rings your ears and muffles the rest for a few seconds"`,
+	volume:            i32 `jsoncomment:"0 to 100"`,
+	battle_effects:    bool `jsoncomment:"a far shot or blast also plays its distant sound"`,
+	explosion_effects: bool `jsoncomment:"a blast next to you rings your ears and muffles the rest for a few seconds"`,
 }
 
 Network_Settings :: struct {
-	server:     string `jsoncomment:"the server the main menu joins, host:port"`,
-	password:   string `jsoncomment:"the password the main menu joins with; empty for none"`,
-	lobby:      string `jsoncomment:"the lobby the server browser asks for its list"`,
-	mods_index: string `jsoncomment:"the mods' catalogue the Mods page lists, a mods.json"`,
-	smooth:     i32 `jsoncomment:"milliseconds a correction of another player is smoothed over; 0 snaps"`,
-	interp:     i32 `jsoncomment:"ticks the others are shown behind the newest snapshot, at least, so jitter doesn't show; raised by itself while snapshots come late"`,
+	server:     string `jsoncomment:"the server the main menu joins, host:port"`,
+	password:   string `jsoncomment:"the password the main menu joins with; empty for none"`,
+	lobby:      string `jsoncomment:"the lobby the server browser asks for its list"`,
+	mods_index: string `jsoncomment:"the mods' catalogue the Mods page lists, a mods.json"`,
+	smooth:     i32 `jsoncomment:"milliseconds a correction of another player is smoothed over; 0 snaps"`,
+	interp:     i32 `jsoncomment:"ticks the others are shown behind the newest snapshot, at least, so jitter doesn't show; raised by itself while snapshots come late"`,
 }
 
 Demo_Settings :: struct {
-	record_rounds: bool `jsoncomment:"a demo of every round joined, into demos/"`,
+	record_rounds: bool `jsoncomment:"a demo of every round joined, into demos/"`,
 }
 
 // Offline Play: capture the flag against bots, on this machine and no other, with no
 // server. Its limits, its bots and its maps.
 Offline_Settings :: struct {
-	time_limit:    i32 `jsoncomment:"minutes a round lasts"`,
-	capture_limit: i32 `jsoncomment:"the captures that win a round"`,
-	bots:          Bot_Settings `jsoncomment:"the bots on each team, how well they play, whether they talk"`,
-	maps:          []string `jsoncomment:"the rotation, played in turn; none plays the last map again"`,
+	time_limit:    i32 `jsoncomment:"minutes a round lasts"`,
+	capture_limit: i32 `jsoncomment:"the captures that win a round"`,
+	bots:          Bot_Settings `jsoncomment:"the bots on each team, how well they play, whether they talk"`,
+	maps:          []string `jsoncomment:"the rotation, played in turn; none plays the last map again"`,
 }
 
 Radio_Settings :: struct {
@@ -192,11 +192,11 @@ Radio_Call :: struct {
 // and radio calls, said by a key and not typed, still come through, but for a
 // spectator's while the spectators are muted.
 Mute_Settings :: struct {
-	everyone:   bool `jsoncomment:"everyone's chat"`,
-	team:       bool `jsoncomment:"your team's"`,
-	enemies:    bool `jsoncomment:"the other team's"`,
-	spectators: bool `jsoncomment:"the spectators', their taunts too"`,
-	players:    []string `jsoncomment:"these players', by name in any case, until unmuted"`,
+	everyone:   bool `jsoncomment:"everyone's chat"`,
+	team:       bool `jsoncomment:"your team's"`,
+	enemies:    bool `jsoncomment:"the other team's"`,
+	spectators: bool `jsoncomment:"the spectators', their taunts too"`,
+	players:    []string `jsoncomment:"these players', by name in any case, until unmuted"`,
 }
 
 LOBBY_URL :: "https://soldatreloaded-lobby.fly.dev"
