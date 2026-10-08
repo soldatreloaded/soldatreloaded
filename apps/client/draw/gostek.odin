@@ -134,6 +134,15 @@ PARTS := [?]Part {
 	// the waifu's: her fringe's bangs sit a little right on everyone, so it is anchored in
 	{file = "hair5", p1 = 9, p2 = 12, center = {0.03, 0.65}, flip = true, team = true, color = .Hair, hair = .Fringe},
 	{file = "hair6", p1 = 9, p2 = 12, center = {0, 0.5}, flip = true, team = true, color = .Hair, hair = .Bob},
+	// the new cuts, the mullet and the wolfcut, the fringe's anchors to start
+	{file = "hair7", p1 = 9, p2 = 12, center = {0.173, 0.591}, flip = true, team = true, color = .Hair, hair = .Mullet},
+	{file = "hair8", p1 = 9, p2 = 12, center = {0.167, 0.629}, flip = true, team = true, color = .Hair, hair = .Wolfcut},
+	// baldcut, the hair lab's
+	{file = "hair9", p1 = 9, p2 = 12, center = {0.018519, 0.574074}, flip = true, team = true, color = .Hair, hair = .Baldcut},
+	// afro, the hair lab's
+	{file = "hair10", p1 = 9, p2 = 12, center = {0, 0.499}, flip = true, team = true, color = .Hair, hair = .Afro},
+	// emo, the hair lab's
+	{file = "hair11", p1 = 9, p2 = 12, center = {0, 0.493}, flip = true, team = true, color = .Hair, hair = .Emo},
 	{id = "Silver_Lchain", file = "lancuch", p1 = 10, p2 = 22, center = {0.1, 0.5}, team = true, chain = .Dog_Tags},
 	{id = "Silver_Rchain", file = "lancuch", p1 = 11, p2 = 22, center = {0.1, 0.5}, team = true, chain = .Dog_Tags},
 	{id = "Silver_Pendant", file = "metal", p1 = 22, p2 = 21, center = {0.5, 0.7}, flip = true, team = true, chain = .Dog_Tags},

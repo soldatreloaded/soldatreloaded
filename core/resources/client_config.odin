@@ -45,7 +45,7 @@ Player_Settings :: struct {
 	skin:             utils.Rgba `jsoncomment:"the skin's colour, RRGGBB"`,
 	hair:             utils.Rgba `jsoncomment:"the hair's colour, RRGGBB"`,
 	jet:              utils.Rgba `jsoncomment:"the jet flame's colour, RRGGBB"`,
-	hair_style:       Hair_Style `jsoncomment:"army; the male's dreadlocks, punk, mr_t or normal; the waifu's fringe or bob. The rat and the furry wear only army, punk and mr_t."`,
+	hair_style:       Hair_Style `jsoncomment:"army; the male's dreadlocks, punk, mr_t or normal; the waifu's fringe or bob; mullet, wolfcut, baldcut, afro or emo. The rat and the furry wear only army, punk and mr_t."`,
 	head_style:       Head_Style `jsoncomment:"none; the male's helmet or hat; the waifu's own. The rat and the furry wear none."`,
 	chain_style:      Chain_Style `jsoncomment:"none, dog_tags or gold_chain"`,
 	primary_weapon:   Weapon `jsoncomment:"the primary at the next spawn: desert_eagles to minigun"`,
@@ -68,6 +68,11 @@ Hair_Style :: enum {
 	Normal,
 	Fringe,
 	Bob,
+	Mullet,
+	Wolfcut,
+	Baldcut,
+	Afro,
+	Emo,
 }
 
 Head_Style :: enum {
