@@ -4,7 +4,7 @@ A work in progress rewrite of Soldat Reloaded in Odin.
 Once completed, all future development will take place in this repo and the old C codebase will be archived.
 
 Soldat is a fast 2D multiplayer shooter: soldiers with jet boots, a dozen weapons and
-capture the flag. [Soldat Reloaded](https://github.com/soldatreloaded/soldatreloaded) is
+capture the flag. [Soldat Reloaded](https://github.com/soldatreloaded/old-soldatreloaded) is
 its C port, played and tested by the community; this is that game rewritten, playing
 exactly as it does.
 

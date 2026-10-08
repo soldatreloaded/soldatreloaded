@@ -13,7 +13,7 @@ import "core:fmt"
 import "../../core/http"
 import res "../../core/resources"
 
-REPOSITORY :: "soldatreloaded/soldatreloaded-odin"
+REPOSITORY :: "soldatreloaded/soldatreloaded"
 LATEST_URL :: "https://github.com/" + REPOSITORY + "/releases/latest/download/"
 MANIFEST :: "manifest." + PLATFORM + ".json"
 ARCHIVE :: "soldatreloaded-" + PLATFORM + ".zip"

@@ -105,7 +105,7 @@ Each package is a program and the part of `assets/` it reads. The game's zips ho
 install in a `Soldat Reloaded` folder, which the launcher reads its files from; the
 server's is unpacked flat, so that its root is the server's directory. Their names carry
 no version, so the newest release's are always at the same addresses
-(`https://github.com/soldatreloaded/soldatreloaded-odin/releases/latest/download/<name>`):
+(`https://github.com/soldatreloaded/soldatreloaded/releases/latest/download/<name>`):
 
 | File | Holds |
 |---|---|
