@@ -70,12 +70,11 @@ jobs:
           gh release create "$TAG" dist/* \
             --title "$TAG" --notes-from-tag --verify-tag $prerelease
 
-  # Off until the DISCORD_WEBHOOK secret is set: to turn it on, put back
-  # if: ${{ !contains(github.ref_name, '-') }}
+  # A release announced on Discord (discord-notify.yml); a pre-release (v0.11.0-rc.1) isn't.
   discord:
     needs: publish
-    if: false
-    uses: ./.github/workflows/discord.yml
+    if: ${{ !contains(github.ref_name, '-') }}
+    uses: ./.github/workflows/discord-notify.yml
     with:
       tag: ${{ github.ref_name }}
     secrets: inherit
