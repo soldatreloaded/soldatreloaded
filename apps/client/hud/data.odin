@@ -53,8 +53,9 @@ Hud_Data :: struct {
 
 	// the settings
 	minimap:      bool,
-	clock:        bool, // the time left, at the top
-	clocks:       bool, // the time left and the time of day, in a row left of the stats
+	clock:        bool, // the time left, in the middle at the top
+	clock_right:  bool, // the time left, in a row left of the stats
+	local_time:   bool, // and the time of day there
 	stats:        Stats, // which of the frame rate and the line's numbers stack in the top right
 	player_names: bool,
 	team_names:   bool, // teammates' names by them always, not only out of view

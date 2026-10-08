@@ -170,6 +170,26 @@ old_json_config :: proc(t: ^testing.T) {
 	testing.expect(t, again.player.name == "Old", "the MJSON read from then on")
 }
 
+// A config of 0.10's, with time_left and clocks as they were, still reads: the settings
+// gone are passed over, the rest kept, and the time left's place is its own setting.
+@(test)
+old_time_settings :: proc(t: ^testing.T) {
+	dir := scratch(t, "time")
+	defer os.remove_all(dir)
+	path := utils.temp_path(dir, "client.config.mjson")
+	write(path, "player: {name: \"Kept\"}\ninterface: {time_left: true, clocks: true, minimap: true}\n")
+	config := res.client_config_load(path)
+	defer res.client_config_destroy(config)
+	testing.expect(t, !config.broken && config.player.name == "Kept" && config.interface.minimap, "it reads, its other settings kept")
+	testing.expect_value(t, config.interface.time_left_position, res.Time_Left_Position.None)
+
+	write(path, "interface: {time_left_position: \"top_right\", local_time: true}\n")
+	again := res.client_config_load(path)
+	defer res.client_config_destroy(again)
+	testing.expect_value(t, again.interface.time_left_position, res.Time_Left_Position.Top_Right)
+	testing.expect(t, again.interface.local_time, "and the local time")
+}
+
 // A config that still names the lobby of before is moved to the lobby now, the client's
 // and the server's; one naming a lobby of its own keeps it.
 @(test)

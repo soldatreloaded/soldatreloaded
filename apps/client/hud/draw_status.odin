@@ -43,12 +43,12 @@ draw_readouts :: proc(u: ^ui.Ui, data: ^Hud_Data) {
 	if .Jitter in shown do readout(u, fmt.tprintf("Jitter: %d ms", data.jitter), &y, STATS_COLOR)
 }
 
-// The clocks, with their setting: the round's time left and the time of day, in a row
-// along the top, left of the corner's lines and in the scoreboard clock's colour. The
+// The clocks, with their settings: the round's time left (time_left_position) and the
+// time of day (local_time), in a row along the top, left of the corner's lines and in the scoreboard clock's colour. The
 // lines are made room for at their widest likely numbers, so the row stays put as they
 // change.
 draw_clocks :: proc(u: ^ui.Ui, data: ^Hud_Data) {
-	if !data.clocks do return
+	if !data.clock_right && !data.local_time do return
 	room: f32
 	widest :: proc(u: ^ui.Ui, room: ^f32, likely, text: string) {
 		room^ = max(room^, text_width(u, likely, STATS_FONT), text_width(u, text, STATS_FONT))
@@ -60,7 +60,8 @@ draw_clocks :: proc(u: ^ui.Ui, data: ^Hud_Data) {
 	if .Loss in shown do widest(u, &room, "Loss: 100%", fmt.tprintf("Loss: %d%%", data.loss))
 	if .Jitter in shown do widest(u, &room, "Jitter: 999 ms", fmt.tprintf("Jitter: %d ms", data.jitter))
 	if room > 0 do room += 12
-	text := fmt.tprintf("Time %02d:%02d   %s", data.time_left / 60, data.time_left % 60, data.time_of_day)
+	text := fmt.tprintf("Time %02d:%02d", data.time_left / 60, data.time_left % 60) if data.clock_right else ""
+	if data.local_time do text = fmt.tprintf("%s   %s", text, data.time_of_day) if text != "" else data.time_of_day
 	write(u, text, {u.width - STATS_EDGE - room - text_width(u, text, STATS_FONT), STATS_EDGE}, STATS_FONT, CLOCK_COLOR)
 }
 

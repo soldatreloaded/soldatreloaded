@@ -132,8 +132,9 @@ hud_data :: proc(match: ^Match, config: ^res.Client_Config) -> (data: hud.Hud_Da
 	interface := &config.interface
 	graphics := &config.graphics
 	data.minimap = interface.minimap
-	data.clock = interface.time_left
-	data.clocks = interface.clocks
+	data.clock = interface.time_left_position == .Top_Center || interface.time_left_position == .Both
+	data.clock_right = interface.time_left_position == .Top_Right || interface.time_left_position == .Both
+	data.local_time = interface.local_time
 	if interface.show_fps do data.stats += {.FPS}
 	if interface.show_ping do data.stats += {.Ping}
 	if interface.show_loss do data.stats += {.Loss}

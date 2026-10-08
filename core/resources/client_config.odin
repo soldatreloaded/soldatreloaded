@@ -118,27 +118,34 @@ Window_Mode :: enum {
 }
 
 Interface_Settings :: struct {
-	minimap:           bool `jsoncomment:"the minimap"`,
-	time_left:         bool `jsoncomment:"the time left in the round, at the top of the screen"`,
-	clocks:            bool `jsoncomment:"the time left in the round and the time of day, in a row left of the frame rate and the line's numbers, always"`,
-	show_fps:          bool `jsoncomment:"the frame rate, in the top right"`,
-	show_ping:         bool `jsoncomment:"your ping, under it"`,
-	show_loss:         bool `jsoncomment:"the share of the server's snapshots lost over the last second"`,
-	show_jitter:       bool `jsoncomment:"how much the round trip varies"`,
-	player_names:      bool `jsoncomment:"teammates' names at the screen's edge when out of view (everyone's, spectating)"`,
-	team_names:        bool `jsoncomment:"teammates' names by them always, not only at the screen's edge when out of view (with player_names)"`,
-	typing:            Typing_Style `jsoncomment:"over a player typing: off, dots (the original's) or typing, the word"`,
-	typing_size:       i32 `jsoncomment:"the typing indicator's size, percent, 50 to 200"`,
-	kill_log_length:   i32 `jsoncomment:"the kill log's lines, two a kill, 0 to 50; 0 shows none"`,
-	kill_log_position: Kill_Log_Position `jsoncomment:"where the kill log is: top_right (the original's), lower_right, or top_left, under the chat"`,
-	console_lines:     i32 `jsoncomment:"how many console lines the HUD shows"`,
-	discord:           bool `jsoncomment:"Playing Soldat Reloaded on your Discord profile, with the map and the server, while the Discord app runs here"`,
+	minimap:            bool `jsoncomment:"the minimap"`,
+	time_left_position: Time_Left_Position `jsoncomment:"the time left in the round, and where: none, top_center, top_right (in a row left of the frame rate and the line's numbers), or both"`,
+	local_time:         bool `jsoncomment:"your local time, in the top right, in a row left of the frame rate and the line's numbers"`,
+	show_fps:           bool `jsoncomment:"the frame rate, in the top right"`,
+	show_ping:          bool `jsoncomment:"your ping, under it"`,
+	show_loss:          bool `jsoncomment:"the share of the server's snapshots lost over the last second"`,
+	show_jitter:        bool `jsoncomment:"how much the round trip varies"`,
+	player_names:       bool `jsoncomment:"teammates' names at the screen's edge when out of view (everyone's, spectating)"`,
+	team_names:         bool `jsoncomment:"teammates' names by them always, not only at the screen's edge when out of view (with player_names)"`,
+	typing:             Typing_Style `jsoncomment:"over a player typing: off, dots (the original's) or typing, the word"`,
+	typing_size:        i32 `jsoncomment:"the typing indicator's size, percent, 50 to 200"`,
+	kill_log_length:    i32 `jsoncomment:"the kill log's lines, two a kill, 0 to 50; 0 shows none"`,
+	kill_log_position:  Kill_Log_Position `jsoncomment:"where the kill log is: top_right (the original's), lower_right, or top_left, under the chat"`,
+	console_lines:      i32 `jsoncomment:"how many console lines the HUD shows"`,
+	discord:            bool `jsoncomment:"Playing Soldat Reloaded on your Discord profile, with the map and the server, while the Discord app runs here"`,
 }
 
 Typing_Style :: enum {
 	Off,
 	Dots,   // the original's
 	Typing, // Typing...
+}
+
+Time_Left_Position :: enum {
+	None,
+	Top_Center,
+	Top_Right, // by the frame rate and the line's numbers
+	Both,
 }
 
 Kill_Log_Position :: enum {

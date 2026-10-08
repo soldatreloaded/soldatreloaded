@@ -10,6 +10,9 @@ TYPING_NAMES := [?]string{"Off", "Dots", "Typing..."}
 @(private = "file", rodata)
 KILL_LOG_PLACES := [?]string{"Top right", "Lower right", "Top left"}
 
+@(private = "file", rodata)
+TIME_LEFT_PLACES := [?]string{"None", "Top center", "Top right", "Both"}
+
 page_options :: proc(menu: ^Menu) {
 	k := &menu.kit
 	config := menu.config
@@ -31,8 +34,8 @@ page_options :: proc(menu: ^Menu) {
 	ui.slider(k, "Kill log length", &config.interface.kill_log_length, 0, 50, 2, "%d lines")
 	ui.enum_select(k, "Kill log position", &config.interface.kill_log_position, KILL_LOG_PLACES[:])
 	ui.toggle(k, "Minimap", &config.interface.minimap)
-	ui.toggle(k, "Show time left", &config.interface.time_left)
-	ui.toggle(k, "Show clocks by the stats", &config.interface.clocks)
+	ui.enum_select(k, "Show time left", &config.interface.time_left_position, TIME_LEFT_PLACES[:])
+	ui.toggle(k, "Show local time", &config.interface.local_time)
 	ui.toggle(k, "Show FPS", &config.interface.show_fps)
 	ui.toggle(k, "Show ping", &config.interface.show_ping)
 	ui.toggle(k, "Show packet loss", &config.interface.show_loss)

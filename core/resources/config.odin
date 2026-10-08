@@ -156,7 +156,7 @@ config_marshalers_init :: proc "contextless" () {
 
 	register(utils.Rgba, marshal_color, unmarshal_color)
 	register(Maybe(utils.Rgba), marshal_maybe_color, unmarshal_maybe_color)
-	for id in ([?]typeid{Gostek, Hair_Style, Head_Style, Chain_Style, Weapon, Typing_Style, Kill_Log_Position}) {
+	for id in ([?]typeid{Gostek, Hair_Style, Head_Style, Chain_Style, Weapon, Typing_Style, Kill_Log_Position, Time_Left_Position}) {
 		register(id, marshal_enum, unmarshal_enum)
 	}
 	register(Window_Mode, marshal_enum, unmarshal_window_mode)
