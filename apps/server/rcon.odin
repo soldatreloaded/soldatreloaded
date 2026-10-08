@@ -217,9 +217,12 @@ admin_line :: proc(r: ^Rcon, admin: ^Rcon_Admin, sv: ^Server, password: string, 
 	}
 	text := strings.trim_left(line, "/")
 	if text == "" do return
-	log.infof("rcon %s: %s", admin.address, text)
 	word, _ := next_word(text)
-	if !admin_command(sv, Rcon_Caller{admin.address}, text) do log.infof("No command %s; /help lists them.", word)
+	log.infof("rcon %s: %s", admin.address, "password ..." if word == "password" else text) // every admin reads the log
+	if admin_command(sv, Rcon_Caller{admin.address}, text) do return
+	// what the server hasn't, a script's: a controller's word to it (the gather bot's)
+	if sv.hooks.rcon != nil && sv.hooks.rcon(sv.hooks.user, text) do return
+	log.infof("No command %s; /help lists them.", word)
 }
 
 // A line to the admin, as the log's are sent.

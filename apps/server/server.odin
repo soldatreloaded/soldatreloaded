@@ -71,6 +71,7 @@ Hooks :: struct {
 	user:          rawptr,
 	chat:          proc(user: rawptr, slot: game.Soldier_Id, text: string, team: bool) -> bool, // true: kept, not relayed
 	command:       proc(user: rawptr, slot: game.Soldier_Id, text: string) -> bool,            // the text after the '/'; true: answered
+	rcon:          proc(user: rawptr, text: string) -> bool,                                    // an rcon line no admin command takes; true: answered
 	joined:        proc(user: rawptr, slot: game.Soldier_Id),
 	left:          proc(user: rawptr, slot: game.Soldier_Id, name: string),
 	ticked:        proc(user: rawptr),
@@ -111,6 +112,7 @@ Server :: struct {
 	pending_map: net.Map_Name,                 // the map the countdown leads to
 	ending_told: bool,                         // the countdown has begun and been announced
 	end_why:     string,                       // "limit", "nextmap" or "vote", for the hooks; "" until known
+	password:    Maybe(net.Password),          // set while running (/password, a script), over the config's until the server stops
 	hooks:       Hooks,
 	suicides:    [MAX_PLAYERS]Maybe(bool), // a death asked for in the chat (/kill, /brutalkill: brutal) or by an admin (pkill), for the next tick
 	last_joined: Maybe(Slot),             // the person who joined last, for kicklast
@@ -257,9 +259,23 @@ server_map :: proc(sv: ^Server) -> string {
 	return utils.short_string_text(&sv.map_name)
 }
 
-// The password a Hello must say, as the config has it now; empty for none.
+// The password a Hello must say: one set while running, else the config's as it is now;
+// empty for none.
 server_password :: proc(sv: ^Server) -> string {
+	if set, is_set := &sv.password.?; is_set do return utils.short_string_text(set)
 	return sv.options.config.server.password
+}
+
+// The password a Hello must say from now on, over the config's until the server stops;
+// empty for none. Kept in memory alone: a server started again asks the config's. False
+// if it is too long to keep, or has a space or a quote in it, which a player's Join page
+// couldn't carry.
+server_set_password :: proc(sv: ^Server, password: string) -> bool {
+	if len(password) > len(net.Password{}.chars) || strings.contains_any(password, " 	\"") do return false
+	set: net.Password
+	utils.short_string_set(&set, password)
+	sv.password = set
+	return true
 }
 
 // The port it listens on: the one it was started with, else the config's.

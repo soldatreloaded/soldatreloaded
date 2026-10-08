@@ -13,7 +13,8 @@ import "../../apps/server"
 // Rcon as an admin tool or telnet speaks it, over a real TCP connection on the loopback:
 // greeted, a wrong password answered and hung up on; the right one, and the commands
 // said with it in the same packet, run as the console's admin commands are, their
-// answers sent back; the console's own (quit) aren't rcon's.
+// answers sent back; the console's own (quit) aren't rcon's. The join password set and
+// cleared, and never said back; a line no admin command takes handed to the script.
 @(test)
 rcon :: proc(t: ^testing.T) {
 	PASSWORD :: "secret"
@@ -88,4 +89,28 @@ rcon :: proc(t: ^testing.T) {
 	send(&a, "help\n")
 	heard, _ = hear(sv, r, &a, "/kick")
 	testing.expect(t, heard, "help lists the admin commands")
+
+	// the join password: set, refused when it couldn't be typed, and cleared; never said back
+	send(&a, "password gather42\n")
+	heard, _ = hear(sv, r, &a, "The join password is set.")
+	testing.expect(t, heard && server.server_password(sv) == "gather42", "rcon sets the join password")
+	send(&a, "password two words\n")
+	heard, _ = hear(sv, r, &a, "at most 32 letters")
+	testing.expect(t, heard && server.server_password(sv) == "gather42", "one with a space is refused")
+	send(&a, "password\n")
+	heard, _ = hear(sv, r, &a, "The join password is cleared.")
+	testing.expect(t, heard && server.server_password(sv) == "", "and clears it")
+	testing.expect(t, !strings.contains(strings.to_string(a.heard), "gather42"), "the password is never said back, nor in the log")
+
+	// a line no admin command takes goes to the script, which answers it or doesn't
+	@(static) script_heard: [dynamic]string
+	sv.hooks.rcon = proc(user: rawptr, text: string) -> bool {
+		append(&script_heard, strings.clone(text, context.temp_allocator))
+		return text == "gather start 7"
+	}
+	send(&a, "gather start 7\nnothing here\n")
+	heard, _ = hear(sv, r, &a, "No command nothing")
+	testing.expect(t, heard && len(script_heard) == 2 && script_heard[0] == "gather start 7", "the script hears what the server has no command for")
+	testing.expect(t, !strings.contains(strings.to_string(a.heard), "No command gather"), "and what it answers isn't refused")
+	delete(script_heard)
 }

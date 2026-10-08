@@ -112,6 +112,21 @@ handlers :: proc(t: ^testing.T) {
 	testing.expect(t, !hooks.command(hooks.user, 0, "unknown"), "and not one it doesn't")
 	testing.expect(t, hooks.command(hooks.user, 0, "module"), "the script it requires answers its own")
 
+	// an rcon line the server has no command for, a controller's word to the script; and
+	// the join password, which the script may set (a gather's)
+	testing.expect(t, server.script_run(s, `
+		server.on('rcon', function(text)
+			local word, rest = text:match('^(%S+)%s*(.*)$')
+			if word ~= 'gather' then return false end
+			rcon_heard = rest
+			return server.set_password(rest)
+		end)`, "rcon"), "a handler for rcon's lines")
+	testing.expect(t, hooks.rcon(hooks.user, "gather pw42") && holds(s, "assert(rcon_heard == 'pw42')"), "the script hears an rcon line and answers it")
+	testing.expect(t, server.server_password(sv) == "pw42", "and sets the join password")
+	testing.expect(t, !hooks.rcon(hooks.user, "other line"), "and doesn't answer what isn't its")
+	testing.expect(t, holds(s, "assert(server.set_password('two words') == false and server.set_password() == true)") && server.server_password(sv) == "",
+		"a password with a space is refused, and none clears it")
+
 	// handlers handed in by any script: heard in turn, an error passed over, the first to
 	// keep a line ending it, one taken off heard no more
 	testing.expect(t, server.script_run(s, `

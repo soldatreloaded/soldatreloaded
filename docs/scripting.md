@@ -58,6 +58,7 @@ one script, hand handlers in with `server.on`, and keep a script's own names `lo
 | `round_start` | `map` | the next round has begun on `map` | |
 | `tick` | `tick` | every tick, 60 a second: keep it quick | |
 | `second` | | once a second | |
+| `rcon` | `text` | an rcon admin sent a line the server has no command for: a controller's word to the script, a gather bot's say | `true` answers it; else "No command" |
 
 `stats` holds `why` (`"limit"`, `"nextmap"` or `"vote"`), `map`, `round`, `time_left`
 in seconds, `scores` (`{alpha = n, bravo = n}`), `winner` (`"alpha"` or `"bravo"`, or
@@ -78,6 +79,7 @@ players are known by on the wire; a slot is reused once its player has left.
 | `server.command(text)` | a console command, as if typed: `"say hello"`, `"addbot1"`, `"nextmap"`, `"banip 1.2.3.4 60"`. Only the console's own commands (`apps/server/console.odin`): the settings are server.config.mjson's, and none is changed from here |
 | `server.pause()`, `server.unpause()` | the game stands still, nobody moving and the clock stopped, or goes on; `true` if that changed anything |
 | `server.paused()` | whether it stands |
+| `server.set_password([password])` | the password players join with, from now on until the server stops (the config's after); none, or `""`, for none: `true`, or `false` for one longer than 32 letters or with a space or quote |
 | `server.next_map([map])` | the round ends now; on `map` if given, else the rotation's next: `true`, or `false` (and nothing changes) for a map the server hasn't got, which it couldn't load |
 | `server.maps()` | the server's list of maps, the one its votes and map window pick from: the rotation (`maps` in server.config.mjson), or every map it has when there is none |
 | `server.map()`, `server.round()` | the map; the round, from 1 |

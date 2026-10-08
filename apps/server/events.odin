@@ -26,11 +26,12 @@ Event :: enum {
 	Round_Start,
 	Tick,
 	Second,
+	Rcon,
 }
 
 // The events by the names server.on takes, ended by nil for luaL_checkoption.
 @(private = "file")
-event_names := [len(Event) + 1]cstring{"chat", "command", "join", "leave", "kill", "capture", "spawn", "match_end", "round_end", "round_start", "tick", "second", nil}
+event_names := [len(Event) + 1]cstring{"chat", "command", "join", "leave", "kill", "capture", "spawn", "match_end", "round_end", "round_start", "tick", "second", "rcon", nil}
 
 @(private = "file")
 global_names := [Event]cstring {
@@ -46,6 +47,7 @@ global_names := [Event]cstring {
 	.Round_Start = "on_round_start",
 	.Tick        = "on_tick",
 	.Second      = "on_second",
+	.Rcon        = "on_rcon",
 }
 
 // The registry's table of the handlers: event -> {fn, fn, ...}.
@@ -158,6 +160,7 @@ hooks :: proc(s: ^Script) -> Hooks {
 		user          = s,
 		chat          = hook_chat,
 		command       = hook_command,
+		rcon          = hook_rcon,
 		joined        = hook_joined,
 		left          = hook_left,
 		ticked        = hook_ticked,
@@ -181,6 +184,15 @@ hook_command :: proc(user: rawptr, slot: game.Soldier_Id, text: string) -> bool 
 	lua.pushinteger(s.L, lua.Integer(slot))
 	push_string(s.L, text)
 	return dispatch(s, .Command, 2, true)
+}
+
+// An rcon line the server has no command for, as a controller's word to the script;
+// true if a handler answered it.
+hook_rcon :: proc(user: rawptr, text: string) -> bool {
+	s := (^Script)(user)
+	if !listened(s, .Rcon) do return false
+	push_string(s.L, text)
+	return dispatch(s, .Rcon, 1, true)
 }
 
 hook_joined :: proc(user: rawptr, slot: game.Soldier_Id) {

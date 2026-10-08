@@ -23,6 +23,7 @@ server_api := [?]lua.L_Reg {
 	{"pause", l_pause},
 	{"unpause", l_unpause},
 	{"paused", l_paused},
+	{"set_password", l_set_password},
 	{"next_map", l_next_map},
 	{"map", l_map},
 	{"maps", l_maps},
@@ -200,6 +201,17 @@ l_unpause :: proc "c" (L: ^lua.State) -> c.int {
 	s := script_of(L)
 	context = s.ctx
 	lua.pushboolean(L, b32(server_pause(s.server, false)))
+	return 1
+}
+
+// server.set_password(password): the join password from now on, until the server stops;
+// "" or nil for none. False if it is too long, or has a space or a quote in it.
+@(private = "file")
+l_set_password :: proc "c" (L: ^lua.State) -> c.int {
+	s := script_of(L)
+	context = s.ctx
+	password := string(lua.L_optstring(L, 1, ""))
+	lua.pushboolean(L, b32(server_set_password(s.server, password)))
 	return 1
 }
 

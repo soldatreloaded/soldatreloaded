@@ -3,6 +3,7 @@ package server
 import "core:fmt"
 import "core:log"
 import "core:strconv"
+import "core:strings"
 import "core:time"
 
 import sa "core:container/small_array"
@@ -47,7 +48,7 @@ import "lists"
 ADMIN_COMMANDS :: [?]string {
 	"kick", "kicklast", "ban", "banip", "banhw", "unban", "unbanlast", "mute", "unmute",
 	"setteam1", "setteam2", "setteam5", "pkill", "map", "nextmap", "restart", "pause",
-	"unpause", "addbot", "addbot1", "addbot2", "say", "bans", "mutes", "admins",
+	"unpause", "addbot", "addbot1", "addbot2", "say", "bans", "mutes", "admins", "password",
 }
 
 // What /help says, a line each, as the chat has room for.
@@ -67,6 +68,7 @@ ADMIN_HELP := [?]string {
 	"/servermute <player>  /serverunmute <whom>  /bans /mutes /admins",
 	"/map <name>  /nextmap  /restart  /pause  /unpause",
 	"/addbot [name] (/addbot1 alpha, /addbot2 bravo)  /say <text>",
+	"/password [password]: the join password until the server stops; none clears it",
 }
 
 // Who runs an admin command: the server's console (nil), a player in the chat, or an
@@ -223,6 +225,14 @@ admin_command :: proc(sv: ^Server, from: Caller, text: string) -> bool {
 	case "restart":
 		server_change_map(sv, server_map(sv))
 		log.infof("%s restarted %s", by, server_map(sv))
+	case "password": // the join password from now on; not said back, nor logged but as set
+		password := strings.trim_space(rest)
+		if !server_set_password(sv, password) {
+			reply(sv, from, "A password is at most 32 letters, with no space or quote.")
+		} else {
+			reply(sv, from, "The join password is set." if password != "" else "The join password is cleared.")
+			log.infof("%s %s the join password", by, "set" if password != "" else "cleared")
+		}
 	case "pause", "unpause":
 		paused := word == "pause"
 		if server_pause(sv, paused) {
