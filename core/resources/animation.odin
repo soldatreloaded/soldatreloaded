@@ -59,6 +59,9 @@ Animation_Id :: enum {
 	Hands_Up_Recoil,
 	Melee,
 	Own,
+	Breakdown,
+	Dab,
+	Yeah,
 }
 
 // Where an animation's keyframes are, and how it plays: the ticks each frame is held
@@ -114,6 +117,10 @@ ANIMATION_INFO := [Animation_Id]Animation_Info {
 	.Hands_Up_Recoil = {"goraodrzut.poa", 1, false},
 	.Melee           = {"kolba.poa", 1, false},
 	.Own             = {"rucha.poa", 3, false},
+	// the community's cheers, past the original's
+	.Breakdown       = {"cieszy_breakdown.poa", 3, false},
+	.Dab             = {"cieszy_dab.poa", 3, false},
+	.Yeah            = {"cieszy_yeah.poa", 3, false},
 }
 
 // Where each of the skeleton's points is in one frame. Point n of the file is index n-1.

@@ -62,7 +62,8 @@ soldier_pose :: proc(animations: ^res.Animations, soldier: ^Soldier, pos: utils.
 arms_animated :: proc(id: res.Animation_Id) -> bool {
 	#partial switch id {
 	case .Reload, .Clip_In, .Clip_Out, .Slide_Back, .Change, .Throw_Weapon, .Weapon_None, .Punch, .Roll,
-	     .Roll_Back, .Cigar, .Match, .Smoke, .Wipe, .Take_Off, .Groin, .Piss, .Mercy, .Mercy2, .Victory, .Own, .Melee:
+	     .Roll_Back, .Cigar, .Match, .Smoke, .Wipe, .Take_Off, .Groin, .Piss, .Mercy, .Mercy2, .Victory, .Own,
+	     .Breakdown, .Dab, .Yeah, .Melee:
 		return true
 	}
 	return false

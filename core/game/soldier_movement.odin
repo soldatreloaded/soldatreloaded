@@ -254,7 +254,7 @@ movement_control :: proc(world: ^World, resources: ^Resources, soldier: ^Soldier
 	legs, body := &soldier.pose.legs, &soldier.pose.body
 
 	#partial switch body.id {
-	case .Take_Off, .Piss, .Mercy, .Mercy2, .Victory, .Own:
+	case .Take_Off, .Piss, .Mercy, .Mercy2, .Victory, .Own, .Breakdown, .Dab, .Yeah:
 		return
 	}
 
@@ -447,7 +447,7 @@ body_idle_animation :: proc(id: res.Animation_Id) -> bool {
 	#partial switch id {
 	case .Recoil, .Small_Recoil, .Aim_Recoil, .Hands_Up_Recoil, .Shotgun, .Barret, .Change, .Throw_Weapon, .Weapon_None,
 	     .Punch, .Roll, .Roll_Back, .Cigar, .Match, .Smoke, .Wipe, .Take_Off, .Groin, .Piss, .Mercy, .Mercy2,
-	     .Victory, .Own, .Reload, .Prone, .Get_Up, .Prone_Move, .Melee:
+	     .Victory, .Own, .Breakdown, .Dab, .Yeah, .Reload, .Prone, .Get_Up, .Prone_Move, .Melee:
 		return false
 	}
 	return true

@@ -67,7 +67,7 @@ player_command :: proc(sv: ^Server, slot: game.Soldier_Id, text: string) {
 		team_command(sv, slot, rest)
 	case "votemap", "votekick", "yes", "no":
 		vote_command(sv, slot, word, rest)
-	case "tabac", "smoke", "takeoff", "victory", "piss", "mercy", "pwn":
+	case "tabac", "smoke", "takeoff", "victory", "breakdown", "dab", "yeah", "piss", "mercy", "pwn":
 		game.soldier_taunt(&sv.game.world.soldiers[slot], word)
 	case "kill", "brutalkill":
 		// the original's: a death by one's own hand, a kill fewer; the brutal one tears

@@ -6,7 +6,8 @@ import "../utils"
 // The idle antics and the taunts (Control.pas, the IDLE block of ControlSprite). Standing
 // still long enough a soldier chews tobacco and spits, lights a cigar, wipes its brow or
 // scratches; by chat a player asks for those and the rest (/tabac, /smoke, /takeoff,
-// /victory, /piss, /mercy, /pwn). The server picks the idle antic, and relays every ask
+// /victory, /piss, /mercy, /pwn, and the community's cheers past the original's:
+// /breakdown, /dab, /yeah). The server picks the idle antic, and relays every ask
 // as a numbered antic (antics.asked). The machine runs on the soldier's own animations
 // wherever it is stepped: its owner's run is the one that counts, the others' keep the
 // sparks in step. The sounds are read off the animations; the sparks go out as Antic.
@@ -23,20 +24,26 @@ ANTIC_VICTORY :: 5
 ANTIC_PISS :: 6
 ANTIC_MERCY :: 7
 ANTIC_PWN :: 8
+ANTIC_BREAKDOWN :: 9 // the community's cheers, past the original's: a taunt each
+ANTIC_DAB :: 10
+ANTIC_YEAH :: 11
 
 // The taunts a player asks for in the chat, by the antic each is (CommandPlayerCommand);
 // none for the idle antics no one asks for.
 @(rodata)
 TAUNT_NAMES := [?]string {
-	ANTIC_TOBACCO  = "tabac",
-	ANTIC_CIGAR    = "smoke",
-	ANTIC_WIPE     = "",
-	ANTIC_GROIN    = "",
-	ANTIC_TAKE_OFF = "takeoff",
-	ANTIC_VICTORY  = "victory",
-	ANTIC_PISS     = "piss",
-	ANTIC_MERCY    = "mercy",
-	ANTIC_PWN      = "pwn",
+	ANTIC_TOBACCO   = "tabac",
+	ANTIC_CIGAR     = "smoke",
+	ANTIC_WIPE      = "",
+	ANTIC_GROIN     = "",
+	ANTIC_TAKE_OFF  = "takeoff",
+	ANTIC_VICTORY   = "victory",
+	ANTIC_PISS      = "piss",
+	ANTIC_MERCY     = "mercy",
+	ANTIC_PWN       = "pwn",
+	ANTIC_BREAKDOWN = "breakdown",
+	ANTIC_DAB       = "dab",
+	ANTIC_YEAH      = "yeah",
 }
 
 // The taunt `name` asked of the soldier, by whoever decides its antics (the server, or
@@ -247,6 +254,14 @@ soldier_antics :: proc(world: ^World, resources: ^Resources, id: Soldier_Id, aut
 		if antics.idle_time == 0 {
 			res.animation_switch(animations, body, .Own)
 			res.animation_switch(animations, legs, .Own)
+			antics.idle_time = DEFAULT_IDLE_TIME
+			antics.idle_antic = -1
+		}
+
+	case ANTIC_BREAKDOWN, ANTIC_DAB, ANTIC_YEAH: // as the victory, silent
+		if antics.idle_time == 0 {
+			cheer: res.Animation_Id = .Breakdown if antics.idle_antic == ANTIC_BREAKDOWN else .Dab if antics.idle_antic == ANTIC_DAB else .Yeah
+			res.animation_switch(animations, body, cheer)
 			antics.idle_time = DEFAULT_IDLE_TIME
 			antics.idle_antic = -1
 		}

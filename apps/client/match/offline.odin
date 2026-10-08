@@ -17,7 +17,7 @@ import "../input"
 
 // A command said in the chat, where there is no server to take it: what a server does
 // for its players (apps/server/chat.odin's player_command), done here for me. The taunts
-// (/tabac, /smoke, /takeoff, /victory, /piss, /mercy, /pwn), /kill and /brutalkill,
+// (/tabac, /smoke, /takeoff, /victory, /breakdown, /dab, /yeah, /piss, /mercy, /pwn), /kill and /brutalkill,
 // /team, and /help; the votes are a server's.
 @(private = "package")
 offline_command :: proc(match: ^Match, text: string) {
@@ -38,7 +38,7 @@ offline_command :: proc(match: ^Match, text: string) {
 		hud.console_say(feed, hud.GAME_COLOR, "There are no votes offline.")
 	case "help":
 		hud.console_say(feed, hud.GAME_COLOR, "/team <1 alpha, 2 bravo>  /kill  /brutalkill")
-		hud.console_say(feed, hud.GAME_COLOR, "/tabac /smoke /takeoff /victory /piss /mercy /pwn")
+		hud.console_say(feed, hud.GAME_COLOR, "/tabac /smoke /takeoff /victory /breakdown /dab /yeah /piss /mercy /pwn")
 	case:
 		if !sim.soldier_taunt(me, word) do hud.console_say(feed, hud.GAME_COLOR, "Unknown command: /%s", word)
 	}
