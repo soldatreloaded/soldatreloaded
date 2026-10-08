@@ -91,11 +91,12 @@ tag runs `.github/workflows/release.yml`, each step only if the one before succe
    server on Linux.
 3. **publish**: a GitHub release named after the tag, its notes the tag's message,
    with every package and manifest attached.
-4. **discord**: `discord.yml` posts the release to the channel behind the
-   `DISCORD_WEBHOOK` secret (a webhook URL, set under the repository's Settings →
-   Secrets and variables → Actions). It can be run by hand from the Actions tab to
-   announce a release again. **Off for now** (`if: false` in release.yml), until the
-   secret is set.
+4. **discord**: `discord-notify.yml` posts the release to the channel behind the
+   `DISCORD_RELEASE_WEBHOOK` secret (a webhook URL, under the repository's Settings →
+   Secrets and variables → Actions): an embed of its notes, its downloads, and the game's
+   icon, as `.github/discord-notify.jq` makes it. Not for a pre-release. It can be run by
+   hand from the Actions tab, or with `gh workflow run`, to announce a release again, or
+   with notes and a title of its own.
 
 A tag whose tests fail releases nothing; delete it, fix, and tag again.
 
