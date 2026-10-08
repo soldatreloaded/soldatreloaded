@@ -40,13 +40,12 @@ bind :: proc(menu: ^Menu, key, command: string) {
 
 // ---------------------------------------------------------------------------------
 // The taunts: a modifier and a key, the message said when they are pressed.
-// `alt+q = "say_team Cover me!"` is a taunt, and so is one whose text runs as a radio
-// call: `alt+1 = "radio 1 2 Base!"` says "Base!" to the team as the "Enemy flagger,
-// middle!" call, with its sound; `alt+2 = "radio 1 2"`, with no words, makes the call
-// itself, as the radio menu does. A slot holds one taunt: setting it unbinds the slot's
-// other modifiers. The message loses what a console line can't carry: `"` ends a quoted
-// word, `;` ends a command, and `//` comments the rest of the line away (it becomes a
-// space).
+// `alt+q = "say_team Cover me!"` is a taunt, and so is a radio call: `alt+1 = "radio 1 2"`
+// makes the "Enemy flagger, middle!" call, the same as the radio menu does (a bind
+// written by hand with words after the call loses them here). A slot holds one taunt:
+// setting it unbinds the slot's other modifiers. The message loses what a console line
+// can't carry: `"` ends a quoted word, `;` ends a command, and `//` comments the rest of
+// the line away (it becomes a space).
 
 TAUNT_SLOTS :: 36
 
@@ -73,18 +72,19 @@ TAUNT_MODIFIER_KEYS := [Taunt_Modifier]string {
 	.Shift = "shift",
 }
 
-// Who hears the message: everyone, or the team (a radio call's goes to the team).
+// What the key does: says its message to everyone or to the team, or makes a radio call.
 Taunt_Mode :: enum {
 	Chat,
 	Team,
+	Radio,
 }
 
 Taunt :: struct {
 	slot:     int, // its key's place in TAUNT_SLOT_KEYS
 	modifier: Taunt_Modifier,
 	mode:     Taunt_Mode,
-	text:     string, // the message, a radio call's own words
-	radio:    int,    // 0 none, else the call: (call - 1) * 3 + place, 1 to 9
+	text:     string, // the message, Chat and Team's
+	radio:    int,    // Radio's call: (call - 1) * 3 + place, 1 to 9
 }
 
 // The bind's key for a slot and a modifier: "alt+q".
@@ -100,16 +100,15 @@ taunt_at :: proc(config: ^res.Client_Config, slot: int) -> (taunt: Taunt, found:
 		if !bound do continue
 		taunt = {slot = slot, modifier = modifier}
 
-		// a radio taunt: radio <call> <place> <words>, the words said as that call
+		// a radio call: radio <call> <place>, any words after them left out
 		if len(text) >= 5 && strings.equal_fold(text[:5], "radio") {
 			rest := text[5:]
 			call, place: int
 			ok: bool
 			if call, rest, ok = radio_digit(rest); ok {
 				if place, rest, ok = radio_digit(rest); ok && (rest == "" || rest[0] == ' ') {
-					taunt.mode = .Team // the call goes to the team
+					taunt.mode = .Radio
 					taunt.radio = (call - 1) * 3 + place
-					taunt.text = strings.trim_left(rest, " ")
 					return taunt, true
 				}
 			}
@@ -144,9 +143,9 @@ taunt_at :: proc(config: ^res.Client_Config, slot: int) -> (taunt: Taunt, found:
 }
 
 // The bind's text for a taunt: `say` or `say_team` and the message, or
-// `radio <call> <place>` and the message, said as that call to the team; with no
-// message, the call alone, which says its own words. For this frame.
+// `radio <call> <place>`, the radio menu's call. For this frame.
 taunt_compose :: proc(mode: Taunt_Mode, text: string, radio: int) -> string {
+	if mode == .Radio do return fmt.tprintf("radio %d %d", (radio - 1) / 3 + 1, (radio - 1) % 3 + 1)
 	clean := strings.builder_make(context.temp_allocator)
 	for i := 0; i < len(text); i += 1 {
 		switch {
@@ -159,11 +158,6 @@ taunt_compose :: proc(mode: Taunt_Mode, text: string, radio: int) -> string {
 		}
 	}
 	message := strings.to_string(clean)
-	if radio >= 1 && radio <= 9 {
-		call := fmt.tprintf("radio %d %d", (radio - 1) / 3 + 1, (radio - 1) % 3 + 1)
-		if strings.trim_space(message) == "" do return call // the call's own words
-		return fmt.tprintf("%s %s", call, message)
-	}
 	if mode == .Team do return fmt.tprintf("say_team %s", message)
 	return fmt.tprintf("say %s", message)
 }

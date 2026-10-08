@@ -6,24 +6,25 @@ import "core:strings"
 import "../ui"
 
 // The taunt editor: on the left, the taunts there are, in the slots' order; on the
-// right, the radio call it makes if any, the message and what it is, then the keyboard,
-// whose key the combo is bound on. Update writes the loaded taunt into the config, Clear
-// unbinds it (Delete too).
+// right, what the key does (chat, team chat or a radio call), its message or its call,
+// then the keyboard, whose key the combo is bound on. Update writes the loaded taunt into
+// the config, Clear unbinds it (Delete too).
 
 Taunt_Editor :: struct {
 	slot:     int, // the taunt loaded, -1 for none
 	modifier: Taunt_Modifier,
 	mode:     Taunt_Mode,
-	radio:    int,    // the radio call attached, 0 for none, else 1 to 9
-	text:     string, // the message being edited, a radio call's own words
+	radio:    int,    // Radio's call, 1 to 9, 0 for none picked yet
+	text:     string, // the message being edited, Chat and Team's
 }
 
 TAUNT_TEXT_MAX :: 255
 
 @(rodata)
 TAUNT_MODE_NAMES := [Taunt_Mode]string {
-	.Chat = "Chat",
-	.Team = "Team chat",
+	.Chat  = "Chat",
+	.Team  = "Team chat",
+	.Radio = "Radio",
 }
 @(rodata)
 TAUNT_MODIFIER_NAMES := [?]string{"Alt", "Ctrl", "Shift"}
@@ -63,37 +64,29 @@ page_taunts :: proc(menu: ^Menu) {
 	k.x = x + col_w + 20 if two else x
 	k.y = top_y if two else ends[0]
 	ui.section(k, "EDIT")
-	{ // the radio call the key sends, named from the config's calls
-		names: [10]string
-		names[0] = "None"
-		calls := [3]^type_of(menu.config.radio.call_1){&menu.config.radio.call_1, &menu.config.radio.call_2, &menu.config.radio.call_3}
-		for i in 1 ..= 9 {
-			call := calls[(i - 1) / 3]
-			// cut to the box's room: the words' own lines in the game show them whole
-			names[i] = fmt.tprintf("%s - %s", cut(call.name, 20), cut(call.places[(i - 1) % 3], 12))
-		}
-		if picked := ui.select_box(k, "Radio", names[:], nil, editor.radio); picked >= 0 do editor.radio = picked
-	}
-	{ // the message, typed; what makes it a console line (quotes, semicolons) is left out
-		r := ui.row(k, ui.ROW_H, true)
-		placeholder := "The call's own words" if editor.radio != 0 else "What the key says"
-		if typed, changed := ui.field_box(k, r.id, r.focused, r.x + 10, ui.ctrl_y(r), r.w - 20, &editor.text, editor.text, TAUNT_TEXT_MAX, placeholder, false); changed {
-			set_text(&editor.text, typed)
-		}
-		if ui.edit_entered(k, &editor.text) do taunt_update(menu) // Enter in the message is the Update button
-	}
-	if editor.radio != 0 {
-		// the call says it to the team itself, so there is nothing to pick here
-		if r := ui.row(k, ui.ROW_H, false); r.shown {
-			ui.text_fit(k, ui.BODY, "Empty, the key says the call's own words; typed, it says the message as the call.", r.x + 10, r.y + r.h / 2, r.w - 20, ui.MUTED)
-		}
-	} else { // the two modes, one of them always on
+	{ // the three modes, one of them always on
 		r := ui.row(k, ui.ROW_H, false)
 		cx := r.x
 		for name, mode in TAUNT_MODE_NAMES {
 			if ui.chip(k, cx, r.y + (r.h - ui.CTRL_H) / 2, name, editor.mode == mode) do editor.mode = mode
 			cx += ui.chip_w(k, name) + 8
 		}
+	}
+	if editor.mode == .Radio { // the call, picked from the config's as the radio menu has them
+		names: [9]string
+		calls := [3]^type_of(menu.config.radio.call_1){&menu.config.radio.call_1, &menu.config.radio.call_2, &menu.config.radio.call_3}
+		for i in 1 ..= 9 {
+			call := calls[(i - 1) / 3]
+			// cut to the box's room: the radio's own lines in the game show them whole
+			names[i - 1] = fmt.tprintf("%s - %s", cut(call.name, 20), cut(call.places[(i - 1) % 3], 12))
+		}
+		if picked := ui.select_box(k, "Call", names[:], nil, max(editor.radio, 1) - 1); picked >= 0 do editor.radio = picked + 1
+	} else { // the message, typed; what makes it a console line (quotes, semicolons) is left out
+		r := ui.row(k, ui.ROW_H, true)
+		if typed, changed := ui.field_box(k, r.id, r.focused, r.x + 10, ui.ctrl_y(r), r.w - 20, &editor.text, editor.text, TAUNT_TEXT_MAX, "What the key says", false); changed {
+			set_text(&editor.text, typed)
+		}
+		if ui.edit_entered(k, &editor.text) do taunt_update(menu) // Enter in the message is the Update button
 	}
 	if picked := ui.select_box(k, "Modifier", TAUNT_MODIFIER_NAMES[:], nil, int(editor.modifier)); picked >= 0 {
 		editor.modifier = Taunt_Modifier(picked)
@@ -154,16 +147,15 @@ taunt_row :: proc(menu: ^Menu, slot: int, taunt: Taunt) {
 	if (r.shown && ui.take(k, r.id, r.x, r.y, r.w, r.h)) || ui.take_enter(k, r.focused) do taunt_load(menu, slot)
 	if !r.shown do return
 	combo := fmt.tprintf("%s+%s", TAUNT_MODIFIER_NAMES[taunt.modifier], strings.to_upper(TAUNT_SLOT_KEYS[slot], context.temp_allocator))
-	what := "Radio" if taunt.radio != 0 else "Team" if taunt.mode == .Team else "Chat"
+	what := TAUNT_MODE_NAMES[taunt.mode]
 	cy, cx := r.y + r.h / 2, r.x + 10
 	cw := min(ui.width_of(u, ui.BOLD, combo), 88)
 	ui.text_fit(k, ui.BOLD, combo, cx, cy, cw, ui.TEXT)
 	cx += cw + 12
 	ww := min(ui.width_of(u, ui.BODY, what), 110)
-	ui.text_fit(k, ui.BODY, what, cx, cy, ww, ui.ACCENT if taunt.radio != 0 else ui.MUTED)
+	ui.text_fit(k, ui.BODY, what, cx, cy, ww, ui.ACCENT if taunt.mode == .Radio else ui.MUTED)
 	cx += ww + 12
-	text := taunt.text
-	if taunt.radio != 0 && text == "" do text = radio_words(menu, taunt.radio) // the call alone says its own
+	text := radio_words(menu, taunt.radio) if taunt.mode == .Radio else taunt.text
 	ui.text_fit(k, ui.BODY, text, cx, cy, r.w - 10 - cx + r.x, ui.MUTED)
 }
 
@@ -182,13 +174,14 @@ taunt_load :: proc(menu: ^Menu, slot: int) {
 	set_text(&editor.text, taunt.text)
 }
 
-// The loaded taunt written back: the message as its bind, or a radio call alone; the slot
-// unbound when it has neither. The game saves it with the rest as it closes.
+// The loaded taunt written back: its radio call, or its message; the slot unbound when
+// the message is empty. The game saves it with the rest as it closes.
 @(private = "file")
 taunt_update :: proc(menu: ^Menu) {
 	editor := &menu.taunts
 	if editor.slot < 0 do return
-	text := taunt_compose(editor.mode, editor.text, editor.radio) if editor.text != "" || editor.radio != 0 else ""
+	if editor.mode == .Radio do editor.radio = max(editor.radio, 1) // the box shows the first call when none was picked
+	text := taunt_compose(editor.mode, editor.text, editor.radio) if editor.mode == .Radio || editor.text != "" else ""
 	taunt_set(menu, editor.slot, editor.modifier, text)
 }
 
