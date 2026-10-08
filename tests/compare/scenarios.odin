@@ -47,6 +47,7 @@ SCENARIOS := [?]Scenario {
 	{"fire_barrett", "ctf_Ash", 200, {.Barrett, .AK74}, 360, fire, false, {}},
 	{"fire_m79", "ctf_Ash", 200, {.M79, .AK74}, 240, fire, false, {}},
 	{"grenade", "ctf_Ash", 150, {.AK74, .AK74}, 360, throw_grenade, false, {}},
+	{"grenade_run", "ctf_Ash", 150, {.AK74, .AK74}, 480, throw_grenade_run, false, {}}, // thrown running and jetting: from last tick's hand
 	{"duel", "ctf_Ash", 160, {.AK74, .MP5}, 900, duel, false, {}},
 	{"ctf_duel", "ctf_Ash", 200, {.Minimi, .Ruger77}, 1200, duel, false, {}},
 	{"fire_minigun", "ctf_Ash", 80, {.Minigun, .AK74}, 600, fire, false, {}},
@@ -160,6 +161,15 @@ fire :: proc(tick: int) -> [2]game.Buttons {
 
 throw_grenade :: proc(tick: int) -> [2]game.Buttons {
 	return {tick >= SETTLE && tick < SETTLE + 30 ? {.Throw} : {}, {}}
+}
+
+// Grenades wound up and thrown on the move, running then jetting: the hand they leave is
+// last tick's, a step of the body behind.
+throw_grenade_run :: proc(tick: int) -> [2]game.Buttons {
+	if tick < SETTLE do return {}
+	move: game.Buttons = {.Right} if (tick - SETTLE) < 120 else {.Left, .Jet}
+	if (tick - SETTLE) % 60 < 30 do move += {.Throw}
+	return {move, {}}
 }
 
 // Both fight: firing, moving, reloading.

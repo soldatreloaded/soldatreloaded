@@ -1,7 +1,7 @@
 # Porting the game from C
 
 `core/game` is a port of the C game's simulation (`apps/shared/game` in
-[soldatreloaded](../../bettersoldat), at commit `d5009c2`). It must play **exactly** as
+[soldatreloaded](../../bettersoldat), at commit `41fa1b6`). It must play **exactly** as
 the C game does: the same numbers, bit for bit, tick after tick. It does not keep the C
 game's structure: the logic is ported line by line, into the organization described in
 `core/game/world.odin`.
@@ -13,7 +13,7 @@ gun, no cluster grenades. What it keeps plays as the C game plays it.
 ## Checking it: tests/compare
 
 ```
-tests/compare/build.sh          # the C game at d5009c2, built into tests/compare/build/reference.lib
+tests/compare/build.sh          # the C game at 41fa1b6, built into tests/compare/build/reference.lib
 odin run tests/compare          # every scenario, in both games, compared every tick
 odin run tests/compare -- jump  # only the scenarios whose name contains "jump"
 ```

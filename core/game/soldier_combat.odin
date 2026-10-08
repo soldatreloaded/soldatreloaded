@@ -493,8 +493,9 @@ throw_grenade :: proc(world: ^World, resources: ^Resources, id: Soldier_Id, out:
 
 	if body.frame > 14 && body.frame < 37 && arsenal.grenades > 0 && soldier.vitals.cease_fire < 0 {
 		frag := &resources.weapons[.Frag_Grenade].stats
-		joints := soldier_pose(animations, soldier, soldier.body.pos)
-		dir := utils.normalize(soldier.controls.aim - joints[14])
+		// from the hand as the original's skeleton has it here, a tick old (throw_hand)
+		hand := arsenal.throw_hand
+		dir := utils.normalize(soldier.controls.aim - hand)
 
 		// a few degrees of arc, which go aiming straight up or down
 		arc := sign_of(dir.x) / 8.0 * (1.0 - abs(dir.y))
@@ -506,7 +507,7 @@ throw_grenade :: proc(world: ^World, resources: ^Resources, id: Soldier_Id, out:
 		if body.frame < 24 do velocity *= 0.65
 		velocity += soldier.body.velocity * frag.inherited_velocity
 
-		origin := utils.Vec2{joints[14].x + velocity.x * 3.0, joints[14].y - 2.0 + velocity.y * 3.0}
+		origin := utils.Vec2{hand.x + velocity.x * 3.0, hand.y - 2.0 + velocity.y * 3.0}
 		head := utils.Vec2{soldier.body.pos.x, soldier.body.pos.y - 12.0}
 		if _, inside := res.inside_solid(world.polymap, origin, false); !inside {
 			if _, blocked := res.ray_cast(world.polymap, head, origin, 50, {bullet = true, team = soldier.team}); !blocked {

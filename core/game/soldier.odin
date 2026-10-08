@@ -129,6 +129,11 @@ Arsenal :: struct {
 	secondary:                 Weapon_State `net:"owned"`,
 	grenades:                  i32 `net:"owned 8"`,
 	grenade_can_throw:         bool,
+	// The hand (pose point 14) as the original's skeleton has it when a grenade is
+	// thrown: built after the last tick's controls, from that tick's frame and place,
+	// since ThrowGrenade runs in ControlSprite before TSprite.Update rebuilds it. The
+	// throw's alone: local, never on the wire, and nothing a hit is judged by.
+	throw_hand:                utils.Vec2,
 	burst_count:               i32,
 	can_auto_reload_spas:      bool,
 	auto_reload_when_can_fire: bool,
@@ -250,6 +255,9 @@ soldier_update :: proc(world: ^World, resources: ^Resources, id: Soldier_Id, com
 
 	soldier_control(world, resources, id, authority, out, armed)
 	body.direction = 1 if soldier.controls.aim.x >= body.pos.x else -1
+	// the skeleton the original builds here, before the frame advances and the map moves
+	// the body: the next tick's grenade leaves this hand
+	soldier.arsenal.throw_hand = soldier_pose(resources.animations, soldier, body.pos)[14]
 	res.animation_advance(resources.animations, &soldier.pose.body)
 	res.animation_advance(resources.animations, &soldier.pose.legs)
 
@@ -330,6 +338,7 @@ soldier_spawn :: proc(world: ^World, resources: ^Resources, id: Soldier_Id, resp
 	}
 	res.animation_start(resources.animations, &soldier.pose.legs, .Stand)
 	res.animation_start(resources.animations, &soldier.pose.body, .Stand)
+	soldier.arsenal.throw_hand = soldier_pose(resources.animations, soldier, respawn.pos)[14]
 
 	seed_from_position :: proc(pos: utils.Vec2) -> u64 {
 		x, y := transmute(u32)pos.x, transmute(u32)pos.y
