@@ -135,7 +135,7 @@ apply_ground_friction :: proc(world: ^World, soldier: ^Soldier, polygon: ^res.Po
 	legs := soldier.pose.legs
 
 	#partial switch legs.id {
-	case .Stand, .Crouch, .Prone, .Prone_Move, .Get_Up, .Fall, .Mercy, .Mercy2, .Own:
+	case .Stand, .Crouch, .Prone, .Prone_Move, .Get_Up, .Fall, .Mercy, .Mercy2, .Own, .Yeah:
 		if body.velocity.x < SLIDE_LIMIT && body.velocity.x > -SLIDE_LIMIT && normal.y > SLIDE_LIMIT {
 			body.pos = body.old_pos
 			body.forces.y -= world.gravity

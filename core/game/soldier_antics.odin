@@ -258,10 +258,13 @@ soldier_antics :: proc(world: ^World, resources: ^Resources, id: Soldier_Id, aut
 			antics.idle_antic = -1
 		}
 
-	case ANTIC_BREAKDOWN, ANTIC_DAB, ANTIC_YEAH: // as the victory, silent
+	// As the victory, silent. The yeah sways its hips, so its legs play it too, as the
+	// pwn's do: the whole body.
+	case ANTIC_BREAKDOWN, ANTIC_DAB, ANTIC_YEAH:
 		if antics.idle_time == 0 {
 			cheer: res.Animation_Id = .Breakdown if antics.idle_antic == ANTIC_BREAKDOWN else .Dab if antics.idle_antic == ANTIC_DAB else .Yeah
 			res.animation_switch(animations, body, cheer)
+			if cheer == .Yeah do res.animation_switch(animations, legs, .Yeah)
 			antics.idle_time = DEFAULT_IDLE_TIME
 			antics.idle_antic = -1
 		}
