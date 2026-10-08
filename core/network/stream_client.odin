@@ -226,7 +226,13 @@ frame_apply :: proc(c: ^Client_Stream, g: ^game.Game, me: game.Soldier_Id, frame
 			// the pause holds, a little behind where mine had got to, and the game goes on
 			// from it for everyone alike
 			_, paused := g.round.phase.(game.Paused)
-			if placed || paused do soldier_take_owned(g.resources.animations, s, heard)
+			if placed || paused {
+				soldier_take_owned(g.resources.animations, s, heard)
+			} else if heard.vitals.dead {
+				// dead, my hands are the server's too, as everyone else's are (soldier_apply)
+				s.arsenal.primary = heard.arsenal.primary
+				s.arsenal.fired = false
+			}
 			// A loadout picked while dead can reach the server after it has already
 			// respawned me with the previous one: my choice arms this new life, and the
 			// next client state carries it to the server as well
@@ -249,9 +255,9 @@ frame_apply :: proc(c: ^Client_Stream, g: ^game.Game, me: game.Soldier_Id, frame
 // Soldier `i` as its word in `frame` has it, stepped on `steps` ticks on its last keys
 // to where the tick on show wants it. The correction goes to the picture, to be shown
 // over a little while; a placing, or a jump too far to be a correction, shows at once.
-// A dead one takes the served half alone, as the original never corrects a corpse: its
-// body is the corpse here, started from the served vitals.death, and its place the
-// corpse's head.
+// A dead one takes the served half and its hands alone, as the original never corrects
+// a corpse: its body is the corpse here, started from the served vitals.death, and its
+// place the corpse's head.
 @(private = "file")
 soldier_apply :: proc(c: ^Client_Stream, g: ^game.Game, id: game.Soldier_Id, frame: ^Snap_Frame, steps: int, scratch: ^game.Tick_Output) {
 	w := &g.world
@@ -262,6 +268,10 @@ soldier_apply :: proc(c: ^Client_Stream, g: ^game.Game, id: game.Soldier_Id, fra
 	soldier_take_served(s, heard)
 	s.remote = true
 	if heard.vitals.dead {
+		// but its hands are the server's: the kill let the gun go (a dropped gun now, flying
+		// on its own), and no shot goes off from a corpse
+		s.arsenal.primary = heard.arsenal.primary
+		s.arsenal.fired = false
 		c.blend[id] = {}
 		c.blend_vel[id] = {}
 		return
