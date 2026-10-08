@@ -13,16 +13,16 @@ package launcher
 //
 // Then one of:
 //
-//   up to date        the game starts at once
+//   up to date        nothing to do
 //   an update         its version and its release notes; Enter updates (what is missing
 //                     or changed comes out of the release's zip, what the release
-//                     dropped is deleted), and Enter again starts the game
-//   a repair          the newest version, but files missing or changed: they are put
-//                     right, and the game starts
+//                     dropped is deleted)
+//   a restore         the newest version, but files missing or changed: Enter restores
+//                     them out of the release's zip
 //
 // When something goes wrong (the release can't be reached, the update fails, this isn't
-// an install) it says what, and Enter starts the game as it is, so it can be read before
-// the window goes.
+// an install) it says what. Whatever happened, Enter then starts the game, so what was
+// said can be read before the window goes.
 //
 // It runs from the install's root, wherever it is started from.
 //
@@ -52,7 +52,9 @@ main :: proc() {
 
 	fmt.println("Soldat Reloaded Launcher")
 	fmt.println()
-	if !check_and_update() do wait_enter("Press Enter to launch Soldat Reloaded.")
+	check_and_update()
+	fmt.println()
+	wait_enter("Press Enter to launch Soldat Reloaded.")
 
 	if !launch_game() {
 		fmt.printfln("Could not start %s. Reinstalling the game may help.", GAME)
@@ -61,16 +63,15 @@ main :: proc() {
 	}
 }
 
-// The steps above, as far as the game: true if it starts at once (up to date, or put
-// right), false if the player has something to read first.
-check_and_update :: proc() -> (straight_on: bool) {
+// The steps above, as far as the game.
+check_and_update :: proc() {
 	fmt.println("Checking version...")
 	// Every release's install has its manifest; a folder without one (the source, a
 	// developer's build) isn't an install, and isn't written over.
 	installed, is_install := res.manifest_load(res.MANIFEST_FILE, context.temp_allocator)
 	if !is_install {
 		fmt.println("This folder isn't an install of a release (it has no manifest.json), so it can't be updated.")
-		return false
+		return
 	}
 	fmt.printfln("Installed: v%s", installed.version)
 	fmt.println()
@@ -97,18 +98,21 @@ check_and_update :: proc() -> (straight_on: bool) {
 	if !found {
 		fmt.println("Could not reach the newest release. Check your connection, or try again later.")
 		if len(damaged) > 0 do fmt.println("The missing or changed files will be put right once it can be reached.")
-		return false
+		return
 	}
 	plan := plan_update(installed, latest, &disk)
 	if len(plan.fetch) == 0 && len(plan.remove) == 0 {
 		fmt.printfln("You have the newest version, v%s.", latest.version)
 		save_manifest(latest_text) // the install may have been brought up by hand
-		return true
+		return
 	}
 
 	repair := latest.version == installed.version
 	if repair {
-		fmt.printfln("You have the newest version, v%s. Repairing...", latest.version)
+		fmt.printfln("You have the newest version, v%s.", latest.version)
+		fmt.println()
+		wait_enter("Press Enter to restore the missing or changed files.")
+		fmt.println("Restoring...")
 	} else {
 		fmt.printfln("Update available: v%s", latest.version)
 		if notes, noted := latest_notes(); noted && strings.trim_space(notes.body) != "" {
@@ -123,15 +127,14 @@ check_and_update :: proc() -> (straight_on: bool) {
 	if err := apply_update(plan, latest_text); err != "" {
 		fmt.printfln("Could not update: %s", err)
 		fmt.printfln("Soldat Reloaded is still v%s.", installed.version)
-		return false
+		return
 	}
 	if repair {
-		fmt.println("Repaired.")
-		return true
+		fmt.println("Restored.")
+		return
 	}
 	fmt.println()
 	fmt.printfln("Updated to v%s.", latest.version)
-	return false
 }
 
 // The release's files brought in and the dropped ones deleted, then its manifest kept as
