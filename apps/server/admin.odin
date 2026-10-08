@@ -55,7 +55,7 @@ ADMIN_COMMANDS :: [?]string {
 PLAYER_HELP := [?]string {
 	"/team <1 alpha, 2 bravo, 5 spectator>  /kill  /brutalkill",
 	"/votemap <map>  /votekick <player> [reason]  /yes  /no",
-	"/tabac /smoke /takeoff /victory /breakdown /dab /yeah /piss /mercy /pwn",
+	"Emotes: /tabac /smoke /takeoff /victory /breakdown /dab /yeah /piss /mercy /pwn",
 	"/login <password>: an admin until you leave",
 }
 

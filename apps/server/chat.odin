@@ -28,7 +28,9 @@ chat :: proc(sv: ^Server, slot: game.Soldier_Id, e: ^net.Event) {
 	m.kind = .Server
 	m.color = {}
 	text := utils.short_string_text(&m.text)
-	player.chat_warnings += 1
+	// an emote is no chat: a key does it as often as the player likes (the client keeps it
+	// to one in EMOTE_COOLDOWN), and only the line's own flood check counts it
+	if !is_emote(text) do player.chat_warnings += 1
 	// a script hears it first, and may keep it
 	if sv.hooks.chat != nil && sv.hooks.chat(sv.hooks.user, slot, text, m.team) do return
 	if strings.has_prefix(text, "/") {
@@ -50,6 +52,17 @@ chat :: proc(sv: ^Server, slot: game.Soldier_Id, e: ^net.Event) {
 	for &other, i in sv.players {
 		if other.joined && sv.game.world.soldiers[i].team == team do net.net_send(other.peer, .Chat, bytes)
 	}
+}
+
+// Whether the line is an emote's command: /victory and the rest (game.TAUNT_NAMES).
+@(private = "file")
+is_emote :: proc(text: string) -> bool {
+	if !strings.has_prefix(text, "/") do return false
+	word, _ := next_word(text[1:])
+	for taunt in game.TAUNT_NAMES {
+		if taunt != "" && taunt == word do return true
+	}
+	return false
 }
 
 // The first word of `text`, and the rest past the spaces after it.

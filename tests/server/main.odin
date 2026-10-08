@@ -206,6 +206,24 @@ join :: proc(t: ^testing.T) {
 	testing.expect_value(t, utils.short_string_text(&b.chat.text), "hello")
 	testing.expect(t, b.chat.slot == a.welcome.slot, "as Alice")
 
+	// emotes aren't chat: eight in a row are each done, and none is counted toward the
+	// chat flood, which kicks past five
+	Emoted :: struct {
+		sv:    ^server.Server,
+		slot:  game.Soldier_Id,
+		count: u8,
+	}
+	@(static) emoted: Emoted
+	emoted = {sv, a.welcome.slot, sv.game.world.soldiers[a.welcome.slot].antics.asked_count + 8}
+	warnings := sv.players[a.welcome.slot].chat_warnings
+	for _ in 0 ..< 8 do say(a, "/victory")
+	all_done := pump_until(sv, clients, proc(cs: []^Test_Client) -> bool {
+		return emoted.sv.game.world.soldiers[emoted.slot].antics.asked_count == emoted.count
+	})
+	testing.expect(t, all_done, "each emote was done")
+	testing.expect(t, sv.players[a.welcome.slot].joined, "and Alice wasn't kicked for them")
+	testing.expect(t, sv.players[a.welcome.slot].chat_warnings <= warnings, "nor were they counted as chat")
+
 	// a client's state is taken as its soldier's word
 	soldier := &a.game.world.soldiers[a.welcome.slot]
 	soldier^ = sv.game.world.soldiers[a.welcome.slot]

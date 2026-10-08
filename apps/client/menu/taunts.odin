@@ -6,15 +6,16 @@ import "core:strings"
 import "../ui"
 
 // The taunt editor: on the left, the taunts there are, in the slots' order; on the
-// right, what the key does (chat, team chat or a radio call), its message or its call,
-// then the keyboard, whose key the combo is bound on. Update writes the loaded taunt into
-// the config, Clear unbinds it (Delete too).
+// right, what the key does (chat, team chat, a radio call or an emote), its message, its
+// call or its emote, then the keyboard, whose key the combo is bound on. Update writes the
+// loaded taunt into the config, Clear unbinds it (Delete too).
 
 Taunt_Editor :: struct {
 	slot:     int, // the taunt loaded, -1 for none
 	modifier: Taunt_Modifier,
 	mode:     Taunt_Mode,
 	radio:    int,    // Radio's call, 1 to 9, 0 for none picked yet
+	emote:    int,    // Emote's, its place in EMOTES
 	text:     string, // the message being edited, Chat and Team's
 }
 
@@ -25,6 +26,7 @@ TAUNT_MODE_NAMES := [Taunt_Mode]string {
 	.Chat  = "Chat",
 	.Team  = "Team chat",
 	.Radio = "Radio",
+	.Emote = "Emote",
 }
 @(rodata)
 TAUNT_MODIFIER_NAMES := [?]string{"Alt", "Ctrl", "Shift"}
@@ -64,10 +66,14 @@ page_taunts :: proc(menu: ^Menu) {
 	k.x = x + col_w + 20 if two else x
 	k.y = top_y if two else ends[0]
 	ui.section(k, "EDIT")
-	{ // the three modes, one of them always on
+	{ // the four modes, one of them always on, on a second row when the column is narrow
 		r := ui.row(k, ui.ROW_H, false)
 		cx := r.x
 		for name, mode in TAUNT_MODE_NAMES {
+			if cx > r.x && cx + ui.chip_w(k, name) > r.x + r.w {
+				r = ui.row(k, ui.ROW_H, false)
+				cx = r.x
+			}
 			if ui.chip(k, cx, r.y + (r.h - ui.CTRL_H) / 2, name, editor.mode == mode) do editor.mode = mode
 			cx += ui.chip_w(k, name) + 8
 		}
@@ -81,6 +87,10 @@ page_taunts :: proc(menu: ^Menu) {
 			names[i - 1] = fmt.tprintf("%s - %s", cut(call.name, 20), cut(call.places[(i - 1) % 3], 12))
 		}
 		if picked := ui.select_box(k, "Call", names[:], nil, max(editor.radio, 1) - 1); picked >= 0 do editor.radio = picked + 1
+	} else if editor.mode == .Emote { // the emote, as the game names them
+		names: [len(EMOTES)]string
+		for emote, i in EMOTES do names[i] = emote.title
+		if picked := ui.select_box(k, "Emote", names[:], nil, editor.emote); picked >= 0 do editor.emote = picked
 	} else { // the message, typed; what makes it a console line (quotes, semicolons) is left out
 		r := ui.row(k, ui.ROW_H, true)
 		if typed, changed := ui.field_box(k, r.id, r.focused, r.x + 10, ui.ctrl_y(r), r.w - 20, &editor.text, editor.text, TAUNT_TEXT_MAX, "What the key says", false); changed {
@@ -136,8 +146,8 @@ page_taunts :: proc(menu: ^Menu) {
 	}
 }
 
-// A taunt as its list row reads: the combo, as Alt+Q, what the text is (a radio call,
-// or said to everyone or the team) and the text. A click, or Enter, loads it into the
+// A taunt as its list row reads: the combo, as Alt+Q, what it is (a radio call, an
+// emote, or said to everyone or the team) and its words. A click, or Enter, loads it into the
 // editor.
 @(private = "file")
 taunt_row :: proc(menu: ^Menu, slot: int, taunt: Taunt) {
@@ -153,9 +163,13 @@ taunt_row :: proc(menu: ^Menu, slot: int, taunt: Taunt) {
 	ui.text_fit(k, ui.BOLD, combo, cx, cy, cw, ui.TEXT)
 	cx += cw + 12
 	ww := min(ui.width_of(u, ui.BODY, what), 110)
-	ui.text_fit(k, ui.BODY, what, cx, cy, ww, ui.ACCENT if taunt.mode == .Radio else ui.MUTED)
+	ui.text_fit(k, ui.BODY, what, cx, cy, ww, ui.ACCENT if taunt.mode == .Radio || taunt.mode == .Emote else ui.MUTED)
 	cx += ww + 12
-	text := radio_words(menu, taunt.radio) if taunt.mode == .Radio else taunt.text
+	text := taunt.text
+	#partial switch taunt.mode {
+	case .Radio: text = radio_words(menu, taunt.radio)
+	case .Emote: text = EMOTES[taunt.emote].title
+	}
 	ui.text_fit(k, ui.BODY, text, cx, cy, r.w - 10 - cx + r.x, ui.MUTED)
 }
 
@@ -171,17 +185,19 @@ taunt_load :: proc(menu: ^Menu, slot: int) {
 	editor.modifier = taunt.modifier
 	editor.mode = taunt.mode
 	editor.radio = taunt.radio
+	editor.emote = taunt.emote
 	set_text(&editor.text, taunt.text)
 }
 
-// The loaded taunt written back: its radio call, or its message; the slot unbound when
-// the message is empty. The game saves it with the rest as it closes.
+// The loaded taunt written back: its radio call, its emote, or its message; the slot
+// unbound when the message is empty. The game saves it with the rest as it closes.
 @(private = "file")
 taunt_update :: proc(menu: ^Menu) {
 	editor := &menu.taunts
 	if editor.slot < 0 do return
 	if editor.mode == .Radio do editor.radio = max(editor.radio, 1) // the box shows the first call when none was picked
-	text := taunt_compose(editor.mode, editor.text, editor.radio) if editor.mode == .Radio || editor.text != "" else ""
+	said := editor.mode == .Chat || editor.mode == .Team
+	text := taunt_compose(editor.mode, editor.text, editor.radio, editor.emote) if !said || editor.text != "" else ""
 	taunt_set(menu, editor.slot, editor.modifier, text)
 }
 

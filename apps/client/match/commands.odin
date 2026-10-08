@@ -17,6 +17,7 @@ import "../hud"
 //   say <text>  say_team <text>   a line, as a key says it: a taunt
 //   votemap <map>  votekick <player>
 //   +radio  radio <call> <place> [words]
+//   emote <name>        an emote (/victory and the rest), done and said to nobody
 //   mute unmute <player | all>  muteall muteteam muteenemies mutespecs  mutes
 //   freecam             the free camera, while I watch or a demo plays
 //   record [name]  stop  playdemo <name>
@@ -27,7 +28,7 @@ import "../hud"
 @(private = "file", rodata)
 COMMANDS := [?]string {
 	"escmenu", "teammenu", "weaponsmenu", "fragsmenu", "statsmenu", "toggle", "togglewindow",
-	"chat", "teamchat", "cmd", "say", "say_team", "votemap", "votekick", "+radio", "-radio", "radio",
+	"chat", "teamchat", "cmd", "say", "say_team", "votemap", "votekick", "+radio", "-radio", "radio", "emote",
 	"mute", "unmute", "muteall", "muteteam", "muteenemies", "mutespecs", "mutes", "freecam",
 	"record", "stop", "playdemo", "demo_pause", "demo_fast", "demo_tick", "demo_tick_r",
 	"connect", "disconnect", "quit", "netstats",
@@ -75,6 +76,8 @@ command_run :: proc(match: ^Match, line: string) {
 	case "votemap", "votekick":
 		if rest == "" do usage(match, "%s <%s>", word, "map" if word == "votemap" else "player")
 		else do say(match, false, false, fmt.tprintf("/%s %s", word, rest))
+	case "emote":
+		if !emote(match, strings.trim_space(rest)) do usage(match, "emote <%s>", emote_names())
 	case "+radio":
 		radio_toggle(match)
 	case "-radio":

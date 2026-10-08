@@ -42,10 +42,11 @@ bind :: proc(menu: ^Menu, key, command: string) {
 // The taunts: a modifier and a key, the message said when they are pressed.
 // `alt+q = "say_team Cover me!"` is a taunt, and so is a radio call: `alt+1 = "radio 1 2"`
 // makes the "Enemy flagger, middle!" call, the same as the radio menu does (a bind
-// written by hand with words after the call loses them here). A slot holds one taunt:
-// setting it unbinds the slot's other modifiers. The message loses what a console line
-// can't carry: `"` ends a quoted word, `;` ends a command, and `//` comments the rest of
-// the line away (it becomes a space).
+// written by hand with words after the call loses them here); and so is an emote:
+// `alt+v = "emote victory"` cheers, as /victory does, and says nothing. A slot holds one
+// taunt: setting it unbinds the slot's other modifiers. The message loses what a console
+// line can't carry: `"` ends a quoted word, `;` ends a command, and `//` comments the
+// rest of the line away (it becomes a space).
 
 TAUNT_SLOTS :: 36
 
@@ -72,11 +73,33 @@ TAUNT_MODIFIER_KEYS := [Taunt_Modifier]string {
 	.Shift = "shift",
 }
 
-// What the key does: says its message to everyone or to the team, or makes a radio call.
+// What the key does: says its message to everyone or to the team, makes a radio call, or
+// does an emote.
 Taunt_Mode :: enum {
 	Chat,
 	Team,
 	Radio,
+	Emote,
+}
+
+// The emotes a key can do, as the game names them (/victory) and as the editor lists them.
+Emote :: struct {
+	name:  string,
+	title: string,
+}
+
+@(rodata)
+EMOTES := [?]Emote {
+	{"tabac", "Chew tobacco"},
+	{"smoke", "Smoke a cigar"},
+	{"takeoff", "Take off helmet"},
+	{"victory", "Victory"},
+	{"breakdown", "Breakdown"},
+	{"dab", "Dab"},
+	{"yeah", "Yeah"},
+	{"piss", "Piss"},
+	{"mercy", "Mercy (press twice; costs a kill)"},
+	{"pwn", "Pwn"},
 }
 
 Taunt :: struct {
@@ -85,6 +108,7 @@ Taunt :: struct {
 	mode:     Taunt_Mode,
 	text:     string, // the message, Chat and Team's
 	radio:    int,    // Radio's call: (call - 1) * 3 + place, 1 to 9
+	emote:    int,    // Emote's, its place in EMOTES
 }
 
 // The bind's key for a slot and a modifier: "alt+q".
@@ -111,6 +135,15 @@ taunt_at :: proc(config: ^res.Client_Config, slot: int) -> (taunt: Taunt, found:
 					taunt.radio = (call - 1) * 3 + place
 					return taunt, true
 				}
+			}
+		}
+		// an emote: emote <name>, one of EMOTES
+		if rest, is := word_after(text, "emote"); is {
+			for emote, i in EMOTES {
+				if !strings.equal_fold(rest, emote.name) do continue
+				taunt.mode = .Emote
+				taunt.emote = i
+				return taunt, true
 			}
 		}
 		// a said one: `say` to everyone, `say_team` to the team, then the message
@@ -142,10 +175,11 @@ taunt_at :: proc(config: ^res.Client_Config, slot: int) -> (taunt: Taunt, found:
 	}
 }
 
-// The bind's text for a taunt: `say` or `say_team` and the message, or
-// `radio <call> <place>`, the radio menu's call. For this frame.
-taunt_compose :: proc(mode: Taunt_Mode, text: string, radio: int) -> string {
+// The bind's text for a taunt: `say` or `say_team` and the message,
+// `radio <call> <place>`, the radio menu's call, or `emote <name>`. For this frame.
+taunt_compose :: proc(mode: Taunt_Mode, text: string, radio: int, emote: int) -> string {
 	if mode == .Radio do return fmt.tprintf("radio %d %d", (radio - 1) / 3 + 1, (radio - 1) % 3 + 1)
+	if mode == .Emote do return fmt.tprintf("emote %s", EMOTES[clamp(emote, 0, len(EMOTES) - 1)].name)
 	clean := strings.builder_make(context.temp_allocator)
 	for i := 0; i < len(text); i += 1 {
 		switch {

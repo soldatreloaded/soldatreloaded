@@ -54,6 +54,7 @@ Chat :: struct {
 	reason:        bool,             // the prompt takes a kick vote's reason (the kick window's Kick)
 	kick_target:   sim.Soldier_Id,   // whom it is about
 	big_scroll:    int,              // how far back the big console is paged while a line is typed
+	emoted_at:     f64,              // the clock's when the last emote went (EMOTE_COOLDOWN)
 }
 
 Kept_Line :: struct {
@@ -462,4 +463,38 @@ big_copy :: proc(match: ^Match) {
 	}
 	rl.SetClipboardText(strings.clone_to_cstring(strings.to_string(b), context.temp_allocator))
 	hud.console_add(&match.hud.feed, hud.GAME_COLOR, "Copied chat contents to clipboard")
+}
+
+// ---------------------------------------------------------------------------------
+// Emotes
+
+EMOTE_COOLDOWN :: 1.5 // seconds after an emote before the next goes; one asked sooner is let go
+
+// emote <name>: the emote by the game's name for it (sim.TAUNT_NAMES), as /<name> does
+// it but with nothing to see in the chat: done here offline; online asked of the server
+// as a command, a line beginning '/', which it answers and relays to nobody; nothing in a
+// demo. False if there is no emote by that name.
+@(private = "package")
+emote :: proc(match: ^Match, asked: string) -> bool {
+	name := strings.to_lower(asked, context.temp_allocator)
+	known := false
+	for taunt in sim.TAUNT_NAMES do known ||= taunt != "" && taunt == name
+	if !known do return false
+	now := rl.GetTime()
+	if match.chat.emoted_at != 0 && now - match.chat.emoted_at < EMOTE_COOLDOWN do return true
+	match.chat.emoted_at = now
+	switch match.mode {
+	case .Offline: sim.soldier_taunt(&match.game.world.soldiers[match.me], name)
+	case .Online:  online.line_say(match.line, fmt.tprintf("/%s", name), false, true)
+	case .Demo:
+	}
+	return true
+}
+
+// The emotes' names, for the command's usage: tabac | smoke | ...
+@(private = "package")
+emote_names :: proc() -> string {
+	names := make([dynamic]string, context.temp_allocator)
+	for taunt in sim.TAUNT_NAMES do if taunt != "" do append(&names, taunt)
+	return strings.join(names[:], " | ", context.temp_allocator)
 }
