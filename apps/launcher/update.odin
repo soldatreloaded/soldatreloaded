@@ -32,12 +32,27 @@ Plan :: struct {
 	remove: [dynamic]string,            // the old release's, dropped by the latest
 }
 
-plan_update :: proc(installed, latest: res.Manifest) -> (plan: Plan) {
+// The files on disk as hashed so far, by path: each file's SHA-256, "" if it is missing.
+// The integrity check fills it and the plan reads it, so no file is hashed twice.
+Disk :: map[string]string
+
+// The installed manifest's files that are missing or changed on disk, by path.
+check_integrity :: proc(installed: res.Manifest, disk: ^Disk) -> (damaged: [dynamic]string) {
+	damaged = make([dynamic]string, context.temp_allocator)
+	for file in installed.files {
+		if !on_disk(file, disk) do append(&damaged, file.path)
+	}
+	return
+}
+
+plan_update :: proc(installed, latest: res.Manifest, disk: ^Disk = nil) -> (plan: Plan) {
 	plan.fetch = make([dynamic]res.Manifest_File, context.temp_allocator)
 	plan.remove = make([dynamic]string, context.temp_allocator)
+	disk := disk
+	if disk == nil do disk = new_clone(make(Disk, context.temp_allocator), context.temp_allocator)
 
 	for file in latest.files {
-		if !on_disk(file) do append(&plan.fetch, file)
+		if !on_disk(file, disk) do append(&plan.fetch, file)
 	}
 
 	kept := make(map[string]bool, context.temp_allocator)
@@ -48,12 +63,18 @@ plan_update :: proc(installed, latest: res.Manifest) -> (plan: Plan) {
 	return
 }
 
-// Whether the file on disk is the one the manifest lists.
-on_disk :: proc(file: res.Manifest_File) -> bool {
-	data, err := os.read_entire_file(file.path, context.allocator)
-	if err != nil do return false
-	defer delete(data)
-	return i64(len(data)) == file.size && sha256(data) == file.sha256
+// Whether the file on disk is the one the manifest lists, hashed once into `disk`.
+on_disk :: proc(file: res.Manifest_File, disk: ^Disk) -> bool {
+	hashed, seen := disk[file.path]
+	if !seen {
+		hashed = ""
+		if data, err := os.read_entire_file(file.path, context.allocator); err == nil {
+			hashed = sha256(data)
+			delete(data)
+		}
+		disk[file.path] = hashed
+	}
+	return hashed != "" && hashed == file.sha256
 }
 
 // The files to fetch, out of the release's zip. The reason it couldn't, or "".

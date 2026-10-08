@@ -67,7 +67,14 @@ plan_from_two_manifests_and_the_disk :: proc(t: ^testing.T) {
 	latest := res.Manifest {
 		files = {file("data/same.txt", "the same"), file("data/changed.txt", "as released"), file("data/new.txt", "new")},
 	}
-	plan := launcher.plan_update(installed, latest)
+	// the integrity check names what the install's manifest has that the disk doesn't,
+	// and the plan reads the files as it hashed them
+	disk := make(launcher.Disk, context.temp_allocator)
+	damaged := launcher.check_integrity(installed, &disk)
+	testing.expectf(t, len(damaged) == 1 && damaged[0] == "data/changed.txt", "the changed file is named, the rest are intact (%v)", damaged)
+	testing.expect_value(t, len(disk), 3)
+	plan := launcher.plan_update(installed, latest, &disk)
+	testing.expect_value(t, len(disk), 4) // and only the new file was hashed since
 
 	fetched := make([dynamic]string, context.temp_allocator)
 	for f in plan.fetch do append(&fetched, f.path)

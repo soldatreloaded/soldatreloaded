@@ -7,6 +7,7 @@ package launcher
 //   manifest.<platform>.json        every file of the game on this platform
 //   soldatreloaded-<platform>.zip   the game for this platform, which those files are in
 
+import "core:encoding/json"
 import "core:fmt"
 
 import "../../core/http"
@@ -24,6 +25,20 @@ latest_manifest :: proc() -> (manifest: res.Manifest, text: []byte, ok: bool) {
 	text = download(LATEST_URL + MANIFEST) or_return
 	manifest = res.manifest_parse(text, context.temp_allocator) or_return
 	return manifest, text, true
+}
+
+// The newest release as GitHub's API tells it: its notes, as written on its page. Not
+// `ok` if GitHub couldn't be asked; the update goes on without them.
+Release_Notes :: struct {
+	body: string,
+}
+
+LATEST_API_URL :: "https://api.github.com/repos/" + REPOSITORY + "/releases/latest"
+
+latest_notes :: proc() -> (notes: Release_Notes, ok: bool) {
+	text := download(LATEST_API_URL) or_return
+	ok = json.unmarshal(text, &notes, allocator = context.temp_allocator) == nil
+	return
 }
 
 // The newest release's zip of the game for this platform.
