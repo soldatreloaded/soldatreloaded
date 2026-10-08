@@ -85,7 +85,12 @@ server_stream_receive :: proc(s: ^Server_Stream, g: ^game.Game, slot: game.Soldi
 	soldier := &g.world.soldiers[slot]
 	_, paused := g.round.phase.(game.Paused)
 	if soldier.active && !soldier.vitals.dead && m.life == soldier.vitals.life && !paused {
+		// but the grenades, which the server counts, as OpenSoldat's does: a kit fills them
+		// here a round trip before the owner hears of it, and its word, still short, would
+		// let it take a second kit lying alongside. Its throws empty them as they are heard.
+		grenades := soldier.arsenal.grenades
 		soldier_take_owned(g.resources.animations, soldier, &m.owned)
+		soldier.arsenal.grenades = grenades
 	}
 	soldier.player.typing = m.typing
 	soldier.loadout = game.loadout_allowed(m.owned.loadout)

@@ -347,6 +347,62 @@ streams :: proc(t: ^testing.T) {
 }
 
 
+// The grenades are the server's count, as OpenSoldat's: the owner's word, sent before it
+// heard of the kit that filled them, doesn't empty them again (which let one player take
+// two kits lying together); a throw heard from the owner takes one off.
+@(test)
+grenades_counted_by_server :: proc(t: ^testing.T) {
+	server := make_game(true)
+	client := make_game(false)
+	defer {
+		game.game_destroy(server)
+		game.game_destroy(client)
+		free(server)
+		free(client)
+	}
+	game.soldier_place(server, 0, .Alpha, remote = true)
+	run(server, 120, {}) // past the spawn protection
+
+	words: net.Wire_Queue
+	net.wire_queue_init(&words)
+	streams := new([game.MAX_PLAYERS]net.Server_Stream)
+	defer free(streams)
+	net.server_stream_init(&streams[0], 1)
+	names: [game.MAX_PLAYERS]net.Name
+	client_stream: net.Client_Stream
+	net.client_stream_init(&client_stream)
+	defer net.client_stream_destroy(&client_stream)
+	net.client_stream_reset(&client_stream, 1)
+
+	buf: [net.MTU]u8
+	for _ in 0 ..< 3 {
+		run(server, 1, {})
+		net.wire_collect(&words, &server.output, server.world.tick - 1, nil)
+		snapshot := net.server_stream_snapshot(&streams[0], server, 0, &words, &names, buf[:])
+		testing.expect(t, net.client_stream_hear(&client_stream, client, 0, snapshot), "the client reads it")
+		net.client_stream_begin_tick(&client_stream, client, 0, 0)
+		state := net.client_stream_state(&client_stream, &client.world.soldiers[0], buf[:])
+		testing.expect(t, net.server_stream_receive(&streams[0], server, 0, state, &words), "the server reads it")
+	}
+	me, mine_there := &client.world.soldiers[0], &server.world.soldiers[0]
+	testing.expect(t, me.active && me.vitals.life == mine_there.vitals.life, "I was placed")
+	full := server.world.rules.max_grenades
+
+	// a kit filled them there; my word still says none
+	mine_there.arsenal.grenades = full
+	me.arsenal.grenades = 0
+	me.body.pos.x += 1
+	state := net.client_stream_state(&client_stream, me, buf[:])
+	testing.expect(t, net.server_stream_receive(&streams[0], server, 0, state, &words))
+	testing.expect_value(t, mine_there.arsenal.grenades, full)
+	testing.expect_value(t, mine_there.body.pos.x, me.body.pos.x) // the rest of my word is taken
+
+	// my throw, heard there
+	sa.push_back(&server.world.heard, game.Hearing{word = game.Shot{owner = 0, weapon = .Frag_Grenade, pos = mine_there.body.pos - {0, 20}, damage = 1}})
+	run(server, 1, {})
+	testing.expect_value(t, mine_there.arsenal.grenades, full - 1)
+}
+
 // The lobby's list: an address and a port a line; what isn't one is passed over, and no
 // more are read than there is room for.
 @(test)

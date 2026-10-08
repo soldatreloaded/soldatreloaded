@@ -56,6 +56,12 @@ heard_apply :: proc(world: ^World, resources: ^Resources, authority: ^Authority,
 				bullet_remote_fire(world, resources, w, out)
 			}
 			bullet_hear(world, resources, w, hearing.catch_up, authority, out)
+			// a player's grenade, thrown on its own machine: the server keeps the count
+			// (stream_server.odin), so the throw is taken off it here
+			if authority != nil && w.weapon == .Frag_Grenade {
+				arsenal := &world.soldiers[w.owner].arsenal
+				arsenal.grenades = max(arsenal.grenades - 1, 0)
+			}
 		case Shot_End:   if turn == .Bullets do bullet_shot_end(world, resources, w, out)
 		// recorded as the server's own are, for the sounds, the sparks and the feed; a
 		// client's collection for the wire leaves rulings out, so none goes back
