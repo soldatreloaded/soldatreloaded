@@ -49,6 +49,7 @@ Arguments :: struct {
 	ip:       string `usage:"the address to listen on, over server.config.mjson's (on fly.io, fly-global-services')"`,
 	hostname: string `usage:"the game's name, over server.config.mjson's"`,
 	lobby_ip: string `usage:"the IPv4 address the lobby lists, over server.config.mjson's (on fly.io, the app's dedicated one)"`,
+	rcon_ip:  string `usage:"the address rcon listens on over TCP; else the game's (on fly.io 0.0.0.0, as TCP comes to the machine's own address, not fly-global-services)"`,
 }
 
 App :: struct {
@@ -136,7 +137,7 @@ start :: proc(app: ^App, args: Arguments) -> bool {
 	lobby.lobby_init(&app.lobby)
 	if app.config.server.rcon {
 		if app.config.server.admin_password == "" do log.info("rcon: off, as there is no admin password")
-		else do rcon_open(&app.rcon, server_ip(&app.sv), server_port(&app.sv))
+		else do rcon_open(&app.rcon, app.args.rcon_ip if app.args.rcon_ip != "" else server_ip(&app.sv), server_port(&app.sv))
 	}
 	return true
 }
