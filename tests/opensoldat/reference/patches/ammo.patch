@@ -1,0 +1,16 @@
+The server leaves a player's ammo to the player's client, which counts it as it fires
+and says so in its snapshots; the reference has no client, so its server counts it, as
+the client's TSprite.Fire does.
+
+--- a/shared/mechanics/Sprites.pas
++++ b/shared/mechanics/Sprites.pas
+@@ -4279,7 +4279,8 @@
+   end;
+
+   // Shouldn't we dec on server too?
+-  {$IFNDEF SERVER}
++  // the reference: counted as a player's client counts it (tests/opensoldat)
++  {$IF TRUE}
+   if Weapon.AmmoCount > 0 then
+     Dec(Weapon.AmmoCount);
+   {$ENDIF}

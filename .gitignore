@@ -1,4 +1,5 @@
 tests/compare/build/
+tests/opensoldat/build/
 build/
 assets/*.exe
 assets/*.config.json
