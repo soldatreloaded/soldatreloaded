@@ -150,12 +150,15 @@ ruling_sounds :: proc(s: ^Sound, ruling: sim.Ruling, world: ^sim.World, me: sim.
 		at := world.soldiers[r.soldier].body.pos
 		play_at(s, "takegun.wav" if r.kind == .Weapon else KIT_SOUNDS[r.kind], at)
 	// The flag's: a capture and a return are heard wherever you are, flat, as the
-	// original's, a flag timed out back to its base among the returns. The grab is from
-	// where it happened.
+	// original's, but a return only when my team's player made it (a spectator hears every
+	// player's): not the enemy's, and not a flag timed out back to its base. The players
+	// asked for it, a departure. The grab is from where it happened.
 	case sim.Flag_Grab:
 		play_at(s, "capture.wav", world.soldiers[r.soldier].body.pos)
 	case sim.Flag_Return:
-		sound_flat(s, "capture.wav")
+		by, returned := r.returner.?
+		mine := world.soldiers[me].team
+		if returned && (mine == .Spectator || world.soldiers[by].team == mine) do sound_flat(s, "capture.wav")
 	case sim.Flag_Capture:
 		sound_flat(s, "ctf.wav")
 	}
