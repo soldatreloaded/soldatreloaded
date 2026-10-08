@@ -117,7 +117,7 @@ map_read :: proc(sv: ^Server) -> ([]u8, bool) {
 // The round's map to one peer, and its own art after it.
 tell_map :: proc(sv: ^Server, peer: net.Peer) {
 	m := net.Msg_Map{round = sv.round, map_name = sv.map_name, limit = u16(clamp(sv.game.settings.capture_limit, 0, i32(max(u16)))), hash = sv.map_hash, art = u8(len(sv.map_art))}
-	utils.short_string_set(&m.hostname, sv.options.config.server.hostname)
+	utils.short_string_set(&m.hostname, server_hostname(sv))
 	net.net_send_message(peer, .Map, net.msg_map, &m)
 	for &art, i in sv.map_art {
 		a := net.Msg_Map_Art{round = sv.round, index = u8(i), size = u32(len(art.data)), hash = art.hash}
