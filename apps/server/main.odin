@@ -47,6 +47,8 @@ Arguments :: struct {
 	map_name: string `args:"name=map" usage:"the first round's map; else the rotation's first"`,
 	port:     u16 `usage:"the UDP port to listen on, over server.config.mjson's"`,
 	ip:       string `usage:"the address to listen on, over server.config.mjson's (on fly.io, fly-global-services')"`,
+	hostname: string `usage:"the game's name, over server.config.mjson's"`,
+	lobby_ip: string `usage:"the IPv4 address the lobby lists, over server.config.mjson's (on fly.io, the app's dedicated one)"`,
 }
 
 App :: struct {
@@ -54,6 +56,7 @@ App :: struct {
 	config:  ^res.Server_Config,
 	weapons: res.Weapon_Table, // the weapons as they stand: weapons.ini's, and the `weapon` lines since
 	lobby:   lobby.Lobby,
+	args:    Arguments, // the command line, over the config
 	rcon:    Rcon,   // remote admins (rcon.odin); held by its address, as the log reaches it
 	script:  Script, // held by its address while open
 	quit:    bool,
@@ -105,6 +108,7 @@ on_interrupt :: proc "c" (_: i32) {
 // The config and the files beside it, the network, the game hosted on them, and rcon.
 @(private = "file")
 start :: proc(app: ^App, args: Arguments) -> bool {
+	app.args = args
 	app.config = res.server_config_load(SERVER_CONFIG, OLD_SERVER_CONFIG)
 	// its file whole, as it stands; the command line is the server's (Options), not the file's
 	if !res.server_config_save(app.config, SERVER_CONFIG) do log.errorf("could not write %s", SERVER_CONFIG)
@@ -121,6 +125,7 @@ start :: proc(app: ^App, args: Arguments) -> bool {
 		first_map   = args.map_name,
 		port        = args.port,
 		ip          = args.ip,
+		hostname    = args.hostname,
 		weapons     = app.weapons,
 	}
 	if !server_init(&app.sv, options) {
@@ -168,7 +173,8 @@ weapons_load :: proc(path: string) -> res.Weapon_Table {
 @(private = "file")
 lobby_settings :: proc(app: ^App) -> lobby.Settings {
 	l := &app.config.lobby
-	return {public = l.public, url = l.url if l.url != "" else lobby.DEFAULT_URL, address = l.ip, port = server_port(&app.sv)}
+	address := app.args.lobby_ip if app.args.lobby_ip != "" else l.ip
+	return {public = l.public, url = l.url if l.url != "" else lobby.DEFAULT_URL, address = address, port = server_port(&app.sv)}
 }
 
 // ---------------------------------------------------------------------------------

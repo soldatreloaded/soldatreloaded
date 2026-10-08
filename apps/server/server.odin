@@ -59,6 +59,7 @@ Options :: struct {
 	first_map:   string, // the first round's; "" for the rotation's first
 	port:        u16,    // the port to listen on, over the config's; 0 for the config's
 	ip:          string, // the address to listen on, over the config's; "" for the config's
+	hostname:    string, // the game's name, over the config's; "" for the config's
 	weapons:     res.Weapon_Table, // the weapons' numbers the game plays by: weapons.ini's over GatherWM's
 }
 
@@ -272,6 +273,11 @@ server_ip :: proc(sv: ^Server) -> string {
 	return sv.options.ip if sv.options.ip != "" else sv.options.config.server.ip
 }
 
+// The game's name: the one it was started with, else the config's.
+server_hostname :: proc(sv: ^Server) -> string {
+	return sv.options.hostname if sv.options.hostname != "" else sv.options.config.server.hostname
+}
+
 // The weapons' numbers changed while the game is on: the game takes them at once, and
 // everyone on is told.
 server_weapons_changed :: proc(sv: ^Server, weapons: res.Weapon_Table) {
@@ -323,7 +329,7 @@ answer_query :: proc(user: rawptr, info: ^net.Server_Info) {
 		if player.bot do info.bots += 1
 		else if player.joined do info.players += 1
 	}
-	utils.short_string_set(&info.hostname, sv.options.config.server.hostname)
+	utils.short_string_set(&info.hostname, server_hostname(sv))
 	info.map_name = sv.map_name
 }
 
