@@ -109,6 +109,17 @@ client_config_round_trip :: proc(t: ^testing.T) {
 }
 
 @(test)
+borderless_is_fullscreen :: proc(t: ^testing.T) {
+	dir := scratch(t, "borderless")
+	defer os.remove_all(dir)
+	path := utils.temp_path(dir, "client.config.mjson")
+	write(path, `graphics: {window_mode: "borderless"}`)
+	config := res.client_config_load(path)
+	defer res.client_config_destroy(config)
+	testing.expect(t, !config.broken && config.graphics.window_mode == .Fullscreen, "an older config's borderless reads as fullscreen, which it now is")
+}
+
+@(test)
 mjson_as_people_write_it :: proc(t: ^testing.T) {
 	dir := scratch(t, "hand")
 	defer os.remove_all(dir)

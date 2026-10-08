@@ -12,7 +12,7 @@ import "../hud"
 //
 //   escmenu teammenu weaponsmenu fragsmenu statsmenu   the menus
 //   toggle <setting>    ui_minimap, ui_info, ui_playernames, r_swapeffect (vsync)
-//   togglewindow        a window, or back to the fullscreen it came from
+//   togglewindow        fullscreen, or a window
 //   chat teamchat cmd   the prompt, for everyone, the team, or a command
 //   say <text>  say_team <text>   a line, as a key says it: a taunt
 //   votemap <map>  votekick <player>
@@ -62,12 +62,7 @@ command_run :: proc(match: ^Match, line: string) {
 		toggle(match, rest)
 	case "togglewindow":
 		graphics := &config.graphics
-		if graphics.window_mode != .Windowed {
-			match.windowed = graphics.window_mode
-			graphics.window_mode = .Windowed
-		} else {
-			graphics.window_mode = match.windowed
-		}
+		graphics.window_mode = .Windowed if graphics.window_mode == .Fullscreen else .Fullscreen
 	case "chat":
 		prompt_open(match, .Public)
 	case "teamchat":

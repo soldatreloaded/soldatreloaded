@@ -90,9 +90,9 @@ Control_Settings :: struct {
 
 Graphics_Settings :: struct {
 	mod:               string `jsoncomment:"the mod the game looks and sounds like, over Classic (mods/classic/): one of mods/; empty for Classic alone. Chosen on the Mods page, which uses it at once."`,
-	screen_width:      i32 `jsoncomment:"the window's width"`,
-	screen_height:     i32 `jsoncomment:"the window's height"`,
-	window_mode:       Window_Mode `jsoncomment:"windowed, fullscreen or borderless"`,
+	screen_width:      i32 `jsoncomment:"the resolution's width: windowed, the window's; fullscreen, the world is drawn at it and scaled to the screen"`,
+	screen_height:     i32 `jsoncomment:"the resolution's height"`,
+	window_mode:       Window_Mode `jsoncomment:"windowed, or fullscreen: a window without borders over the whole screen"`,
 	vsync:             bool `jsoncomment:"wait for the display's refresh"`,
 	fps_limit:         bool `jsoncomment:"draw at most max_fps frames a second; false draws them as fast as they come"`,
 	max_fps:           i32 `jsoncomment:"the frames drawn a second at most, while fps_limit is on"`,
@@ -114,8 +114,7 @@ Graphics_Settings :: struct {
 
 Window_Mode :: enum {
 	Windowed,
-	Fullscreen,
-	Borderless,
+	Fullscreen, // borderless, over the whole screen; an older config's "borderless" reads as it
 }
 
 Interface_Settings :: struct {

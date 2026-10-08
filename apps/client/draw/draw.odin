@@ -80,18 +80,18 @@ art_destroy :: proc(art: ^Art) {
 	art^ = {}
 }
 
-// The world as `camera` sees it in `frame`, over the whole window, as the graphics
-// settings have it. The original's RenderFrame order: the sky and the polygons behind
-// (each layer of polygons over its edges, unless graphics.smooth_polygons leaves them out),
-// the back scenery, the bullets behind the soldiers, the soldiers, the
+// The world as `camera` sees it in `frame`, into `area` of what is drawn into, in pixels,
+// as the graphics settings have it. The original's RenderFrame order: the sky and the
+// polygons behind (each layer of polygons over its edges, unless graphics.smooth_polygons
+// leaves them out), the back scenery, the bullets behind the soldiers, the soldiers, the
 // things' sprites in front of them, the sparks, the middle scenery, the flags' cloth and
 // the kits over that, then the map's polygons and the front scenery over everything.
-draw_world :: proc(art: ^Art, game: ^sim.Game, frame: ^Frame, sparks: ^Sparks, camera: Camera, graphics: ^res.Graphics_Settings) {
+draw_world :: proc(art: ^Art, game: ^sim.Game, frame: ^Frame, sparks: ^Sparks, camera: Camera, area: rl.Rectangle, graphics: ^res.Graphics_Settings) {
 	polymap := &game.polymap
 	seconds := rl.GetTime() // what pulses goes by it
 	sky := sky_of(polymap, graphics)
 	draw_sky_behind(sky, camera)
-	rl.BeginMode2D(camera_raylib(camera))
+	rl.BeginMode2D(camera_raylib(camera, area))
 	rl.BeginBlendMode(.ALPHA_PREMULTIPLY)
 	rlgl.DisableBackfaceCulling() // a map's polygons and a mirrored sprite face either way
 	defer {

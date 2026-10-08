@@ -70,6 +70,7 @@ Match :: struct {
 	seen:       draw.Camera, // as the frame draws it: between the last two ticks'
 	sparks:    draw.Sparks,
 	minimap:    draw.Minimap,
+	canvas:     draw.Canvas, // the world at a resolution not the window's
 	before:     draw.Snapshot, // the world a tick ago, which a frame blends from
 	frame:      draw.Frame,    // what is drawn: the world between its last two ticks
 	input:      input.Input,
@@ -89,7 +90,6 @@ Match :: struct {
 	playback:   Playback, // a demo playing
 	recorder:   demo.Recorder, // online: the game recorded
 	record:     Record_Asked,
-	windowed:   res.Window_Mode, // the fullscreen togglewindow left, to go back to
 	request:    Request, // what a command asked of the client, handed over at the frame's end
 	settings:   bool, // the escape menu's Options chosen: the settings asked of the client at the frame's end
 }
@@ -195,6 +195,7 @@ match_end :: proc(match: ^Match) {
 	}
 	input.input_stop(&match.input)
 	draw.minimap_destroy(&match.minimap)
+	draw.canvas_destroy(&match.canvas)
 	draw.art_destroy(&match.art)
 	hud.hud_destroy(&match.hud)
 	delete(match.profiles)
@@ -223,7 +224,7 @@ match_pace :: proc(match: ^Match) -> f64 {
 // on, my soldier standing.
 match_update :: proc(match: ^Match, config: ^res.Client_Config, sounds: ^sound.Sound, ticks: int, alpha, dt: f32, held := false) -> Request {
 	match.request = nil
-	draw.camera_fit(&match.camera)
+	draw.camera_fit(&match.camera, draw.view_of(&config.graphics))
 	if match.mode != .Offline {
 		if !online.line_joined(match.line) do return Leave{} // the line is lost, or the demo over
 		if !take(match) do return Leave{} // a map that couldn't be loaded
@@ -258,17 +259,30 @@ match_update :: proc(match: ^Match, config: ^res.Client_Config, sounds: ^sound.S
 	return match.request
 }
 
-// The world and the HUD in the view's area of the window, bars beside it if the window's
-// shape is past the original's limits.
+// The world and the HUD in the view's area of the window, bars beside it if its shape is
+// past the original's limits. The world is drawn at the view's resolution, through the
+// canvas where that isn't the window's; the HUD always at the window's, to stay sharp.
 match_draw :: proc(match: ^Match, u: ^ui.Ui, config: ^res.Client_Config) {
-	area := draw.view_area()
+	view := draw.view_of(&config.graphics)
+	area := view.area
 	ui.ui_fit(u, area)
 	sky := draw.sky_of(&match.game.polymap, &config.graphics)
 	draw.minimap_fit(&match.minimap, &match.art, &match.game.polymap, u.scale, sky) // into its own texture: before the scissor
+	direct := draw.view_direct(view)
+	if !direct { // into the canvas too, before the scissor
+		draw.canvas_fit(&match.canvas, view.size)
+		draw.canvas_begin(&match.canvas)
+		draw.draw_world(&match.art, match.game, &match.frame, &match.sparks, match.seen, {0, 0, f32(view.size.x), f32(view.size.y)}, &config.graphics)
+		draw.canvas_end(&match.canvas)
+	}
 	rl.ClearBackground(rl.BLACK)
 	rl.BeginScissorMode(i32(area.x), i32(area.y), i32(area.width), i32(area.height))
 	defer rl.EndScissorMode()
-	draw.draw_world(&match.art, match.game, &match.frame, &match.sparks, match.seen, &config.graphics)
+	if direct {
+		draw.draw_world(&match.art, match.game, &match.frame, &match.sparks, match.seen, area, &config.graphics)
+	} else {
+		draw.canvas_show(&match.canvas, area)
+	}
 	data := hud_data(match, config)
 	rlgl.PushMatrix() // the HUD's units are from the view's top-left
 	rlgl.Translatef(area.x, area.y, 0)
@@ -277,13 +291,11 @@ match_draw :: proc(match: ^Match, u: ^ui.Ui, config: ^res.Client_Config) {
 	rlgl.PopMatrix()
 }
 
-// What every match has, whatever plays it: the sparks, the HUD, the window's mode to go
-// back to.
+// What every match has, whatever plays it: the sparks, the HUD.
 @(private = "file")
 match_open :: proc(match: ^Match) {
 	draw.sparks_init(&match.sparks)
 	hud.hud_init(&match.hud, match.mod)
-	match.windowed = .Fullscreen
 	match.chat.big_scroll = 0
 }
 
@@ -291,7 +303,7 @@ match_open :: proc(match: ^Match) {
 // first placings seen and heard.
 @(private = "file")
 view_open :: proc(match: ^Match, sounds: ^sound.Sound) {
-	draw.camera_fit(&match.camera)
+	draw.camera_fit(&match.camera, draw.view_of(&match.config.graphics))
 	draw.camera_place(&match.camera, match.game.world.soldiers[match.me].body.pos)
 	match.seen = match.camera
 	input.input_start(&match.input, match.camera.view)

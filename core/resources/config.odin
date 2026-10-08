@@ -156,9 +156,10 @@ config_marshalers_init :: proc "contextless" () {
 
 	register(utils.Rgba, marshal_color, unmarshal_color)
 	register(Maybe(utils.Rgba), marshal_maybe_color, unmarshal_maybe_color)
-	for id in ([?]typeid{Gostek, Hair_Style, Head_Style, Chain_Style, Weapon, Window_Mode, Typing_Style, Kill_Log_Position}) {
+	for id in ([?]typeid{Gostek, Hair_Style, Head_Style, Chain_Style, Weapon, Typing_Style, Kill_Log_Position}) {
 		register(id, marshal_enum, unmarshal_enum)
 	}
+	register(Window_Mode, marshal_enum, unmarshal_window_mode)
 	register(f32, marshal_f32) // read as the package reads it
 	register(map[string]string, marshal_string_map) // read as the package reads it
 	for id in ([?]typeid{[]string, []Admin_Entry, []Ban_Entry, []Mute_Entry}) {
@@ -285,6 +286,17 @@ unmarshal_enum :: proc(p: ^json.Parser, v: any) -> json.Unmarshal_Error {
 		return nil
 	}
 	return json.Unsupported_Type_Error{v.id, token}
+}
+
+// A window mode; "borderless", which fullscreen now is, reads as fullscreen.
+@(private = "file")
+unmarshal_window_mode :: proc(p: ^json.Parser, v: any) -> json.Unmarshal_Error {
+	if p.curr_token.kind == .String && strings.equal_fold(p.curr_token.text, `"borderless"`) {
+		json.advance_token(p)
+		(^Window_Mode)(v.data)^ = .Fullscreen
+		return nil
+	}
+	return unmarshal_enum(p, v)
 }
 
 // The string the parser is at, unquoted into the temp allocator, and the parser past it.

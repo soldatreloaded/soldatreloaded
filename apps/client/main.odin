@@ -418,16 +418,16 @@ discord_update :: proc(client: ^Client) {
 
 // The window's settings as they were last applied.
 Window :: struct {
-	mode:    res.Window_Mode,
-	size:    [2]i32, // windowed
-	vsync:   bool,
-	fps:     i32,  // the frames a second at most; 0 for no limit
-	focused: bool, // it had the keys last frame
+	mode:  res.Window_Mode,
+	size:  [2]i32, // windowed
+	vsync: bool,
+	fps:   i32, // the frames a second at most; 0 for no limit
 }
 
-// The window as the config has it: its size and mode, and how fast it is drawn.
+// The window as the config has it: its size and mode, and how fast it is drawn. It
+// can't be resized by hand, as the original's can't: its size is the resolution's.
 window_open :: proc(window: ^Window, graphics: ^res.Graphics_Settings) {
-	flags := rl.ConfigFlags{.WINDOW_RESIZABLE, .MSAA_4X_HINT}
+	flags := rl.ConfigFlags{.MSAA_4X_HINT}
 	if graphics.vsync do flags += {.VSYNC_HINT}
 	rl.SetConfigFlags(flags)
 	rl.InitWindow(graphics.screen_width, graphics.screen_height, "Soldat Reloaded")
@@ -445,40 +445,17 @@ window_open :: proc(window: ^Window, graphics: ^res.Graphics_Settings) {
 
 // The window changed to what the config has now, where it differs from what was made:
 // the mode, the size while windowed, vsync and the frame rate's limit, as the C client
-// applies them, at once.
-//
-// On Windows, GLFW holds a fullscreen window on top of every other, and raylib turns off
-// the minimizing that would get it out of the way: Alt+Tab gave another window the
-// keys, but left it hidden behind the game. So a fullscreen window that loses the keys
-// is minimized here, as GLFW would have done (its display's mode restored with it), and
-// comes back fullscreen from the taskbar. raylib's borderless is GLFW's fullscreen too,
-// at the display's own mode, so borderless is made here instead (window_borderless).
+// applies them, at once. Fullscreen is a window without borders over the whole screen,
+// at the display's own mode, so Alt+Tab is instant and nothing flickers; the
+// resolution is the view's then, not the window's (draw/view.odin).
 window_follow :: proc(window: ^Window, graphics: ^res.Graphics_Settings) {
-	focused := rl.IsWindowFocused()
-	if window.mode == .Fullscreen && window.focused && !focused do rl.MinimizeWindow()
-	window.focused = focused
-
 	size := [2]i32{graphics.screen_width, graphics.screen_height}
-	if graphics.window_mode != window.mode {
-		switch window.mode { // out of the one it was in
-		case .Windowed:
-		case .Fullscreen: rl.ToggleFullscreen()
-		case .Borderless: rl.ClearWindowState({.WINDOW_UNDECORATED})
-		}
-		switch graphics.window_mode { // into the one asked for
-		case .Windowed:
-			window_size(size)
-		case .Fullscreen: // the display's own resolution, whatever the window's size was
-			monitor := rl.GetCurrentMonitor()
-			rl.SetWindowSize(rl.GetMonitorWidth(monitor), rl.GetMonitorHeight(monitor))
-			rl.ToggleFullscreen()
-		case .Borderless:
-			window_borderless()
+	if graphics.window_mode != window.mode || (window.mode == .Windowed && size != window.size) {
+		switch graphics.window_mode {
+		case .Windowed:   window_windowed(size)
+		case .Fullscreen: window_fullscreen()
 		}
 		window.mode = graphics.window_mode
-		window.size = size
-	} else if size != window.size {
-		if window.mode == .Windowed do window_size(size)
 		window.size = size
 	}
 	if graphics.vsync != window.vsync {
@@ -493,16 +470,22 @@ window_follow :: proc(window: ^Window, graphics: ^res.Graphics_Settings) {
 	}
 }
 
-// Windowed at `size`, in the middle of its display.
-window_size :: proc(size: [2]i32) {
-	rl.SetWindowSize(size.x, size.y)
+// Windowed at the size `wanted`, with its borders, in the middle of its display; no
+// larger than it, as a resolution chosen for fullscreen may be.
+window_windowed :: proc(wanted: [2]i32) {
 	monitor := rl.GetCurrentMonitor()
-	rl.SetWindowPosition((rl.GetMonitorWidth(monitor) - size.x) / 2, (rl.GetMonitorHeight(monitor) - size.y) / 2)
+	screen := [2]i32{rl.GetMonitorWidth(monitor), rl.GetMonitorHeight(monitor)}
+	size := [2]i32{min(wanted.x, screen.x), min(wanted.y, screen.y)}
+	at := rl.GetMonitorPosition(monitor)
+	rl.ClearWindowState({.WINDOW_UNDECORATED})
+	rl.SetWindowSize(size.x, size.y)
+	rl.SetWindowPosition(i32(at.x) + (screen.x - size.x) / 2, i32(at.y) + (screen.y - size.y) / 2)
 }
 
-// Borderless: an ordinary window, undecorated and over the whole of its display, so it
-// goes behind another as any window does.
-window_borderless :: proc() {
+// Fullscreen: an ordinary window, undecorated and over the whole of its display, so it
+// goes behind another as any window does. raylib's own fullscreen is GLFW's, which holds
+// the window over every other on Windows, even after Alt+Tab.
+window_fullscreen :: proc() {
 	monitor := rl.GetCurrentMonitor()
 	at := rl.GetMonitorPosition(monitor)
 	rl.SetWindowState({.WINDOW_UNDECORATED})
