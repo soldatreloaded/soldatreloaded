@@ -118,6 +118,7 @@ vote_start :: proc(sv: ^Server, slot: game.Soldier_Id, kind: net.Vote_Kind, targ
 	sv.vote_cooldown[slot] = VOTE_COOLDOWN_TICKS
 	tell_vote(sv, nil) // the vote's box says who wants what; the original's console says nothing
 	if kind == .Kick do log.infof("%s started votekick against %s - Reason:%s", utils.short_string_text(&sv.players[slot].name), target, reason)
+	if kind == .Map do log.infof("%s started votemap for %s", utils.short_string_text(&sv.players[slot].name), target)
 }
 
 // A vote said in the chat, as the original's ServerHandleVoteKick and CommandVotemap
@@ -179,7 +180,9 @@ vote_command :: proc(sv: ^Server, slot: game.Soldier_Id, word, rest: string) {
 // A map vote passed since last asked (or an admin's /map): the map, once.
 vote_take_map :: proc(sv: ^Server) -> (map_name: string, passed: bool) {
 	if sv.vote_map.length == 0 do return
-	map_name = utils.short_string_text(&sv.vote_map)
+	// a copy: the text is a view of vote_map's bytes, which are cleared now (taken as it
+	// was, the map was as long as its name and all zeros, and the server stopped on it)
+	map_name = strings.clone(utils.short_string_text(&sv.vote_map), context.temp_allocator)
 	sv.vote_map = {}
 	return map_name, true
 }

@@ -484,3 +484,18 @@ admin_commands :: proc(t: ^testing.T) {
 	testing.expect(t, a_banned && !b_banned, "unbanlast lifts the last ban alone")
 	testing.expect(t, server.admin_command(sv, nil, "kicklast"), "kicklast with nobody joined is answered")
 }
+
+// A map vote passed, or an admin's /map, hands over the map's name whole, once: taken
+// as a view of the vote's own bytes, which are cleared as it is taken, it came out all
+// zeros, and the server stopped on loading it.
+@(test)
+voted_map_taken :: proc(t: ^testing.T) {
+	sv := new(server.Server)
+	defer free(sv)
+	utils.short_string_set(&sv.vote_map, "ctf_Ash")
+	name, passed := server.vote_take_map(sv)
+	testing.expect(t, passed, "the vote passed")
+	testing.expect_value(t, name, "ctf_Ash")
+	_, again := server.vote_take_map(sv)
+	testing.expect(t, !again, "and is taken once")
+}
