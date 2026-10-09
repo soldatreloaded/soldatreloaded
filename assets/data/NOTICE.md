@@ -13,4 +13,9 @@ is in [LICENSE.txt](LICENSE.txt).
   personalities were rewritten from their `.bot` (INI) files as JSON (`bots/*.json`),
   each with the same name, look, weapons, skill and lines.
 
+## What here is not from base
+
+- `maps/ctf_Spark.pms`: **ctf_Spark**, by Vauat, a community map. Its art is in
+  `mods/classic/`, credited in that notice.
+
 [base]: https://github.com/opensoldat/base
