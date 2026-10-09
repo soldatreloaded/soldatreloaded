@@ -1,12 +1,15 @@
 package menu
 
+import "core:strings"
+
 import "../../../core/utils"
 import "../online"
 import "../ui"
 
-// Join by address: the server's address and its password, and Connect. While the line
-// joins, the button gives it up, and the footer says how it goes: what the line last
-// said, or how much of the server's map has come.
+// Join by address: the server's address and its password in one field, as
+// host:port/password (as the gather bot gives them), and Connect. While the line joins,
+// the button gives it up, and the footer says how it goes: what the line last said, or
+// how much of the server's map has come.
 
 Join :: struct {
 	connect_asked: bool, // Connect was pressed: what becomes of the line shows beside it
@@ -15,6 +18,7 @@ Join :: struct {
 NAME_MAX :: 23     // a player's name, as the wire carries it
 PASSWORD_MAX :: 31 // a server's password
 ADDRESS_MAX :: 63
+TARGET_MAX :: ADDRESS_MAX + 1 + PASSWORD_MAX // the two, a slash between
 
 page_join :: proc(menu: ^Menu) {
 	k := &menu.kit
@@ -22,11 +26,16 @@ page_join :: proc(menu: ^Menu) {
 	full_w := k.w
 	k.w = min(full_w, 520) // the fields near their names
 	ui.section(k, "SERVER")
-	ui.text_row(k, "Address", &network.server, ADDRESS_MAX, "host:port", config_allocator(menu))
-	ui.text_row(k, "Password", &network.password, PASSWORD_MAX, "if the server asks one", config_allocator(menu), secret = true)
+	// the config's address and password as one, split again as they are typed
+	target := online.target_join(network.server, network.password)
+	if typed, changed := ui.field_row(k, "Server", &menu.join, target, TARGET_MAX, "host:port/password"); changed {
+		address, password, _ := online.target_split(typed)
+		network.server = strings.clone(address, config_allocator(menu))
+		network.password = strings.clone(password, config_allocator(menu))
+	}
 	ui.gap(k, 6)
 	if tip_y := k.y; tip_y + 40 < k.bottom {
-		tip := "A server's address is its IP or name and its port, as 192.168.1.20:23073. Ctrl+V pastes."
+		tip := "A server's IP or name and its port, then its password after a slash if it asks one, as 192.168.1.20:23073/secret. Ctrl+V pastes."
 		ui.text_wrap(k, ui.BODY, tip, k.x + 12, tip_y, k.w - 24, ui.MUTED)
 	}
 

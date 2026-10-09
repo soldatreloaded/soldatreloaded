@@ -307,17 +307,20 @@ leave :: proc(client: ^Client) {
 	screen_switch(client, menu_open(client))
 }
 
-// The line to `address`, saying who I am in the Hello: my name, the password to join
-// with, my look, my loadout.
-connect :: proc(client: ^Client, address: string) {
+// The line to `target` (host:port, with /password after it if the server asks one: else
+// the config's), saying who I am in the Hello: my name, the password to join with, my
+// look, my loadout.
+connect :: proc(client: ^Client, target: string) {
 	config := client.config
+	address, password, has_password := online.target_split(target)
+	if !has_password do password = config.network.password
 	hello := network.Msg_Hello {
 		look      = match.look_of(config),
 		primary   = config.player.primary_weapon,
 		secondary = config.player.secondary_weapon,
 	}
 	utils.short_string_set(&hello.name, config.player.name)
-	utils.short_string_set(&hello.password, config.network.password)
+	utils.short_string_set(&hello.password, password)
 	online.line_connect(&client.line, address, hello)
 }
 

@@ -189,8 +189,8 @@ page_servers :: proc(menu: ^Menu) {
 	}
 }
 
-// Off to `server`: at once, or by Join by address with its address filled in when it
-// asks a password, which is typed there.
+// Off to `server`: at once, or by Join by address with its address and a slash filled
+// in when it asks a password, which is typed after them.
 @(private = "file")
 join_server :: proc(menu: ^Menu, server: ^online.Browser_Server) {
 	network := &menu.config.network
@@ -201,11 +201,12 @@ join_server :: proc(menu: ^Menu, server: ^online.Browser_Server) {
 		menu.request = Connect{network.server}
 		return
 	}
+	network.password = "" // another server's, if any
 	go_page(menu, .Join)
 	k := &menu.kit
 	k.in_page = true
-	k.nav = 1 // the password
-	ui.edit_begin(k, &network.password, network.password, PASSWORD_MAX)
+	k.nav = 0 // the server field, its password to be typed
+	ui.edit_begin(k, &menu.join, fmt.tprintf("%s/", address), TARGET_MAX)
 }
 
 // What the list is waiting on, or how it stands.

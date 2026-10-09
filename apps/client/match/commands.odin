@@ -104,7 +104,7 @@ command_run :: proc(match: ^Match, line: string) {
 	case "demo_pause", "demo_fast", "demo_tick", "demo_tick_r":
 		demo_command(match, word, rest)
 	case "connect":
-		if rest == "" do usage(match, "connect <address[:port]>")
+		if rest == "" do usage(match, "connect <address[:port][/password]>")
 		else do match.request = Connect{strings.clone(rest, context.temp_allocator)}
 	case "disconnect":
 		match.request = Leave{}

@@ -118,6 +118,23 @@ line_connect :: proc(n: ^Line, address: string, hello: network.Msg_Hello) {
 	say(n, .Plain, "Connecting to %s...", utils.short_string_text(&n.address))
 }
 
+// A server as it is given to join: host:port/password, the password and its slash only
+// when the server asks one. The password is all after the first slash: an address has
+// none of its own.
+target_split :: proc(target: string) -> (address, password: string, has_password: bool) {
+	trimmed := strings.trim_space(target)
+	if slash := strings.index_byte(trimmed, '/'); slash >= 0 {
+		return strings.trim_space(trimmed[:slash]), trimmed[slash + 1:], true
+	}
+	return trimmed, "", false
+}
+
+// The address and password as one, the other way.
+target_join :: proc(address, password: string, allocator := context.temp_allocator) -> string {
+	if password == "" do return strings.clone(address, allocator)
+	return strings.concatenate({address, "/", password}, allocator)
+}
+
 line_disconnect :: proc(n: ^Line) {
 	if n.playback {
 		n.playback = false

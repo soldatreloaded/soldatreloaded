@@ -292,3 +292,15 @@ browser_asks :: proc(t: ^testing.T) {
 	testing.expect_value(t, utils.short_string_text(&info.map_name), "ctf_Ash")
 	testing.expect_value(t, info.protocol, u16(network.VERSION))
 }
+
+// A server given as one, host:port/password: split at the first slash, which an
+// address never has, and joined back the same; no slash, no password.
+@(test)
+test_target_split :: proc(t: ^testing.T) {
+	address, password, has := online.target_split(" 1.2.3.4:23073/se/cret ")
+	testing.expect(t, address == "1.2.3.4:23073" && password == "se/cret" && has)
+	address, password, has = online.target_split("1.2.3.4:23073")
+	testing.expect(t, address == "1.2.3.4:23073" && password == "" && !has)
+	testing.expect_value(t, online.target_join("1.2.3.4:23073", "abc"), "1.2.3.4:23073/abc")
+	testing.expect_value(t, online.target_join("1.2.3.4:23073", ""), "1.2.3.4:23073")
+}
