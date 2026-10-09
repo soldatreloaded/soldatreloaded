@@ -189,7 +189,15 @@ Transport is ENet, one unreliable channel and one reliable.
 
 A snapshot fits one datagram, about 1100 bytes. In the steady state deltas are a few
 bytes per soldier and this never binds; for a join and after loss, soldiers out of view
-and old events are held back to the next snapshot by priority.
+and old events are held back to the next snapshot by priority. A delta's baseline may be
+up to STREAM_WHOLE_AFTER (56) ticks old, inside the server's history and both rings, so a
+round trip of most of a second still gets deltas; past that every snapshot is whole. A
+snapshot carries STREAM_WORDS_MIN (4) of the server's events however full it is, the
+farthest soldiers and things held back for them first, so a whole snapshot never
+crowds out every damage and death. A client takes the server's next event however far
+its count has jumped: the server writes from the oldest the client hasn't acknowledged,
+and what it skips is the client's own events relayed to others, or ones its queue
+let go.
 
 ## The query, and the lobby
 

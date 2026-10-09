@@ -70,7 +70,8 @@ SEEN_STEPS_MAX :: 16 // a snapshot is stepped this far at most where it is taken
 CLAIM_SEEN_MAX :: 30 // ticks back a claim's picture may be from: as far as a shot is run forward
 CLAIM_HITS_MAX :: 8  // claims a shot may land
 CLAIM_PATH_SLACK :: f32(1.5) // how far off its shot's flight a claimed bullet may be: a pierce slows it a little behind
-CLAIM_BODY_SLACK :: f32(1)   // past a pose point's radius, for the picture made again
+CLAIM_BODY_SLACK :: f32(2.5) // past a pose point's radius, for the picture made again: the client's picture of a soldier keeps a little of its own state the wire doesn't carry (whether it was jumping, its forces), which steps a pixel or two apart
+CLAIM_POINT_SLACK :: f32(3)  // and for the point met, which only places the blood: the last part met, maybe not the one hit
 MELEE_REACH :: f32(40)       // from the hand to the blade
 
 // Whether a bullet of `style` is claimed by its shooter's client.
@@ -100,8 +101,20 @@ SHOT_TRACE_MAX :: BULLET_TIMEOUT // a flight is kept to its end: a long shot is 
 Shot_Records :: struct {
 	records: [SHOT_RECORDS]Shot_Record,
 	next:    int,
+	landed:  [LANDED_KEPT]Landed_Hit, // the claims landed lately, round the ring
+	landed_next: int,
 	scratch: Tick_Output, // what the steps of a claim's target made again say, which nobody hears
 }
+
+// A claim landed: the shove its shooter's client gave the target there, as its own flight
+// met it, which that client's picture of the target carries until a snapshot replaces it.
+Landed_Hit :: struct {
+	owner, target: Soldier_Id,
+	tick:          u32, // the tick it was met in, on the shooter's screen
+	push:          utils.Vec2,
+}
+
+LANDED_KEPT :: 256
 
 Shot_Record :: struct {
 	used:       bool,
@@ -203,7 +216,7 @@ hit_claim_judge :: proc(world: ^World, resources: ^Resources, authority: ^Author
 	if claim.seen < claim.taken || claim.seen > CLAIM_SEEN_MAX do return
 	if int(claim.pre) > SEEN_STEPS_MAX || claim.steps < 1 || claim.steps > CLAIM_SEEN_MAX + 1 do return
 	seen, taken := tick - u32(claim.seen), tick - u32(claim.taken)
-	target, made := target_as_seen(world, resources, authority, claim.target, seen, taken, int(claim.pre), int(claim.steps))
+	target, made := target_as_seen(world, resources, authority, claim.owner, claim.target, seen, taken, int(claim.pre), int(claim.steps))
 	if !made || target.vitals.dead || target.vitals.cease_fire >= 0 do return
 	part := int(claim.part)
 	if !hit_part(part) do return
@@ -218,6 +231,11 @@ hit_claim_judge :: proc(world: ^World, resources: ^Resources, authority: ^Author
 	owner := &world.soldiers[claim.owner]
 	push: utils.Vec2
 	if !live.vitals.dead do push = claim.velocity * info.stats.push
+	// the shove the shooter's client gave its picture of the target, which its next claims
+	// on it are made again with
+	records := &authority.shots
+	records.landed[records.landed_next] = {owner = claim.owner, target = claim.target, tick = tick, push = claim.velocity * info.stats.push}
+	records.landed_next = (records.landed_next + 1) % LANDED_KEPT
 	impact := (claim.point - target.pose.skeleton[part]) * 1.3
 	impact.y = -impact.y
 	emit(out, Hit {
@@ -274,7 +292,7 @@ on_body :: proc(skeleton: ^Joints, point: utils.Vec2, melee: bool) -> bool {
 	for k in HIT_PARTS {
 		center := skeleton[k]
 		if !melee do center.x -= 2.0
-		if utils.length(point - center) <= PART_RADIUS + CLAIM_BODY_SLACK + 0.01 do return true
+		if utils.length(point - center) <= PART_RADIUS + CLAIM_POINT_SLACK do return true
 	}
 	return false
 }
@@ -300,15 +318,16 @@ segment_distance :: proc(p, a, b: utils.Vec2) -> f32 {
 	return utils.length(p - (a + ab * t))
 }
 
-// The soldier in `id` as a client showed it, having taken it from the snapshot of tick
-// `seen` in tick `taken`: stepped `pre` times there on its last keys, as soldier_apply
-// steps it, then `steps` times more, once a tick, as the client's own steps do. (The
-// ticks those steps ran in are taken to follow on from `taken`: a view clock nudged in
-// between makes a step or two of difference, which the slack absorbs or the claim fails.)
-// Made in the world's slot and put back: nothing else in the world is moved, and no dice
-// are rolled that the world rolls.
+// The soldier in `id` as `owner`'s client showed it, having taken it from the snapshot of
+// tick `seen` in tick `taken`: stepped `pre` times there on its last keys, as
+// soldier_apply steps it, then `steps` times more, once a tick, as the client's own steps
+// do, with the shoves that client's own hits on it gave it since (Landed_Hit). (The ticks
+// those steps ran in are taken to follow on from `taken`: a view clock nudged in between
+// makes a step or two of difference, which the slack absorbs or the claim fails.) Made in
+// the world's slot and put back: nothing else in the world is moved, and no dice are
+// rolled that the world rolls.
 @(private = "file")
-target_as_seen :: proc(world: ^World, resources: ^Resources, authority: ^Authority, id: Soldier_Id, seen, taken: u32, pre, steps: int) -> (soldier: Soldier, ok: bool) {
+target_as_seen :: proc(world: ^World, resources: ^Resources, authority: ^Authority, owner, id: Soldier_Id, seen, taken: u32, pre, steps: int) -> (soldier: Soldier, ok: bool) {
 	frame, _, kept := history_at(&authority.history, seen)
 	if !kept do return
 	if !frame[id].active || frame[id].vitals.dead do return
@@ -324,7 +343,14 @@ target_as_seen :: proc(world: ^World, resources: ^Resources, authority: ^Authori
 		soldier_update(world, resources, id, soldier_last_command(&world.soldiers[id], false), nil, scratch)
 	}
 	for _ in 0 ..< pre do step(world, resources, id, taken, scratch)
-	for k in 0 ..< steps do step(world, resources, id, taken + u32(k), scratch)
+	for k in 0 ..< steps {
+		at := taken + u32(k)
+		step(world, resources, id, at, scratch)
+		// a hit there met the target after it stepped, and shoves it at its next step
+		for landed in authority.shots.landed {
+			if landed.owner == owner && landed.target == id && landed.tick == at do world.soldiers[id].body.next_push += landed.push
+		}
+	}
 	soldier = world.soldiers[id]
 	world.soldiers[id], world.rng, world.tick = saved, rng, now
 	sa.resize(&world.things_asked, asked)

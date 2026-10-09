@@ -28,9 +28,12 @@ import res "../resources"
 // (soldier_last_command), one-shot buttons cleared so a throw is not thrown again;
 // after STREAM_RELEASE_TICKS of silence the keys are let go and it falls and stops.
 
-STREAM_RING :: 32          // states kept for deltas, each side
-STREAM_WHOLE_AFTER :: 24   // a baseline older than this many states or ticks: whole
+STREAM_RING :: 64          // states kept for deltas, each side: a baseline a second old is still in hand
+STREAM_WHOLE_AFTER :: 56   // a baseline older than this many states or ticks: whole (the server's history keeps 64)
 STREAM_RELEASE_TICKS :: 30 // no word for this long: the keys are let go
+STREAM_WORDS_MIN :: 4      // the server's words a snapshot carries at least, while anything else can wait instead
+
+#assert(STREAM_WHOLE_AFTER < STREAM_RING && STREAM_WHOLE_AFTER < game.HISTORY_TICKS) // a baseline young enough is still kept
 
 // ---------------------------------------------------------------------------------
 // The messages

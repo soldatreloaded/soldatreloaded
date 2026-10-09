@@ -25,8 +25,8 @@ WATCHER :: game.Soldier_Id(2)
 
 @(test)
 claims_land_what_the_shooter_saw :: proc(t: ^testing.T) {
-	for delay in ([]int{1, 6, 12}) { // ticks each way: a round trip of 33 ms, 200 and 400
-		claimed, landed, told, watched, guessed := claims_play(delay)
+	for delay in ([]int{1, 6, 12, 20}) { // ticks each way: a round trip of 33 ms, 200, 400 and 667
+		claimed, landed, told, watched, guessed, _ := claims_play(delay)
 		fmt.printfln("a line %d ticks each way: %d hits the shooter saw, %d landed, %d told, %d shown to the watcher; %d ticks it guessed",
 			delay, claimed, landed, told, watched, guessed)
 		testing.expect(t, claimed >= 20, "the shooter hit its target, often")
@@ -83,7 +83,7 @@ Packet :: struct {
 // saw, those that landed, those the server told of, those the watcher showed, and the
 // ticks the shooter's screen guessed.
 @(private = "file")
-claims_play :: proc(delay: int) -> (claimed, landed, told, watched, guessed: int) {
+claims_play :: proc(delay: int) -> (claimed, landed, told, watched, guessed, heard: int) {
 	server := claims_game(true)
 	shooter := claims_game(false)
 	watcher := claims_game(false)
@@ -215,6 +215,7 @@ claims_play :: proc(delay: int) -> (claimed, landed, told, watched, guessed: int
 			}
 		}
 	}
+	heard = int(client_streams[1].pending.received)
 	return
 }
 
@@ -308,4 +309,13 @@ claims_on_a_long_flight :: proc(t: ^testing.T) {
 		if hit, is_hit := event.(game.Hit); is_hit && hit.shooter == SHOOTER && hit.target == TARGET do landed = true
 	}
 	testing.expect(t, landed, fmt.tprintf("a hit %d ticks into its flight lands (the shot at %v, the chest at %v)", FLOWN, at.pos, chest))
+}
+
+// A round trip too long for a delta, past a second, sends every snapshot whole; the
+// server's words still go with them, a few at a time, as nothing else has to: before,
+// a whole snapshot fitted with none, and none ever went.
+@(test)
+words_on_a_whole_snapshot :: proc(t: ^testing.T) {
+	_, _, _, _, _, heard := claims_play(32)
+	testing.expectf(t, heard > 100, "the watcher heard the server's words (%d)", heard)
 }

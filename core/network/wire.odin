@@ -235,6 +235,12 @@ wire_read_pending :: proc(b: ^Buffer, p: ^Wire_Pending) {
 		if !buffer_ok(b) do continue
 		// the first heard begins the count: what came before a newcomer is nobody's news
 		if p.received == 0 && p.applied == 0 && seq > 0 do p.applied = seq - 1
+		// The sender writes from the oldest the receiver hasn't acknowledged, leaving out
+		// the receiver's own words (wire_write): one far past the newest kept, with nothing
+		// waiting, has only those, or words the sender's queue let go, before it. The count
+		// moves up to it, or a receiver whose own words ran past the ring (a long burst of
+		// fire, with nobody else's word between) would never take the server's again.
+		if seq >= p.applied + WIRE_PENDING && p.received == p.applied do p.applied, p.received = seq - 1, seq - 1
 		if seq <= p.applied || seq >= p.applied + WIRE_PENDING do continue
 		if p.seq[seq % WIRE_PENDING] == seq do continue // a resend of one still waiting
 		p.items[seq % WIRE_PENDING] = item
