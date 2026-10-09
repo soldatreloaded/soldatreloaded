@@ -1,18 +1,9 @@
 package resources
 
-import "core:c"
-import "core:encoding/endian"
 import "core:encoding/ini"
 import "core:log"
-import "core:os"
-import "core:path/filepath"
-import "core:slice"
 import "core:strconv"
 import "core:strings"
-
-import stbi "vendor:stb/image"
-
-import "../utils"
 
 // What a mod says of itself, in its mod.ini, as an original Soldat or OpenSoldat mod says
 // it; each mod of the stack has its own, or Classic's if it hasn't one (mod_make), which
@@ -104,72 +95,6 @@ mod_scale :: proc(mod: Mod, layer: int, path: string) -> (scale: f32, set: bool)
 		if value, found := config.scale.paths[key[:slash]]; found && value > 0 do return value, l.own_config
 	}
 	return config.scale.default if config.scale.default > 0 else DEFAULT_MOD_SCALE, false
-}
-
-// The scale an old mod's art is drawn at: a pixel a unit, as the original drew it before
-// its art was drawn four and a half times finer (Soldat 1.6).
-OLD_ART_SCALE :: 1
-
-// Whether the art in the folder `dir` ("gostek-gfx") of the mod `layer` is the old,
-// small kind, which its mod.ini sizes as the new: the mod's images there that Classic has
-// too, as their scales would draw them, are half Classic's size or less, by the middle
-// one, and two at least to say so. An old mod kept a mod.ini of the new art's scale
-// with its old art (qb's, DefaultScale=4.5), and was drawn a quarter of its size; its
-// images there that its mod.ini names are passed over, sized as it says. Found once a
-// folder, and kept with the mod.
-mod_old_art :: proc(mod: Mod, layer: int, dir: string) -> bool {
-	last := len(mod.layers) - 1
-	if layer < 0 || layer >= last do return false
-	l := &mod.layers[layer]
-	key := strings.to_lower(dir, context.temp_allocator)
-	if old, found := l.old_art[key]; found do return old
-	ratios := make([dynamic]f32, context.temp_allocator)
-	classic := &mod.layers[last]
-	// each folder read once, not once an image
-	listings := make(utils.Dir_Listings, context.temp_allocator)
-	for name in layer_folder(l, dir) {
-		path := utils.temp_path(dir, name)
-		scale, set := mod_scale(mod, layer, path)
-		if set do continue
-		mine := layer_find(l, layer, dir, name, filepath.ext(name), &listings) or_continue
-		theirs := layer_find(classic, last, dir, name, ".png", &listings) or_continue
-		mine_w, _ := image_size(mine) or_continue
-		theirs_w, _ := image_size(theirs) or_continue
-		if mine_w == 0 do continue
-		classic_scale, _ := mod_scale(mod, last, path)
-		append(&ratios, (f32(theirs_w) / classic_scale) / (f32(mine_w) / scale))
-	}
-	old := false
-	if len(ratios) >= 2 {
-		slice.sort(ratios[:])
-		old = ratios[len(ratios) / 2] >= 2
-	}
-	l.old_art[strings.clone(key, l.old_art.allocator)] = old
-	if old do log.infof("the mod %s's %s is old art, drawn a pixel a unit, as its mod.ini doesn't say", l.name, dir)
-	return old
-}
-
-// An image's width and height, from its header: a .png's or a .bmp's on disk read
-// from its first bytes alone; anything else, or in an .smod, read whole.
-@(private = "file")
-image_size :: proc(file: Mod_File) -> (width, height: int, ok: bool) {
-	if file.archive == nil {
-		f, err := os.open(file.path)
-		if err != nil do return
-		head: [32]byte
-		n, _ := os.read(f, head[:])
-		os.close(f)
-		if n >= 24 && string(head[1:4]) == "PNG" {
-			return int(endian.unchecked_get_u32be(head[16:])), int(endian.unchecked_get_u32be(head[20:])), true
-		}
-		if n >= 26 && string(head[:2]) == "BM" {
-			return int(endian.unchecked_get_u32le(head[18:])), abs(int(i32(endian.unchecked_get_u32le(head[22:])))), true
-		}
-	}
-	data := mod_read(file, context.temp_allocator) or_return
-	w, h, comp: c.int
-	if stbi.info_from_memory(raw_data(data), c.int(len(data)), &w, &h, &comp) == 0 do return
-	return int(w), int(h), true
 }
 
 // Where the part or weapon of the original's id `id` is pinned, by [GOSTEK]; `default`

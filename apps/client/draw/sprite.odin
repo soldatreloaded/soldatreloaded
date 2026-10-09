@@ -70,12 +70,10 @@ sprite_book_load :: proc(book: ^Sprite_Book, dir, name: string, listings: ^utils
 }
 
 // The scale of the image at `path`, relative to the mod ("weapons-gfx/ak74.png"), as
-// the mod.ini of the mod it came from has it ([SCALE], res.mod_scale); an old mod's
-// small art, which its mod.ini sizes as the new, a pixel a unit (res.mod_old_art).
+// the mod.ini of the mod it came from has it ([SCALE], res.mod_scale). A mod of the old,
+// small art says so there.
 scale_of :: proc(mod: res.Mod, layer: int, path: string) -> f32 {
-	scale, set := res.mod_scale(mod, layer, path)
-	slash := strings.last_index_byte(path, '/')
-	if !set && slash >= 0 && res.mod_old_art(mod, layer, path[:slash]) do return res.OLD_ART_SCALE
+	scale, _ := res.mod_scale(mod, layer, path)
 	return scale
 }
 
