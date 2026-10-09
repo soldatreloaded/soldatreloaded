@@ -20,7 +20,8 @@ import "../../../core/utils"
 // waifu, rat and furry, which the original hasn't, each in its own folder under it), and
 // its hair, headgear and chain. The hair and the headgear are every style's, in
 // gostek-gfx itself as the original's, one file per style; the rat and the furry wear
-// only army, punk and Mr. T, and no headgear. So an original mod's gostek-gfx dresses
+// only dreadlocks, punk, Mr. T, the mullet and the wolfcut, and no headgear. So an
+// original mod's gostek-gfx dresses
 // the male, his hair and his headgear as it is. The chain and the
 // dreadlocks hang from the points 21 to 24, which the simulation swings. The cigar shows
 // while one is in the mouth, and the helmet or the hat sits in the hand while the brow
@@ -134,6 +135,15 @@ PARTS := [?]Part {
 	// the waifu's: her fringe's bangs sit a little right on everyone, so it is anchored in
 	{file = "hair5", p1 = 9, p2 = 12, center = {0.03, 0.65}, flip = true, team = true, color = .Hair, hair = .Fringe},
 	{file = "hair6", p1 = 9, p2 = 12, center = {0, 0.5}, flip = true, team = true, color = .Hair, hair = .Bob},
+	// the new cuts, the mullet and the wolfcut, the fringe's anchors to start
+	{file = "hair7", p1 = 9, p2 = 12, center = {0.173, 0.591}, flip = true, team = true, color = .Hair, hair = .Mullet},
+	{file = "hair8", p1 = 9, p2 = 12, center = {0.167, 0.629}, flip = true, team = true, color = .Hair, hair = .Wolfcut},
+	// baldcut, the hair lab's
+	{file = "hair9", p1 = 9, p2 = 12, center = {0.018519, 0.574074}, flip = true, team = true, color = .Hair, hair = .Baldcut},
+	// afro, the hair lab's
+	{file = "hair10", p1 = 9, p2 = 12, center = {0, 0.499}, flip = true, team = true, color = .Hair, hair = .Afro},
+	// emo, the hair lab's
+	{file = "hair11", p1 = 9, p2 = 12, center = {0, 0.493}, flip = true, team = true, color = .Hair, hair = .Emo},
 	{id = "Silver_Lchain", file = "lancuch", p1 = 10, p2 = 22, center = {0.1, 0.5}, team = true, chain = .Dog_Tags},
 	{id = "Silver_Rchain", file = "lancuch", p1 = 11, p2 = 22, center = {0.1, 0.5}, team = true, chain = .Dog_Tags},
 	{id = "Silver_Pendant", file = "metal", p1 = 22, p2 = 21, center = {0.5, 0.7}, flip = true, team = true, chain = .Dog_Tags},
@@ -301,7 +311,7 @@ part_shown :: proc(part: Part, outfit: Outfit) -> bool {
 	furred := look.gostek == .Rat || look.gostek == .Furry
 	if part.nade > outfit.grenades do return false // a corpse keeps its belt, as the original leaves it
 	if part.hair != .Army {
-		if furred && part.hair != .Punk && part.hair != .Mr_T do return false
+		if furred && part.hair != .Punk && part.hair != .Mr_T && part.hair != .Dreadlocks && part.hair != .Mullet && part.hair != .Wolfcut do return false
 		if part.hair != look.hair_style || !outfit.hair_shown do return false
 	}
 	if part.head != .None {
