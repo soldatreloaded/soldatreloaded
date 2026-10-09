@@ -86,17 +86,31 @@ net_stamped :: proc(b: ^Buffer, seq: ^u32, item: ^Stamped) {
 	net_word(b, &item.word)
 }
 
-// The tables of the words' payloads, made as first needed.
+// The tables of the words' payloads, every variant's (the rulings' inside too), made
+// once as the program starts and only read after: words are written on many threads at
+// once in the tests, which a table made as first needed raced on.
+@(private = "file")
+word_tables: map[typeid]Field_Table
+
+@(init, private = "file")
+word_tables_init :: proc "contextless" () {
+	context = runtime.default_context()
+	word_tables = make(map[typeid]Field_Table, runtime.default_allocator())
+	add :: proc(info: ^runtime.Type_Info) {
+		for variant in runtime.type_info_base(info).variant.(runtime.Type_Info_Union).variants {
+			if _, is_union := runtime.type_info_base(variant).variant.(runtime.Type_Info_Union); is_union {
+				add(variant)
+			} else {
+				word_tables[variant.id] = fields_of(variant.id, "", runtime.default_allocator()) // for the program's life
+			}
+		}
+	}
+	add(type_info_of(game.Word))
+}
+
 @(private = "file")
 table_of :: proc(id: typeid) -> Field_Table {
-	@(static) tables: map[typeid]Field_Table
-	if tables == nil do tables = make(map[typeid]Field_Table, runtime.default_allocator())
-	table, known := tables[id]
-	if !known {
-		table = fields_of(id, "", runtime.default_allocator()) // for the program's life
-		tables[id] = table
-	}
-	return table
+	return word_tables[id]
 }
 
 // ---------------------------------------------------------------------------------
