@@ -27,7 +27,6 @@ Stats :: bit_set[Stat]
 STATS_EDGE :: 4 // from the view's top and right
 STATS_FONT :: SMALLEST_FONT
 STATS_ROW :: 11
-@(private = "file") STATS_COLOR :: rl.Color{239, 170, 200, 255}
 
 // The corner's lines, top down: REC while a demo is recorded, then each stat shown.
 draw_readouts :: proc(u: ^ui.Ui, data: ^Hud_Data) {
@@ -37,14 +36,14 @@ draw_readouts :: proc(u: ^ui.Ui, data: ^Hud_Data) {
 		readout(u, "REC", &y, {195, 0, 0, blink})
 	}
 	shown := data.stats
-	if .FPS in shown do readout(u, fmt.tprintf("FPS: %d", data.fps), &y, STATS_COLOR)
-	if .Ping in shown do readout(u, fmt.tprintf("Ping: %d ms", data.players[data.me].ping), &y, STATS_COLOR)
-	if .Loss in shown do readout(u, fmt.tprintf("Loss: %d%%", data.loss), &y, STATS_COLOR)
-	if .Jitter in shown do readout(u, fmt.tprintf("Jitter: %d ms", data.jitter), &y, STATS_COLOR)
+	if .FPS in shown do readout(u, fmt.tprintf("FPS: %d", data.fps), &y, data.stats_color)
+	if .Ping in shown do readout(u, fmt.tprintf("Ping: %d ms", data.players[data.me].ping), &y, data.stats_color)
+	if .Loss in shown do readout(u, fmt.tprintf("Loss: %d%%", data.loss), &y, data.stats_color)
+	if .Jitter in shown do readout(u, fmt.tprintf("Jitter: %d ms", data.jitter), &y, data.stats_color)
 }
 
 // The clocks, with their settings: the round's time left (time_left_position) and the
-// time of day (local_time), in a row along the top, left of the corner's lines and in the scoreboard clock's colour. The
+// time of day (local_time), in a row along the top, left of the corner's lines, in the time's colour. The
 // lines are made room for at their widest likely numbers, so the row stays put as they
 // change.
 draw_clocks :: proc(u: ^ui.Ui, data: ^Hud_Data) {
@@ -62,7 +61,7 @@ draw_clocks :: proc(u: ^ui.Ui, data: ^Hud_Data) {
 	if room > 0 do room += 12
 	text := fmt.tprintf("Time %02d:%02d", data.time_left / 60, data.time_left % 60) if data.clock_right else ""
 	if data.local_time do text = fmt.tprintf("%s   %s", text, data.time_of_day) if text != "" else data.time_of_day
-	write(u, text, {u.width - STATS_EDGE - room - text_width(u, text, STATS_FONT), STATS_EDGE}, STATS_FONT, CLOCK_COLOR)
+	write(u, text, {u.width - STATS_EDGE - room - text_width(u, text, STATS_FONT), STATS_EDGE}, STATS_FONT, data.time_color)
 }
 
 // Where the corner's lines end, for what is drawn under them.
@@ -94,13 +93,14 @@ draw_watching :: proc(u: ^ui.Ui, data: ^Hud_Data) {
 // The time left in the round, M:SS, in the middle at the top: under the respawn box, and
 // under the minimap while it is shown. Paused, it stands; once the round is over it is
 // gone, the scoreboard having the round's last word. The original shows the time only on
-// the scoreboard (InterfaceGraphics.pas, "Time %.2d:%.2d"), whose colour it keeps.
+// the scoreboard (InterfaceGraphics.pas, "Time %.2d:%.2d"), whose colour it keeps unless
+// the settings give it another.
 draw_time_left :: proc(u: ^ui.Ui, data: ^Hud_Data, minimap: ^draw.Minimap) {
 	if data.ended do return
 	y: f32 = 26
 	if data.minimap && minimap.image.texture.id != 0 do y = max(y, MINIMAP_AT.y + minimap.size.y + 3)
 	text := fmt.tprintf("%d:%02d", data.time_left / 60, data.time_left % 60)
-	write(u, text, {(u.width - text_width(u, text, MENU_FONT)) / 2, y}, MENU_FONT, CLOCK_COLOR)
+	write(u, text, {(u.width - text_width(u, text, MENU_FONT)) / 2, y}, MENU_FONT, data.time_color)
 }
 
 // A demo playing: how far through it is, where the original puts it, and whether it is

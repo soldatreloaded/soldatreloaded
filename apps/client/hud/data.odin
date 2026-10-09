@@ -56,7 +56,9 @@ Hud_Data :: struct {
 	clock:        bool, // the time left, in the middle at the top
 	clock_right:  bool, // the time left, in a row left of the stats
 	local_time:   bool, // and the time of day there
+	time_color:   rl.Color, // the time left's, and the time of day's
 	stats:        Stats, // which of the frame rate and the line's numbers stack in the top right
+	stats_color:  rl.Color,
 	player_names: bool,
 	team_names:   bool, // teammates' names by them always, not only out of view
 	typing:       res.Typing_Style, // over a player typing

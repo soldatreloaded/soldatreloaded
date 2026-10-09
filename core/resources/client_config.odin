@@ -120,10 +120,12 @@ Interface_Settings :: struct {
 	minimap:            bool `jsoncomment:"the minimap"`,
 	time_left_position: Time_Left_Position `jsoncomment:"the time left in the round, and where: none, top_center, top_right (in a row left of the frame rate and the line's numbers), or both"`,
 	local_time:         bool `jsoncomment:"your local time, in the top right, in a row left of the frame rate and the line's numbers"`,
+	time_color:         utils.Rgba `jsoncomment:"the time left's colour, and the local time's, RRGGBB"`,
 	show_fps:           bool `jsoncomment:"the frame rate, in the top right"`,
 	show_ping:          bool `jsoncomment:"your ping, under it"`,
 	show_loss:          bool `jsoncomment:"the share of the server's snapshots lost over the last second"`,
 	show_jitter:        bool `jsoncomment:"how much the round trip varies"`,
+	stats_color:        utils.Rgba `jsoncomment:"the frame rate's and the line's numbers' colour, RRGGBB"`,
 	player_names:       bool `jsoncomment:"teammates' names at the screen's edge when out of view (everyone's, spectating)"`,
 	team_names:         bool `jsoncomment:"teammates' names by them always, not only at the screen's edge when out of view (with player_names)"`,
 	typing:             Typing_Style `jsoncomment:"over a player typing: off, dots (the original's) or typing, the word"`,
@@ -244,6 +246,8 @@ DEFAULT_CLIENT_CONFIG := Client_Config {
 		track_shot        = true,
 	},
 	interface = {
+		time_color      = {170, 160, 200, 255}, // the scoreboard clock's
+		stats_color     = {239, 170, 200, 255},
 		show_ping       = true,
 		player_names    = true,
 		typing          = .Dots,
