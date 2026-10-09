@@ -42,27 +42,37 @@ WEAPON_ART := #partial [res.Weapon]Weapon_Art {
 	.Knife         = {id = "Knife", file = "knife", in_hands = {-0.1, 0.6}, forearm = true, unslung = true},
 }
 
-// Where a weapon is pinned, as the mod's mod.ini has it, else as WEAPON_ART does.
+// Where a weapon is pinned, as the mod.ini of the mod its image is from has it, else as
+// WEAPON_ART does.
 @(private = "package")
 Weapon_Anchors :: struct {
 	in_hands, on_back, flash: [2]f32,
 }
 
 @(private = "package")
-weapons_load :: proc(source: Source, art: ^Gostek_Art, config: ^res.Mod_Config) {
+weapons_load :: proc(source: Source, art: ^Gostek_Art) {
 	for weapon_art, weapon in WEAPON_ART {
 		if weapon_art.file == "" do continue
-		art.held[weapon] = {
-			in_hands = res.mod_anchor(config, concat("Primary_", weapon_art.id), weapon_art.in_hands),
-			on_back  = res.mod_anchor(config, concat("Secondary_", weapon_art.id), weapon_art.on_back),
-			flash    = res.mod_anchor(config, concat("Primary_", weapon_art.id, "_Fire"), weapon_art.flash_center),
-		}
 		art.weapons[weapon][0] = sprite_load(source, concat("weapons-gfx/", weapon_art.file, ".png"))
 		art.weapons[weapon][1] = sprite_load(source, concat("weapons-gfx/", weapon_art.file, "-2.png"))
 		if weapon_art.flash != "" {
 			art.flashes[weapon] = sprite_load(source, concat("weapons-gfx/", weapon_art.flash, ".png"))
 		}
+		gun := art.weapons[weapon][0]
+		art.held[weapon] = {
+			in_hands = anchor_of(source, gun, concat("Primary_", weapon_art.id), weapon_art.in_hands),
+			on_back  = anchor_of(source, gun, concat("Secondary_", weapon_art.id), weapon_art.on_back),
+			flash    = anchor_of(source, art.flashes[weapon], concat("Primary_", weapon_art.id, "_Fire"), weapon_art.flash_center),
+		}
 	}
+}
+
+// Where a sprite is pinned, by the original's id for it: as the mod.ini of the mod it came
+// from says ([GOSTEK]), else `default`.
+@(private = "package")
+anchor_of :: proc(source: Source, sprite: Sprite, id: string, default: [2]f32) -> [2]f32 {
+	if sprite.layer < 0 || sprite.layer >= len(source.mod.layers) do return default
+	return res.mod_anchor(source.mod.layers[sprite.layer].config, id, default)
 }
 
 @(private = "package")

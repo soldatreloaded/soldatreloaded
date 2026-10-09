@@ -61,13 +61,17 @@ animations and the maps decide what is solid, so a difference here is a differen
 A server and its clients must agree on it.
 
 **`mods/` is each player's own.** `mods/classic/` is the game's look and sound, which
-ships with it and is kept by the launcher. Beside it, a player's own mods, each a folder
-of `mods/`, which no update touches. A player picks one (the client config's
-`graphics.mod`, on the Mods page), and each file is looked for in it first and in
-Classic after, so a mod holds only what it changes: a mod can be one sound. Mods are
-laid out as OpenSoldat's are, so one of theirs works as it is: its `mod.ini` says how big
-its images are in the world and where the soldier's parts are pinned, and its
-`txt/font.ini` what the HUD is written in.
+ships with it and is kept by the launcher. Beside it, a player's own mods, each an
+`.smod` (a zip, as OpenSoldat's are, and what the Mods page installs) or a folder (for
+making one), which no update touches. A player turns on any of them, in an order (the
+client config's `graphics.mods`, on the Mods page), and each file is looked for in each
+in turn, the top first, and in Classic last, so a mod holds only what it changes: a mod
+can be one sound, worn with another of art. Mods are laid out as OpenSoldat's are, so one
+of theirs works as it is, even packed a folder down: its `mod.ini` says how big its own
+images are in the world and where the soldier's parts are pinned (a mod without one uses
+Classic's), and its `txt/font.ini` what the HUD is written in. A player's Soldat 1.7.1 is
+made a mod of what they changed in it (`data/soldat-1.7.1.txt` lists the files it came
+with, which are left out).
 
 **A map may carry its own art.** Beside `data/maps/<name>.pms`, a folder of the map's
 name holds the images it draws with that the mods may not have, laid out as a mod is:

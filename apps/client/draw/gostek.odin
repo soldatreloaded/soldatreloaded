@@ -30,7 +30,7 @@ Gostek_Art :: struct {
 	// by style, part, team (the second's image) and mirrored; a part every style wears
 	// the same (part_shared) is the male's alone
 	parts:   [res.Gostek][len(PARTS)][2][2]Sprite,
-	centers: [len(PARTS)][2]f32, // where each part is pinned, as the mod's mod.ini has it
+	centers: [res.Gostek][len(PARTS)][2][2][2]f32, // where each is pinned, as the mod.ini of the mod its image is from has it
 	weapons: [res.Weapon][2]Sprite, // [mirrored]
 	flashes: [res.Weapon]Sprite,
 	held:    [res.Weapon]Weapon_Anchors, // and where each weapon is
@@ -160,19 +160,19 @@ SPAWN_PROTECTED_ALPHA :: 153
 
 // Every style's parts and the weapons' art.
 gostek_load :: proc(art: ^Gostek_Art, source: Source) {
-	config := res.mod_config_load(source.mod, context.temp_allocator)
-	for &part, i in PARTS do art.centers[i] = res.mod_anchor(&config, part.id, part.center)
 	for style in res.Gostek {
 		for &part, i in PARTS {
 			if style != .Male && part_shared(part) do continue
 			for team in 0 ..< (2 if part.team else 1) {
 				for mirrored in 0 ..< (2 if part.flip else 1) {
-					art.parts[style][i][team][mirrored] = sprite_load(source, style_part_path(source, part, style, team == 1, mirrored == 1), flat = part.nade > 0)
+					sprite := sprite_load(source, style_part_path(source, part, style, team == 1, mirrored == 1), flat = part.nade > 0)
+					art.parts[style][i][team][mirrored] = sprite
+					art.centers[style][i][team][mirrored] = anchor_of(source, sprite, part.id, part.center)
 				}
 			}
 		}
 	}
-	weapons_load(source, art, &config)
+	weapons_load(source, art)
 }
 
 // What a soldier wears and does as it is drawn, which says which parts show.
@@ -191,12 +191,13 @@ Outfit :: struct {
 // A soldier on its figure's points, in the shirt it wears (its team's). `grenade_color`
 // puts the belt's grenades in a flat colour of the player's choosing; nil leaves them as
 // the art has them. `standing`, the round stands still: no jets burn, though held.
+// `original`, it is drawn as Soldat 1 draws every soldier, the male (as_original).
 @(private = "package")
-draw_gostek :: proc(art: ^Gostek_Art, soldier: ^sim.Soldier, figure: ^Figure, shirt: utils.Rgba, grenade_color: Maybe(utils.Rgba), standing := false) {
+draw_gostek :: proc(art: ^Gostek_Art, soldier: ^sim.Soldier, figure: ^Figure, shirt: utils.Rgba, grenade_color: Maybe(utils.Rgba), standing := false, original := false) {
 	points := &figure.points
 	facing_left := soldier.body.direction != 1
 	team := 1 if soldier.team == .Bravo || soldier.team == .Delta else 0
-	outfit := outfit_of(soldier, figure.corpse)
+	outfit := outfit_of(soldier, figure.corpse, original)
 	if standing do outfit.jetting = false
 	style := outfit.look.gostek
 
@@ -213,7 +214,7 @@ draw_gostek :: proc(art: ^Gostek_Art, soldier: ^sim.Soldier, figure: ^Figure, sh
 		p1, p2 := points[part.p1 - 1], points[part.p2 - 1]
 		along := p2 - p1
 		angle := math.atan2(along.y, along.x)
-		anchor := art.centers[i] // the mod's, else the part's own
+		anchor := art.centers[.Male if part_shared(part) else style][i][team if part.team else 0][1 if mirrored else 0] // its mod's, else the part's own
 		center := anchor
 		if figure.corpse && part.p2 == 12 {
 			p1 = p2 // a corpse's face hangs from the head, so a cut head rolls off with it
@@ -256,8 +257,8 @@ draw_gostek :: proc(art: ^Gostek_Art, soldier: ^sim.Soldier, figure: ^Figure, sh
 }
 
 @(private = "file")
-outfit_of :: proc(soldier: ^sim.Soldier, corpse: bool) -> (outfit: Outfit) {
-	outfit.look = soldier.player.look
+outfit_of :: proc(soldier: ^sim.Soldier, corpse: bool, original: bool) -> (outfit: Outfit) {
+	outfit.look = as_original(soldier.player.look) if original else soldier.player.look
 	outfit.jetting = !corpse && soldier_jetting(soldier)
 	outfit.wounds = wound_alpha(soldier.vitals.health)
 	outfit.cigar = soldier.antics.cigar == 5 || soldier.antics.cigar == 10
@@ -273,6 +274,18 @@ outfit_of :: proc(soldier: ^sim.Soldier, corpse: bool) -> (outfit: Outfit) {
 	outfit.capped = outfit.look.head_style != .None && soldier.antics.helmet == 1 && !furred
 	outfit.hair_shown = outfit.grabbed || !outfit.capped || outfit.look.hair_style == .Mr_T
 	return
+}
+
+// A look as Soldat 1 would draw it, which has the male alone: the male, his hair and
+// headgear as they were; the waifu's fringe and bob his normal hair, her headgear his
+// helmet. A mod made for Soldat 1 dresses every soldier then.
+@(private = "file")
+as_original :: proc(look: sim.Look) -> sim.Look {
+	look := look
+	look.gostek = .Male
+	if look.hair_style == .Fringe || look.hair_style == .Bob do look.hair_style = .Normal
+	if look.head_style == .Waifu do look.head_style = .Helmet
+	return look
 }
 
 @(private = "file")
@@ -376,14 +389,14 @@ style_part_path :: proc(source: Source, part: Part, style: res.Gostek, team2, mi
 // another's.
 @(private = "file")
 classic_same :: proc(source: Source, a, b: string) -> bool {
-	classic := res.Mod{fallback = source.mod.fallback}
+	classic := res.mod_classic(source.mod)
 	dir_a, name_a := split_path(a)
 	dir_b, name_b := split_path(b)
 	file_a, found_a := res.mod_image(classic, dir_a, name_a, source.listings)
 	file_b, found_b := res.mod_image(classic, dir_b, name_b, source.listings)
 	if !found_a || !found_b do return false
-	data_a, read_a := utils.read_file(file_a, context.temp_allocator)
-	data_b, read_b := utils.read_file(file_b, context.temp_allocator)
+	data_a, read_a := res.mod_read(file_a, context.temp_allocator)
+	data_b, read_b := res.mod_read(file_b, context.temp_allocator)
 	return read_a && read_b && string(data_a) == string(data_b)
 }
 

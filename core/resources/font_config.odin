@@ -32,6 +32,7 @@ Font_Config :: struct {
 	files:  [2]string, // Font1File, Font2File
 	scales: [2]f32,    // Font1ScaleX, Font2ScaleX, as a stretch: 1.5 for 150
 	menu, console, console_small, weapon_menu, big: f32, // in points
+	layer:  int, // of the mod's, the one whose font.ini it is: its fonts are looked for there
 }
 
 DEFAULT_FONT_CONFIG :: Font_Config {
@@ -49,10 +50,13 @@ DEFAULT_FONT_CONFIG :: Font_Config {
 // logged.
 font_config_load :: proc(mod: Mod) -> (config: Font_Config) {
 	config = DEFAULT_FONT_CONFIG
-	path := mod_file(mod, FONT_CONFIG_FILE)
-	if !utils.file_exists(path) do return
-	text, read := utils.read_file(path, context.temp_allocator)
+	config.layer = len(mod.layers) - 1
+	file, found := mod_file(mod, FONT_CONFIG_FILE)
+	if !found do return
+	text, read := mod_read(file, context.temp_allocator)
 	if !read do return
+	config.layer = file.layer
+	path := mod_file_name(file)
 
 	it := ini.iterator_from_string(string(text))
 	for key, value in ini.iterate(&it) {
@@ -83,13 +87,16 @@ font_config_load :: proc(mod: Mod) -> (config: Font_Config) {
 	return
 }
 
-// Where the font file `name` of the mod's font.ini is: in the mod's fonts/, at its root,
-// else in Classic's fonts/; with the temp allocator.
-font_file :: proc(mod: Mod, name: string) -> string {
-	if mod.dir != "" {
-		for path in ([2]string{utils.temp_path(mod.dir, "fonts", name), utils.temp_path(mod.dir, name)}) {
-			if utils.file_exists(path) do return path
+// Where the font file `name` of a font.ini is: in the fonts/ of the mod whose font.ini
+// it is (`config.layer`), or at its root, else in Classic's fonts/.
+font_file :: proc(mod: Mod, config: Font_Config, name: string) -> (file: Mod_File, found: bool) {
+	last := len(mod.layers) - 1
+	if config.layer >= 0 && config.layer < last {
+		layer := &mod.layers[config.layer]
+		for path in ([2]string{utils.temp_path("fonts", name), name}) {
+			if file, found = layer_file(layer, config.layer, path); found do return
 		}
 	}
-	return utils.temp_path(mod.fallback, "fonts", name)
+	if last < 0 do return
+	return layer_file(&mod.layers[last], last, utils.temp_path("fonts", name))
 }

@@ -6,7 +6,6 @@ import "core:encoding/json"
 import "core:fmt"
 import "core:log"
 import "core:os"
-import "core:path/filepath"
 import "core:strings"
 import "core:sync"
 import "core:thread"
@@ -18,10 +17,11 @@ import "../../../core/utils"
 // The mods' catalogue: what the mods repository publishes (soldatreloaded-mods), its
 // index (the client config's network.mods_index, a mods.json) listing each mod's newest
 // version, where its zip is, its size and SHA-256. The index, and a mod installed from
-// it, each come on a thread of their own, so a frame never waits on the web or on
-// unpacking: a mod's zip is fetched, checked against its SHA-256, unpacked into a hidden
-// folder of mods/, and only then put in its place, mods/<name>, over the version that
-// was there. One mod is installed at a time. The Mods page reads it; nothing here draws.
+// it, each come on a thread of their own, so a frame never waits on the web or on the
+// disk: a mod's zip is fetched, checked against its SHA-256 and that it is a zip,
+// written hidden in mods/, and only then put in its place as it is, mods/<name>.smod,
+// over the version that was there (and the folder an install of before unpacked it
+// into). One mod is installed at a time. The Mods page reads it; nothing here draws.
 
 Catalog_State :: enum {
 	Idle,     // never asked
@@ -33,6 +33,7 @@ Catalog_State :: enum {
 // A mod the index lists.
 Catalog_Mod :: struct {
 	name:        string,
+	title:       string, // what it is shown as, spaces and all; its name if the index hasn't one
 	version:     string,
 	author:      string,
 	description: string,
@@ -46,7 +47,7 @@ Catalog_Mod :: struct {
 Install_State :: enum {
 	None,
 	Downloading, // `received` of its size so far
-	Unpacking,
+	Unpacking, // written to the disk
 	Done,        // in its place: the mod's name says which
 	Failed,      // `error` says why
 }
@@ -122,6 +123,11 @@ catalog_pump :: proc(c: ^Catalog) {
 	valid := make([dynamic]Catalog_Mod)
 	for m in index.mods {
 		if catalog_name_ok(m.name) && m.url != "" && len(m.sha256) == 64 {
+			m := m
+			if strings.trim_space(m.title) == "" {
+				delete(m.title)
+				m.title = strings.clone(m.name)
+			}
 			append(&valid, m)
 		} else {
 			log.warnf("the mods' index lists %q, which can't be installed; passed over", m.name)
@@ -174,14 +180,7 @@ install_progress :: proc(i: ^Install) -> (state: Install_State, done: f32) {
 // The version of the player's mod `name` in `mods_dir`, as its about.json says; empty if
 // it has none, or isn't there.
 installed_version :: proc(mods_dir, name: string) -> string {
-	data, err := os.read_entire_file(utils.temp_path(mods_dir, name, "about.json"), context.temp_allocator)
-	if err != nil do return ""
-	About :: struct {
-		version: string,
-	}
-	about: About
-	if json.unmarshal(data, &about, allocator = context.temp_allocator) != nil do return ""
-	return about.version
+	return res.mod_version(mods_dir, name)
 }
 
 // ---------------------------------------------------------------------------------
@@ -215,21 +214,20 @@ install_do :: proc(i: ^Install) -> string {
 
 	entries, readable := utils.zip_entries(zip)
 	if !readable do return "its zip can't be read"
-	// unpacked out of sight, in a folder the Mods page passes over, then moved in whole
-	part := utils.temp_path(i.mods_dir, fmt.tprintf(".%s.part", m.name))
-	os.remove_all(part)
-	defer os.remove_all(part)
-	for name, entry in entries {
+	for name in entries {
 		if !entry_name_ok(name) do return fmt.tprintf("its zip has a file it may not: %s", name)
-		file, extracted := utils.zip_extract(zip, entry)
-		if !extracted do return fmt.tprintf("its file %s couldn't be unpacked", name)
-		path := utils.temp_path(part, name)
-		os.make_directory_all(filepath.dir(path))
-		if os.write_entire_file(path, file) != nil do return fmt.tprintf("its file %s couldn't be written", name)
 	}
-	dir := utils.temp_path(i.mods_dir, m.name)
-	if os.exists(dir) && os.remove_all(dir) != nil do return "the version installed couldn't be replaced: is one of its files open?"
-	if os.rename(part, dir) != nil do return "it couldn't be put in its place"
+	// written out of sight, as a file the Mods page passes over, then moved in whole
+	os.make_directory_all(i.mods_dir)
+	part := utils.temp_path(i.mods_dir, fmt.tprintf(".%s.part", m.name))
+	defer os.remove(part)
+	if os.write_entire_file(part, zip) != nil do return "it couldn't be written: is the disk full?"
+	packed := utils.temp_path(i.mods_dir, strings.concatenate({m.name, res.MOD_EXTENSION}))
+	if os.exists(packed) && os.remove(packed) != nil do return "the version installed couldn't be replaced: is the game using it elsewhere?"
+	if os.rename(part, packed) != nil do return "it couldn't be put in its place"
+	// an install of before, unpacked into a folder, which would hide the .smod
+	unpacked := utils.temp_path(i.mods_dir, m.name)
+	if os.exists(utils.temp_path(unpacked, "about.json")) do os.remove_all(unpacked)
 	return ""
 }
 
@@ -306,7 +304,7 @@ install_free :: proc(i: ^Install) {
 @(private = "file")
 catalog_mod_clone :: proc(m: Catalog_Mod) -> Catalog_Mod {
 	c := m
-	for &s in ([]^string{&c.name, &c.version, &c.author, &c.description, &c.licence, &c.source, &c.url, &c.sha256}) {
+	for &s in ([]^string{&c.name, &c.title, &c.version, &c.author, &c.description, &c.licence, &c.source, &c.url, &c.sha256}) {
 		s^ = strings.clone(s^)
 	}
 	return c
@@ -314,7 +312,7 @@ catalog_mod_clone :: proc(m: Catalog_Mod) -> Catalog_Mod {
 
 @(private = "file")
 catalog_mod_free :: proc(m: Catalog_Mod) {
-	for s in ([]string{m.name, m.version, m.author, m.description, m.licence, m.source, m.url, m.sha256}) {
+	for s in ([]string{m.name, m.title, m.version, m.author, m.description, m.licence, m.source, m.url, m.sha256}) {
 		delete(s)
 	}
 }

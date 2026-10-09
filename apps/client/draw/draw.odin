@@ -29,7 +29,6 @@ Art :: struct {
 	scenery:       []Atlas_Image, // by the map's scenery index; none where the mod hasn't the image
 	scenery_atlas: Atlas,         // the scenery's images
 	sprite_atlas:  Atlas,         // every sprite's image
-	scales:        Scales,        // how big the mod's images are
 	gostek:        Gostek_Art,
 	bullets:       Bullet_Art,
 	things:        Thing_Art,
@@ -54,9 +53,8 @@ art_load :: proc(art: ^Art, mod: res.Mod, polymap: ^res.Poly_Map, map_dirs: []st
 	art.scenery_atlas = {side = atlas_side_for(images)}
 	art.scenery = atlas_add_all(&art.scenery_atlas, images)
 
-	art.scales = scales_load(mod)
 	art.sprite_atlas = {side = ATLAS_SIDE}
-	source := Source{mod, &art.scales, &art.sprite_atlas, source_listings()}
+	source := Source{mod, &art.sprite_atlas, source_listings()}
 	gostek_load(&art.gostek, source)
 	art.bullets = bullets_load(source)
 	art.things = things_load(source)
@@ -76,7 +74,6 @@ art_destroy :: proc(art: ^Art) {
 	delete(art.scenery)
 	atlas_destroy(&art.scenery_atlas)
 	atlas_destroy(&art.sprite_atlas)
-	scales_destroy(&art.scales)
 	art^ = {}
 }
 
@@ -105,7 +102,7 @@ draw_world :: proc(art: ^Art, game: ^sim.Game, frame: ^Frame, sparks: ^Sparks, c
 	draw_polygons(art, polymap, .Background)
 	if graphics.scenery do draw_scenery(art, polymap, .Behind_Map)
 	draw_bullets(&art.bullets, &game.world, frame.alpha, graphics.grenade_color, graphics.trails)
-	draw_soldiers(art, game, frame, graphics.grenade_color)
+	draw_soldiers(art, game, frame, graphics.grenade_color, graphics.original_soldiers)
 	draw_things(&art.things, game, .Sprites, frame.alpha, seconds)
 	draw_sparks(&art.sparks, sparks, frame.alpha)
 	draw_scenery(art, polymap, .Behind_Players)

@@ -71,12 +71,14 @@ Menu :: struct {
 	line:         ^online.Line,     // the client's line, as it joins
 	browser:      ^online.Browser, // and its server list
 	catalog:      ^online.Catalog, // the mods' catalogue
+	mod:          res.Mod,          // the client's mods, worn; not the menu's to free
 	kit:          ui.Kit,
 	page:         Page,
 	side:         int, // the rail's item with the keys: the pages, then Quit
 	request:      Request, // what the last pass asked of the client
 	art:          hud.Art, // the pointer
-	preview:      draw.Preview,
+	preview:      draw.Preview, // the Player page's, loaded as it is first shown
+	previewed:    bool,
 	bar_x:        Maybe(f32), // where this pass's page wants its scrollbar; nil for the right of its column
 	weapon_names: [res.Weapon]string,
 	servers:      Servers,
@@ -127,10 +129,12 @@ Play_Demo :: struct {
 // The lobby asked for its servers again.
 Refresh :: struct {}
 
-// The mod `name`, of mods/, used from now on: what the game looks and sounds like
-// loaded again from it.
+// The mods `mods`, of mods/, the top first, worn from now on over Classic: what the game
+// looks and sounds like loaded again from them, and the Mods page opened again as it was
+// (menu_mods_changed). The list is the request's, allocated with the context's
+// allocator: the client takes it.
 Use_Mod :: struct {
-	name: string,
+	mods: []string,
 }
 
 Quit :: struct {}
@@ -151,11 +155,11 @@ menu_init :: proc(menu: ^Menu, config: ^res.Client_Config, mod: res.Mod, last_ma
 	menu.line = n
 	menu.browser = browser
 	menu.catalog = catalog
+	menu.mod = mod
 	menu.in_game = in_game
 	if !in_game && browser.state != .Fetching && browser.state != .Querying do menu.request = Refresh{}
 	ui.kit_init(&menu.kit)
 	hud.art_load(&menu.art, mod)
-	if !in_game do draw.preview_load(&menu.preview, mod) // the Player page's alone
 	for info, weapon in sim.weapons_default() do menu.weapon_names[weapon] = info.name
 	offline_init(&menu.offline, last_map)
 	menu.taunts.slot = -1
@@ -168,9 +172,20 @@ menu_destroy :: proc(menu: ^Menu) {
 	mods_destroy(&menu.mods)
 	delete(menu.servers.search)
 	delete(menu.taunts.text)
-	if !menu.in_game do draw.preview_destroy(&menu.preview)
+	if menu.previewed do draw.preview_destroy(&menu.preview)
 	hud.art_destroy(&menu.art)
 	menu^ = {}
+}
+
+// The mods worn changed (Use_Mod): what the menu draws of them loaded again, as it
+// stands; the Player page's soldier as that page is next shown.
+menu_mods_changed :: proc(menu: ^Menu, mod: res.Mod) {
+	menu.mod = mod
+	hud.art_destroy(&menu.art)
+	hud.art_load(&menu.art, mod)
+	if menu.previewed do draw.preview_destroy(&menu.preview)
+	menu.previewed = false
+	menu.mods.listed = false // mods/ as it is now
 }
 
 // The keys and the mouse since the last pass; and what that pass asked, once.
@@ -280,7 +295,7 @@ PAGE_LINES := [Page]string {
 	.Taunts   = "What a key says: a message to everyone or the team, or your own words as a radio call.",
 	.Options  = "Sound, the mouse, the interface and the connection.",
 	.Graphics = "The window, and what is drawn of the world.",
-	.Mods     = "How the game looks and sounds: its own, or a mod of it in mods/.",
+	.Mods     = "How the game looks and sounds: mods over its own, stacked, the top one first.",
 }
 
 // What the footer says on the pages with nothing of their own to say there.

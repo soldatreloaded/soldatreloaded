@@ -78,6 +78,10 @@ page_player :: proc(menu: ^Menu) {
 		grenade_color = menu.config.graphics.grenade_color,
 	}
 	at := rl.Vector2{px + pw / 2 - 2 * scale, floor_y}
+	if !menu.previewed { // every style's art: loaded as the page is first shown, not with the menu
+		draw.preview_load(&menu.preview, menu.mod)
+		menu.previewed = true
+	}
 	draw.draw_preview(&menu.preview, dress, at * u.scale, scale * u.scale)
 	rlgl.DisableBackfaceCulling() // the menu's shapes again
 }

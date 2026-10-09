@@ -81,12 +81,14 @@ Ui :: struct {
 }
 
 ui_init :: proc(ui: ^Ui, mod: res.Mod) {
-	for file, face in FACE_FILES {
-		if file != "" do ui.fonts[face] = font_load(res.mod_file(mod, file))
+	for path, face in FACE_FILES {
+		if file, found := res.mod_file(mod, path); found && path != "" do ui.fonts[face] = font_load(res.mod_read(file) or_else nil)
 	}
 	fonts := res.font_config_load(mod)
-	ui.fonts[.Hud_1] = font_load(res.font_file(mod, fonts.files[0]))
-	ui.fonts[.Hud_2] = font_load(res.font_file(mod, fonts.files[1]))
+	for i in 0 ..< 2 {
+		file, found := res.font_file(mod, fonts, fonts.files[i])
+		if found do ui.fonts[.Hud_1 if i == 0 else .Hud_2] = font_load(res.mod_read(file) or_else nil)
+	}
 	ui.hud = {
 		.Menu     = {.Hud_1, fonts.menu * POINT, fonts.scales[0]},
 		.Big      = {.Hud_1, fonts.big * POINT, fonts.scales[0]},

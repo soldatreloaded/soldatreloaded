@@ -41,6 +41,47 @@ toggle :: proc(k: ^Kit, label: string, value: ^bool) -> (flipped: bool) {
 	return
 }
 
+// A switch on its own, its track from `x` along the line `cy`: flipped by a click on it,
+// or Enter while it has the focus. True when flipped.
+switch_at :: proc(k: ^Kit, x, cy: f32, on: bool) -> bool {
+	id := nav_next(k)
+	focused := nav_focused(k, id, cy - 11, 22)
+	hot := over(k, x - 4, cy - 11, 38, 22)
+	focus_ring(k, focused, x - 2, cy - 9, 34, 18, 9)
+	switch_draw(k, x, cy, on, hot)
+	return take(k, id, x - 4, cy - 11, 38, 22) || take_enter(k, focused)
+}
+
+// ---------------------------------------------------------------------------------
+// Tabs
+
+// A row of tabs: the one `current` lit and underlined in the accent, a rule under them
+// all. Which is picked: the one clicked, or entered, else `current`.
+tabs :: proc(k: ^Kit, names: []string, current: int) -> (picked: int) {
+	r := row(k, TAB_H, false)
+	picked = current
+	x := r.x
+	base := r.y + r.h - 1
+	if r.shown do rule(k.ui, r.x, r.x + r.w, base, LINE)
+	for name, i in names {
+		w := width_of(k.ui, TAB, name) + 28
+		id := nav_next(k)
+		focused := nav_focused(k, id, r.y, r.h)
+		on := i == current
+		if r.shown {
+			hot := over(k, x, r.y, w, r.h)
+			focus_ring(k, focused, x, r.y + 3, w, r.h - 7, RADIUS)
+			if hot && !on do rrect(k.ui, x, r.y + 3, w, r.h - 7, RADIUS, HOVER)
+			text_mid(k, TAB, name, x + 14, r.y + r.h / 2 - 1, TEXT if on || hot else MUTED)
+			if on do rrect(k.ui, x + 8, base - 2, w - 16, 3, 1.5, ACCENT)
+			if take(k, id, x, r.y, w, r.h) do picked = i
+		}
+		if take_enter(k, focused) do picked = i
+		x += w + 2
+	}
+	return
+}
+
 // ---------------------------------------------------------------------------------
 // Slider
 
@@ -353,6 +394,21 @@ button_ground :: proc(k: ^Kit, x, y, w, h: f32, primary, disabled, hot: bool) {
 		rrect(k.ui, x, y, w, h, RADIUS, ACCENT_HOT if hot else ACCENT)
 	} else {
 		box(k.ui, x, y, w, h, CONTROL_HOT if hot else CONTROL, BORDER_HOT if hot else BORDER)
+	}
+}
+
+// A radio button about `x, cy`: a ring, a dot in it when `on`; faint when `disabled`.
+radio_draw :: proc(k: ^Kit, x, cy: f32, on, hot, disabled: bool) {
+	ring := ACCENT if on else DISABLED_EDGE if disabled else BORDER_HOT if hot else MUTED
+	circle(k.ui, x, cy, 7, ring)
+	circle(k.ui, x, cy, 5.6, TYPING)
+	if on do circle(k.ui, x, cy, 3.5, ACCENT)
+}
+
+// A handle to drag a row by: six dots, two across and three down, about `x, cy`.
+grip_draw :: proc(k: ^Kit, x, cy: f32, color: rl.Color) {
+	for i in 0 ..< 3 {
+		for j in 0 ..< 2 do circle(k.ui, x + f32(j) * 5, cy - 5 + f32(i) * 5, 1.4, color)
 	}
 }
 

@@ -38,6 +38,7 @@ SECTION_H :: 30
 CTRL_H :: 22 // a field, a list's box, a chip, a small button
 RADIUS :: 4  // every control's corners
 POPUP_ROW :: 20
+TAB_H :: 34 // a row of tabs
 
 // The type: Play at 9 points, Russo One and Black Ops One at 12, each scaled; the
 // capitals tracked out, as small capitals are.
@@ -52,6 +53,7 @@ NAV :: Style{.Regular, UI_POINTS, 0}
 BUTTON :: Style{.Bold, UI_POINTS * 0.95, 0.02}
 BIG :: Style{.Bold, UI_POINTS, 0.12}
 SECTION :: Style{.Bold, UI_POINTS * 0.8, 0.16}
+TAB :: Style{.Bold, UI_POINTS, 0.02}
 GROUP :: Style{.Bold, UI_POINTS * 0.7, 0.24} // the rail's group labels: smaller and fainter than its items
 SUBTITLE :: Style{.Regular, UI_POINTS * 0.95, 0}
 TITLE :: Style{.Display, DISPLAY_POINTS * 1.25, 0.01}

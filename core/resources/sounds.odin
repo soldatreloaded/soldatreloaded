@@ -15,10 +15,6 @@ import "../utils"
 // its case: a .wav, else an .mp3 or an .ogg of the same name, the mod's before Classic's.
 // A .wav is decoded here; the others by the decoder the client gives (Sounds.decode),
 // which has one for them.
-//
-// Classic has its sounds remastered too (Coso's, sfx-remastered/), heard in place of its
-// own when they are asked for and Classic alone is in use: a mod's sounds go with
-// Classic's own, as it was made against them.
 
 // A sound decoded: each frame a left and a right sample, -1 to 1.
 Sound :: struct {
@@ -29,11 +25,10 @@ Sound :: struct {
 // Every sound asked for so far, by file name; a sound that couldn't be loaded is kept
 // too, empty, so it is reported once.
 Sounds :: struct {
-	mod:        Mod,
-	remastered: bool, // Classic's remastered sounds asked for (sound.remastered)
-	by_name:    map[string]Sound,
-	allocator:  mem.Allocator,
-	decode:     Sound_Decoder, // what isn't a .wav; nil to leave it unheard
+	mod:       Mod,
+	by_name:   map[string]Sound,
+	allocator: mem.Allocator,
+	decode:    Sound_Decoder, // what isn't a .wav; nil to leave it unheard
 }
 
 // A sound file's bytes that aren't a .wav's, by its extension (".mp3"), decoded with
@@ -267,8 +262,9 @@ adpcm_frame :: proc(states: [2]$T, channels, which: int) -> (frame: [2]f32) {
 
 // A sound file: a .wav, or what `decode` takes. False, with the reason logged, if it
 // can't be read or decoded.
-sound_load :: proc(path: string, allocator := context.allocator, decode: Sound_Decoder = nil) -> (sound: Sound, ok: bool) {
-	data := utils.read_file(path, context.temp_allocator) or_return
+sound_load :: proc(file: Mod_File, allocator := context.allocator, decode: Sound_Decoder = nil) -> (sound: Sound, ok: bool) {
+	data := mod_read(file, context.temp_allocator) or_return
+	path := mod_file_name(file)
 	extension := strings.to_lower(filepath.ext(path), context.temp_allocator)
 	if extension != ".wav" {
 		if decode != nil {
@@ -286,26 +282,20 @@ sound_load :: proc(path: string, allocator := context.allocator, decode: Sound_D
 	return sound, true
 }
 
-// Where the sound the original names `name` ("radio/efcup.wav") is: in the mod's sfx/,
-// else Classic's, whatever its case, as a .wav, else an .mp3 or an .ogg; with
-// `remastered` and no mod, Classic's sfx-remastered/ first. False if none is anywhere.
-sound_file :: proc(mod: Mod, name: string, remastered := false) -> (path: string, found: bool) {
+// Where the sound the original names `name` ("radio/efcup.wav") is: in the sfx/ of each
+// mod, the top first, Classic's last; whatever its case, as a .wav, else an .mp3 or an
+// .ogg. False if none is anywhere.
+sound_file :: proc(mod: Mod, name: string) -> (file: Mod_File, found: bool) {
 	slash := strings.last_index_byte(name, '/')
 	stem := filepath.stem(name[slash + 1:])
-	Place :: struct {
-		root, sfx: string,
-	}
-	places := [?]Place{{mod.dir, "sfx"}, {mod.fallback if remastered && mod.dir == "" else "", SFX_REMASTERED}, {mod.fallback, "sfx"}}
-	for place in places {
-		if place.root == "" do continue
-		folder := utils.temp_path(place.sfx, name[:slash]) if slash >= 0 else place.sfx
-		dir := utils.temp_path(place.root, folder)
+	dir := utils.temp_path("sfx", name[:slash]) if slash >= 0 else "sfx"
+	for &layer, i in mod.layers {
 		for extension in SOUND_EXTENSIONS {
-			file := strings.concatenate({stem, extension}, context.temp_allocator)
-			if path, found = utils.find_file_any_case(dir, file, extension, context.temp_allocator); found do return
+			wanted := strings.concatenate({stem, extension}, context.temp_allocator)
+			if file, found = layer_find(&layer, i, dir, wanted, extension); found && strings.equal_fold(filepath.ext(file.path), extension) do return
 		}
 	}
-	return
+	return {}, false
 }
 
 sound_destroy :: proc(sound: ^Sound, allocator := context.allocator) {
@@ -313,8 +303,8 @@ sound_destroy :: proc(sound: ^Sound, allocator := context.allocator) {
 	sound^ = {}
 }
 
-sounds_make :: proc(mod: Mod, remastered: bool, decode: Sound_Decoder = nil, allocator := context.allocator) -> Sounds {
-	return {mod = mod, remastered = remastered, by_name = make(map[string]Sound, allocator), allocator = allocator, decode = decode}
+sounds_make :: proc(mod: Mod, decode: Sound_Decoder = nil, allocator := context.allocator) -> Sounds {
+	return {mod = mod, by_name = make(map[string]Sound, allocator), allocator = allocator, decode = decode}
 }
 
 // A sound by its file name in sfx/ ("shotgun.wav"), found as sound_file finds it, and
@@ -323,8 +313,8 @@ sounds_make :: proc(mod: Mod, remastered: bool, decode: Sound_Decoder = nil, all
 sounds_get :: proc(sounds: ^Sounds, name: string) -> ^Sound {
 	if name not_in sounds.by_name {
 		sound: Sound
-		if path, found := sound_file(sounds.mod, name, sounds.remastered); found {
-			sound, _ = sound_load(path, sounds.allocator, sounds.decode)
+		if file, found := sound_file(sounds.mod, name); found {
+			sound, _ = sound_load(file, sounds.allocator, sounds.decode)
 		} else {
 			log.errorf("no sound %s in sfx/, as a .wav, .mp3 or .ogg", name)
 		}

@@ -13,7 +13,6 @@ import "../../../core/utils"
 // client's ui/mainmenu.c (preview).
 
 Preview :: struct {
-	scales:     Scales,
 	atlas:      Atlas,
 	gostek:     Gostek_Art,
 	animations: ^res.Animations, // none if data/ hasn't them: nothing is drawn
@@ -29,16 +28,14 @@ Dress :: struct {
 }
 
 preview_load :: proc(preview: ^Preview, mod: res.Mod) {
-	preview.scales = scales_load(mod)
 	preview.atlas = {side = ATLAS_SIDE}
-	gostek_load(&preview.gostek, {mod, &preview.scales, &preview.atlas, source_listings()})
+	gostek_load(&preview.gostek, {mod, &preview.atlas, source_listings()})
 	preview.animations, _ = res.animations_load(sim.DATA_DIR)
 	preview.skeleton, _ = res.skeleton_load(sim.DATA_DIR, "gostek.po", res.GOSTEK_SCALE)
 }
 
 preview_destroy :: proc(preview: ^Preview) {
 	atlas_destroy(&preview.atlas)
-	scales_destroy(&preview.scales)
 	free(preview.animations)
 	res.skeleton_destroy(&preview.skeleton)
 	preview^ = {}

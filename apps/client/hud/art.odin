@@ -99,8 +99,9 @@ Art :: struct {
 
 art_load :: proc(art: ^Art, mod: res.Mod) {
 	draw.sprite_book_open(&art.book, mod, ART_SIDE)
-	for file, picture in PICTURE_FILES do art.pictures[picture] = interface_image(art, file)
-	for file, weapon in GUN_FILES do art.guns[weapon] = interface_image(art, file)
+	listings := draw.source_listings() // interface-gfx read once for them all
+	for file, picture in PICTURE_FILES do art.pictures[picture] = interface_image(art, file, listings)
+	for file, weapon in GUN_FILES do art.guns[weapon] = interface_image(art, file, listings)
 	// the kill feed's lines on the left begin past the widest icon, drawn at 0.8, so a
 	// mod's wide guns don't cover the names
 	widest: f32 = 0
@@ -115,13 +116,13 @@ art_destroy :: proc(art: ^Art) {
 
 // An image of interface-gfx, by its path there: "health.png", "guns/1.png".
 @(private = "file")
-interface_image :: proc(art: ^Art, path: string) -> draw.Sprite {
+interface_image :: proc(art: ^Art, path: string, listings: ^utils.Dir_Listings) -> draw.Sprite {
 	dir, name := "interface-gfx", path
 	if slash := strings.last_index_byte(path, '/'); slash >= 0 {
 		dir = strings.concatenate({dir, "/", path[:slash]}, context.temp_allocator)
 		name = path[slash + 1:]
 	}
-	return draw.sprite_book_load(&art.book, dir, name)
+	return draw.sprite_book_load(&art.book, dir, name, listings)
 }
 
 // ---------------------------------------------------------------------------------

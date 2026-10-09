@@ -20,7 +20,6 @@ page_options :: proc(menu: ^Menu) {
 	ui.slider(k, "Volume", &config.sound.volume, 0, 100, 5, "%d%%")
 	ui.toggle(k, "Distant battle sounds", &config.sound.battle_effects)
 	ui.toggle(k, "Deafening blasts", &config.sound.explosion_effects)
-	ui.toggle(k, "Remastered sounds (Classic)", &config.sound.remastered) // Coso's; a mod in use keeps Classic's own
 	ui.section(k, "MOUSE")
 	ui.slider(k, "Sensitivity", &config.controls.sensitivity, 0.1, 5.0, 0.1, "%.2f")
 	ui.color_row(k, "Menu cursor colour", &config.graphics.cursor_color)

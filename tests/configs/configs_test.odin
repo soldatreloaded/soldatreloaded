@@ -9,6 +9,7 @@ package configs_test
 //
 //   odin test tests/configs -define:WRITE_SHIPPED=true
 
+import "core:encoding/json"
 import "core:os"
 import "core:strings"
 import "core:testing"
@@ -104,7 +105,9 @@ client_config_round_trip :: proc(t: ^testing.T) {
 	again := res.client_config_load(path)
 	defer res.client_config_destroy(again)
 	testing.expect(t, !again.broken, "the file the game writes reads back")
-	testing.expect(t, again.player == config.player && again.graphics == config.graphics && again.interface == config.interface, "its settings as they were")
+	graphics_again, _ := json.marshal(again.graphics, allocator = context.temp_allocator)
+	graphics, _ := json.marshal(config.graphics, allocator = context.temp_allocator)
+	testing.expect(t, again.player == config.player && string(graphics_again) == string(graphics) && again.interface == config.interface, "its settings as they were")
 	testing.expect(t, len(again.binds) == len(config.binds) && again.binds["alt+q"] == "say_team Cover me!" && again.binds["mouse1"] == "+fire", "and its binds")
 }
 
@@ -188,6 +191,27 @@ old_time_settings :: proc(t: ^testing.T) {
 	defer res.client_config_destroy(again)
 	testing.expect_value(t, again.interface.time_left_position, res.Time_Left_Position.Top_Right)
 	testing.expect(t, again.interface.local_time, "and the local time")
+}
+
+// A config of before the mods were stacked, its one mod in graphics.mod, has it as the
+// only mod on, and is written so; Classic, or none, is no mod on.
+@(test)
+old_mod_setting :: proc(t: ^testing.T) {
+	dir := scratch(t, "mod")
+	defer os.remove_all(dir)
+	path := utils.temp_path(dir, "client.config.mjson")
+	write(path, "player: {name: \"Kept\"}\ngraphics: {mod: \"NoNameMod\", vsync: true}\n")
+	config := res.client_config_load(path)
+	defer res.client_config_destroy(config)
+	testing.expect(t, !config.broken && config.player.name == "Kept" && config.graphics.vsync, "it reads, its other settings kept")
+	testing.expect(t, len(config.graphics.mods) == 1 && config.graphics.mods[0] == "NoNameMod", "its mod the one on")
+	text := read(path)
+	testing.expect(t, strings.contains(text, "mods: [\n") && strings.contains(text, "\"NoNameMod\"") && !strings.contains(text, " mod: "), "and written as one of graphics.mods")
+
+	write(path, "graphics: {mod: \"classic\"}\n")
+	classic := res.client_config_load(path)
+	defer res.client_config_destroy(classic)
+	testing.expect_value(t, len(classic.graphics.mods), 0)
 }
 
 // A config that still names the lobby of before is moved to the lobby now, the client's

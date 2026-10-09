@@ -57,10 +57,10 @@ Page :: struct {
 	row:     i32, // the tallest glyph in the row being filled
 }
 
-// The face in the file at `path`; none (no data) if it isn't there.
-font_load :: proc(path: string) -> (font: Font) {
-	data, read := utils.read_file(path)
-	if !read do return
+// The face in a font file's bytes, which the font keeps and frees; none (no data) if
+// they aren't one.
+font_load :: proc(data: []u8) -> (font: Font) {
+	if data == nil do return
 	if !tt.InitFont(&font.info, raw_data(data), tt.GetFontOffsetForIndex(raw_data(data), 0)) {
 		delete(data)
 		return

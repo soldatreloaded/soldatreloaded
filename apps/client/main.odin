@@ -87,7 +87,7 @@ main :: proc() {
 
 	client: Client
 	client.config = res.client_config_load(CONFIG_PATH, OLD_CONFIG_PATH)
-	client.mod = res.mod_make(res.MODS_DIR, client.config.graphics.mod)
+	client.mod = res.mod_make(res.MODS_DIR, client.config.graphics.mods)
 	client.last_map = strings.clone(menu.FIRST_MAP)
 	if !online.line_init(&client.line) do log.error("ENet wouldn't start: there is no playing online")
 	window_open(&client.window, &client.config.graphics)
@@ -146,7 +146,7 @@ START_STEPS := [?]Start_Step {
 
 start_sound :: proc(client: ^Client) {
 	rl.InitAudioDevice()
-	sound.sound_init(&client.sound, client.mod, client.config.sound.remastered)
+	sound.sound_init(&client.sound, client.mod)
 }
 
 start_menu :: proc(client: ^Client) {
@@ -192,7 +192,7 @@ update :: proc(client: ^Client, dt: f32) {
 		case menu.Refresh:
 			online.browser_refresh(&client.browser, client.config.network.lobby)
 		case menu.Use_Mod:
-			mod_use(client, request.name)
+			mod_use(client, request.mods)
 		case menu.Back: // the settings over a game's alone
 		case menu.Quit:
 			screen_switch(client, nil)
@@ -279,21 +279,28 @@ menu_open :: proc(client: ^Client) -> Screen {
 	return m
 }
 
-// The mod `name` used from now on, and kept in the config: the faces, the sounds and
-// the menu's art loaded again from it, and the menu opened anew on its Mods page. A
-// match loads its own art as it starts.
-mod_use :: proc(client: ^Client, name: string) {
+// The mods `mods`, the top first, worn from now on over Classic, and kept in the config
+// (it takes the list): the faces, the sounds and the menu's art loaded again from them,
+// and the menu's art, the menu standing as it is. A match loads its own art as it
+// starts.
+mod_use :: proc(client: ^Client, mods: []string) {
 	graphics := &client.config.graphics
-	graphics.mod = strings.clone("" if name == res.MOD_CLASSIC else name, virtual.arena_allocator(&client.config.arena))
+	kept := make([]string, len(mods), virtual.arena_allocator(&client.config.arena))
+	for name, i in mods {
+		kept[i] = strings.clone(name, virtual.arena_allocator(&client.config.arena))
+		delete(name)
+	}
+	delete(mods)
+	graphics.mods = kept
+	config_save(client.config)
 	res.mod_destroy(&client.mod)
-	client.mod = res.mod_make(res.MODS_DIR, graphics.mod)
+	client.mod = res.mod_make(res.MODS_DIR, graphics.mods)
 	ui.ui_destroy(&client.ui)
 	ui.ui_init(&client.ui, client.mod)
 	sound.sound_destroy(&client.sound)
-	sound.sound_init(&client.sound, client.mod, client.config.sound.remastered)
-	m := menu_open(client)
-	menu.go_page(m.(^menu.Menu), .Mods)
-	screen_switch(client, m)
+	sound.sound_init(&client.sound, client.mod)
+	if m, is_menu := client.screen.(^menu.Menu); is_menu do menu.menu_mods_changed(m, client.mod)
+	if client.settings != nil do menu.menu_mods_changed(client.settings, client.mod)
 }
 
 // The match over, whatever played it: its line closed, and the main menu back, on the

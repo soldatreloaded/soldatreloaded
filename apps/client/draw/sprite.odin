@@ -13,7 +13,8 @@ import "../../../core/utils"
 // scaled quad. The soldiers, the bullets, the things and the sparks are all sprites,
 // their images packed into one atlas as they load (atlas.odin), so they draw in one go.
 // How big an image is in the world is the mod's to say, in mod.ini's [SCALE] (the
-// original's ScaleData): its pixels over its scale. From the C client's render/sprite.c
+// original's ScaleData): its pixels over its scale, by the mod.ini of the mod it came
+// from, so a mod's art is as big as that mod meant it to be among others'. From the C client's render/sprite.c
 // and render/scale_data.c.
 
 WHITE :: utils.Rgba{255, 255, 255, 255}
@@ -22,29 +23,21 @@ Sprite :: struct {
 	image: Atlas_Image, // none where the mod hasn't the image: it draws nothing
 	mask:  Atlas_Image, // its silhouette in white, for a sprite drawn in a flat colour
 	size:  [2]f32,      // in world units
+	layer: int,         // the mod of the stack it came from, whose mod.ini sizes and pins it
 }
 
-// How big the mod's images are: by a file's path ("interface-gfx/cursor.png"), else
-// by its folder's, else the default (4.5 pixels to a unit).
-Scales :: struct {
-	default: f32,
-	by_path: map[string]f32, // lowercase, with forward slashes, as the original keys them
-}
-
-// Where sprites are loaded from: the mod, and its scales; and the atlas they are packed
-// into. With `listings`, the mod's folders are read once for all the sprites loaded
+// Where sprites are loaded from: the mods; and the atlas they are packed into. With
+// `listings`, the mods' folders are read once for all the sprites loaded
 // (source_listings).
 @(private = "package")
 Source :: struct {
 	mod:      res.Mod,
-	scales:   ^Scales,
 	atlas:    ^Atlas,
 	listings: ^utils.Dir_Listings,
 }
 
 // Folders' listings for a load of many sprites at once, kept with the temp allocator: for
 // this frame's loading, and no later, when mods/ may have changed.
-@(private = "package")
 source_listings :: proc() -> ^utils.Dir_Listings {
 	listings := new(utils.Dir_Listings, context.temp_allocator)
 	listings^ = make(utils.Dir_Listings, context.temp_allocator)
@@ -55,53 +48,35 @@ source_listings :: proc() -> ^utils.Dir_Listings {
 // an atlas of their own and sized by its scales, as the world's are. Drawn with
 // draw_quad, premultiplied as everything is (gpu.odin).
 Sprite_Book :: struct {
-	mod:    res.Mod,
-	scales: Scales,
-	atlas:  Atlas,
+	mod:   res.Mod,
+	atlas: Atlas,
 }
 
 // A book whose atlas pages are `side` pixels square.
 sprite_book_open :: proc(book: ^Sprite_Book, mod: res.Mod, side: i32) {
-	book^ = {mod = mod, scales = scales_load(mod), atlas = {side = side}}
+	book^ = {mod = mod, atlas = {side = side}}
 }
 
 sprite_book_close :: proc(book: ^Sprite_Book) {
-	scales_destroy(&book.scales)
 	atlas_destroy(&book.atlas)
 	book^ = {}
 }
 
 // An image in the mod's folder `dir`, found as the original finds one (sprite_find),
-// green keyed out as the original's interface is. None if the mod hasn't it.
-sprite_book_load :: proc(book: ^Sprite_Book, dir, name: string) -> Sprite {
-	return sprite_find({book.mod, &book.scales, &book.atlas, nil}, dir, name)
+// green keyed out as the original's interface is. None if the mod hasn't it. With
+// `listings` (source_listings), the folders are read once for many images loaded at once.
+sprite_book_load :: proc(book: ^Sprite_Book, dir, name: string, listings: ^utils.Dir_Listings = nil) -> Sprite {
+	return sprite_find({book.mod, &book.atlas, listings}, dir, name)
 }
 
-// mod.ini's [SCALE] (res.Mod_Config); everything at the default without one. A scale
-// that isn't above 0 is passed over.
-scales_load :: proc(mod: res.Mod) -> (scales: Scales) {
-	config := res.mod_config_load(mod, context.temp_allocator)
-	scales.default = config.scale.default if config.scale.default > 0 else res.DEFAULT_MOD_SCALE
-	for path, scale in config.scale.paths {
-		if scale > 0 do scales.by_path[scale_key(path)] = scale
-	}
-	return
-}
-
-scales_destroy :: proc(scales: ^Scales) {
-	for key in scales.by_path do delete(key)
-	delete(scales.by_path)
-	scales^ = {}
-}
-
-// The scale of the image at `path`, relative to the mod ("weapons-gfx/ak74.png").
-scale_of :: proc(scales: ^Scales, path: string) -> f32 {
-	key := scale_key(path, context.temp_allocator)
-	if scale, found := scales.by_path[key]; found do return scale
-	if slash := strings.last_index_byte(key, '/'); slash >= 0 {
-		if scale, found := scales.by_path[key[:slash]]; found do return scale
-	}
-	return scales.default
+// The scale of the image at `path`, relative to the mod ("weapons-gfx/ak74.png"), as
+// the mod.ini of the mod it came from has it ([SCALE], res.mod_scale); an old mod's
+// small art, which its mod.ini sizes as the new, a pixel a unit (res.mod_old_art).
+scale_of :: proc(mod: res.Mod, layer: int, path: string) -> f32 {
+	scale, set := res.mod_scale(mod, layer, path)
+	slash := strings.last_index_byte(path, '/')
+	if !set && slash >= 0 && res.mod_old_art(mod, layer, path[:slash]) do return res.OLD_ART_SCALE
+	return scale
 }
 
 // The image at `path` in the mod ("gostek-gfx/klata.png"), found as the original
@@ -187,11 +162,12 @@ draw_turned :: proc(image: Atlas_Image, size, at, center, scale: [2]f32, angle: 
 }
 
 @(private = "file")
-sprite_from :: proc(source: Source, file, path: string, key: Maybe(utils.Rgba), flat: bool) -> (sprite: Sprite) {
-	image, loaded := res.texture_load(file, key, context.temp_allocator)
+sprite_from :: proc(source: Source, file: res.Mod_File, path: string, key: Maybe(utils.Rgba), flat: bool) -> (sprite: Sprite) {
+	image, loaded := res.texture_load_file(file, key, context.temp_allocator)
 	if !loaded do return
 	sprite.image = atlas_add(source.atlas, image)
-	sprite.size = {f32(image.width), f32(image.height)} / scale_of(source.scales, path)
+	sprite.layer = file.layer
+	sprite.size = {f32(image.width), f32(image.height)} / scale_of(source.mod, file.layer, path)
 	if flat {
 		for &pixel in image.pixels {
 			pixel = {255, 255, 255, pixel.a}

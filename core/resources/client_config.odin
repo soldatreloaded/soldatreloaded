@@ -1,7 +1,9 @@
 package resources
 
+import "core:encoding/json"
 import "core:log"
 import "core:mem/virtual"
+import "core:strings"
 
 import "../utils"
 
@@ -88,7 +90,7 @@ Control_Settings :: struct {
 }
 
 Graphics_Settings :: struct {
-	mod:               string `jsoncomment:"the mod the game looks and sounds like, over Classic (mods/classic/): one of mods/; empty for Classic alone. Chosen on the Mods page, which uses it at once."`,
+	mods:              []string `jsoncomment:"the mods the game looks and sounds like, over Classic (mods/classic/), the top first: each a .smod or a folder of mods/, by its name. A file is the first of them's that has it, else Classic's. Empty for Classic alone. Chosen on the Mods page, which uses them at once."`,
 	screen_width:      i32 `jsoncomment:"the resolution's width: windowed, the window's; fullscreen, the world is drawn at it and scaled to the screen"`,
 	screen_height:     i32 `jsoncomment:"the resolution's height"`,
 	window_mode:       Window_Mode `jsoncomment:"windowed, or fullscreen: a window without borders over the whole screen"`,
@@ -103,6 +105,7 @@ Graphics_Settings :: struct {
 	forced_sky_top:    utils.Rgba `jsoncomment:"the forced sky's colour at the top, RRGGBB"`,
 	forced_sky_bottom: utils.Rgba `jsoncomment:"the forced sky's colour at the bottom, RRGGBB"`,
 	grenade_color:     Maybe(utils.Rgba) `jsoncomment:"the grenades in this colour, RRGGBB, flat and solid; empty for their own art"`,
+	original_soldiers: bool `jsoncomment:"every soldier drawn as Soldat 1's, the male, whatever style its player picked (the female, rat, furry or waifu), a waifu's hair and headgear as his nearest: so a mod made for Soldat 1 looks the same on everyone"`,
 	crosshair_color:   utils.Rgba `jsoncomment:"the aiming crosshair's colour, RRGGBB"`,
 	crosshair_size:    i32 `jsoncomment:"the aiming crosshair's size, percent"`,
 	cursor_color:      utils.Rgba `jsoncomment:"the menu cursor's colour, RRGGBB"`,
@@ -159,7 +162,6 @@ Sound_Settings :: struct {
 	volume:            i32 `jsoncomment:"0 to 100"`,
 	battle_effects:    bool `jsoncomment:"a far shot or blast also plays its distant sound"`,
 	explosion_effects: bool `jsoncomment:"a blast next to you rings your ears and muffles the rest for a few seconds"`,
-	remastered:        bool `jsoncomment:"Classic's sounds remastered, by Coso; with another mod in use, its sounds and Classic's own"`,
 }
 
 Network_Settings :: struct {
@@ -256,7 +258,7 @@ DEFAULT_CLIENT_CONFIG := Client_Config {
 		console_lines   = 6,
 		discord         = true,
 	},
-	sound = {volume = 18, remastered = true},
+	sound = {volume = 18},
 	network = {server = "127.0.0.1:23073", lobby = LOBBY_URL, mods_index = MODS_INDEX_URL, smooth = 100},
 	offline = {time_limit = 15, capture_limit = 10, bots = {difficulty = 100, chat = true}},
 	radio = {
@@ -334,7 +336,8 @@ client_config_load :: proc(path: string, old_path := "") -> ^Client_Config {
 	switch config_read(from, config, virtual.arena_allocator(&config.arena)) {
 	case .Read:
 		if lobby_moved(&config.network.lobby) do log.infof("%s: the lobby is %s now", path, LOBBY_URL)
-		if from != path do client_config_save(config, path)
+		carried := mod_carried(from, config)
+		if from != path || carried do client_config_save(config, path)
 	case .Missing:
 		client_config_save(config, path)
 	case .Broken:
@@ -342,6 +345,28 @@ client_config_load :: proc(path: string, old_path := "") -> ^Client_Config {
 		config.broken = true
 	}
 	return config
+}
+
+// The one mod of a config from before the mods were stacked (graphics.mod), the only mod
+// on in a config that has none on. True if there was one.
+@(private = "file")
+mod_carried :: proc(path: string, config: ^Client_Config) -> bool {
+	if len(config.graphics.mods) > 0 do return false
+	text := utils.read_file(path, context.temp_allocator) or_return
+	Before :: struct {
+		graphics: struct {
+			mod: string,
+		},
+	}
+	before: Before
+	json.unmarshal(text, &before, .MJSON, context.temp_allocator)
+	name := before.graphics.mod
+	if name == "" || mod_builtin(name) || strings.equal_fold(name, "default") do return false
+	mods := make([]string, 1, virtual.arena_allocator(&config.arena))
+	mods[0] = strings.clone(name, virtual.arena_allocator(&config.arena))
+	config.graphics.mods = mods
+	log.infof("%s: the mod %s is the first of graphics.mods now", path, name)
+	return true
 }
 
 // A lobby address of a config read, moved to LOBBY_URL if it is still the old lobby's
