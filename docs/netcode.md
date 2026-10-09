@@ -39,29 +39,34 @@ a test holds that every event type is classified.
 
 - **Local consequences, never sent:** fire, bullet end, wall hit, ricochet, collider
   hit, grenade bounce, cluster split, blood, explosion, and Hit itself. Every machine
-  flies the same bullet from the same seed and produces these for itself. Hit is the
-  simulation proposing a wound; only the server turns it into damage, but its knockback
-  and bink land wherever it is produced, as the original writes a victim's NextPush
-  wherever the bullet is simulated: the owner's word about its soldier stands, so the
-  owner must feel the knock itself. The bink has a second word on a client: the
-  server's damage to it, binked as it is heard rather than when its tick comes on show,
-  which catches the hit the server saw and the bullet flown here missed (judged against
-  the shooter's view there, the present here). Of a hit's two words the first gives the
-  bink and the second, coming within BINK_MATCH_TICKS, is taken as it (hit_spray). The
-  bink goes with the life, cleared while dead, and with the gun put away.
+  flies the same bullet from the same seed and produces these for itself, but a bullet
+  meets a living body only on its shooter's machine (the shooter's client, or the
+  server for its bots): everywhere else the living are the server's word to show (Shot_Hit,
+  below), so no two screens make two different hits of one bullet. Corpses are met
+  everywhere, each machine's own. Hit is the simulation proposing a wound; only the
+  server turns it into damage, but its knockback and bink land wherever it is produced,
+  as the original writes a victim's NextPush wherever the bullet is simulated; the
+  victim's own client, which no other's bullet meets, takes the knock from the server's
+  word of the hit, since the owner's word about its soldier stands. The bink has a
+  second word on a client: the server's damage to it, binked as it is heard rather
+  than when its tick comes on show. Of a hit's two words the first gives the bink and
+  the second, coming within BINK_MATCH_TICKS, is taken as it (hit_spray). The bink goes
+  with the life, cleared while dead, and with the gun put away.
 - **The owner's decisions, in its client state:** the shot (EVENT_SHOT, numbered so the
-  same bullet comes out everywhere), the weapon throw (EVENT_WEAPON_DROP) and the flag
-  throw (EVENT_FLAG_THROW).
+  same bullet comes out everywhere), the weapon throw (EVENT_WEAPON_DROP), the flag
+  throw (EVENT_FLAG_THROW), and the claim (Hit_Claim): a living body its own bullet or
+  blade met on its screen, with which snapshot that body's picture was taken from and
+  how it was stepped (see Time). A claim goes to the server alone.
 - **The server's decisions, in its snapshot:** damage, kill, respawn, flag grab, return
-  and score, kit and weapon pickup, the match's end, a new round; and where a shot ended
-  (EVENT_SHOT_END), for the shots slow enough that a miss shows: a blast (grenades,
-  rockets, clusters, flak) and an arrow or thrown knife stopped in a body. The same
-  bullet flies everywhere, but not against the same soldiers: the server judges it
-  against the shooter's view, a client against its own present, so a grenade that went
-  off on a player at the server can roll on over that player's corpse at the player's
-  own client. Hearing the word, a client puts its flight of the shot where the server's
-  ended and ends it the same way; one it has already ended stays ended. Plain bullets
-  are not told: too quick for a miss to show, and many enough to crowd the queue.
+  and score, kit and weapon pickup, the match's end, a new round; a hit on the living
+  (Shot_Hit), claimed or its bots', for every machine but the shooter's to show: the
+  blood on the target where it is drawn there, the knock to the target's own client,
+  the bullet ended if it stopped; and where a shot ended (EVENT_SHOT_END), for the shots
+  slow enough that a miss shows: a blast (grenades, rockets, clusters, flak) and an
+  arrow or thrown knife stopped in a body. Those the server judges itself, against the
+  shooter's view; hearing the word, a client puts its flight of the shot where the
+  server's ended and ends it the same way; one it has already ended stays ended. A
+  plain bullet's miss is not told: too quick to show, and many enough to crowd the queue.
 - **Neither, and never sent:** what one system asks of another within a machine, such
   as a bullet's knock on a flag (EVENT_THING_KNOCK) or a landed knife (EVENT_KNIFE_LAND);
   every machine produces these for itself.
@@ -130,15 +135,25 @@ leaving the muzzle rather than starting out ahead of it.
 
 A shot is an event from the owner, stamped with its tick, which names the frame the
 shooter had. The server runs the bullet forward from that tick to its own present and,
-each step of the way, judges it against the frame the shooter's screen held at that
-step, out of the history ring (bullet_target, history_targets), until it has caught up
-and meets the present like any other bullet. So what landed on the shooter's screen
-lands on the server however far the target has moved since, and the round trip never
-cheats the shooter of a hit; the price falls on the target, who can be hit a round trip
-after reaching cover, as in every game that rewinds. What is left is what the shooter's
-screen could not know: a key the target changed, or a frame lost, inside the last round
-trip. The shooter plays its own flash, sound and blood at once, and the health on the
-server's damage event.
+each step of the way, judges a blast or a thrown knife against the frame the shooter's
+screen held at that step, out of the history ring (bullet_target, history_targets),
+until it has caught up and meets the present like any other bullet.
+
+A bullet or a blade on the living is judged on the shooter's screen itself, which is
+not quite any frame the server had: on a tick whose snapshot hadn't come, the target
+was stepped there on its last keys from an older one. So the shooter's client claims
+each body its own shot met, naming the snapshot the target was taken from, the tick it
+was taken in, and the steps it was stepped since (client_stream_collect), and the server
+sees the claim again (core/game/hit_claim.odin): it keeps the flight of every client
+shot it has heard, a tick of it at a time, to the end; it makes the target again from
+that snapshot out of the history ring, stepped as the client stepped it, in the
+target's own slot and put back after; and the claim lands if the bullet it names was on
+the shot's flight there, no faster, and met the target so made. The server's own flight
+of a client's shot passes through the living, and ends where a claim says it stopped.
+So what landed on the shooter's screen lands on the server, guessed or not, and every
+other screen is told of it; the price falls on the target, who can be hit a round trip
+after reaching cover, as in every game that favours the shooter. The shooter plays its
+own flash, sound and blood at once, and the health on the server's damage event.
 
 ## Things
 
@@ -155,7 +170,10 @@ Numbers in range. A life that is still being lived (`life`: word from before a
 placing is never taken for word from after it). A shot the weapon in hand could make,
 with the ammo it has, from within a few units of where the shooter has stood over the
 last quarter second: the history ring (history.c) keeps where everyone claimed to be,
-for this, not for rewinding. Duplicate events by number. A movement claim that fails
+for this, not for rewinding. A hit claim (see Time): of a shot heard from the claimant,
+on its flight there, no faster than it flew, on a body made again from a snapshot at
+most half a second old and stepped no further than the client could have; a claim that
+fails lands nothing, and nothing is told. Duplicate events by number. A movement claim that fails
 is dropped and the server's version of the soldier goes out in the snapshot as usual;
 there is no correction message, because the owned half in the snapshot is that.
 

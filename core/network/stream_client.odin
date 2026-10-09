@@ -25,7 +25,7 @@ STREAM_INTERP_SETTLE :: 5 * game.TICK_RATE // no late snapshot for this long: a 
 STREAM_VIEW_SNAP :: 8            // a view this far from where it should be jumps there
 STREAM_VIEW_WINDOW :: 60         // ticks over which the frames in hand are watched before the clock is nudged
 STREAM_VIEW_SLACK :: 2           // frames in hand beyond interp, at the leanest, before the view is nudged forward
-STREAM_STEPS_MAX :: 16           // a word is stepped on this far at most: past it, it stands
+STREAM_STEPS_MAX :: game.SEEN_STEPS_MAX // a word is stepped on this far at most: past it, it stands (as a claim's picture is made again)
 THING_TOLERANCE :: f32(10)       // a thing's points are taken only when they disagree by more than this
 
 // A snapshot as the client keeps it, for the tick that shows it.
@@ -50,6 +50,9 @@ Client_Stream :: struct {
 	level_min:    i32,  // the fewest frames in hand over the window being watched
 	window:       int,  // ticks of it left
 	word_applied: [game.MAX_PLAYERS]u32, // the newest snapshot tick each soldier was taken from
+	word_taken:   [game.MAX_PLAYERS]u32, // and the tick it was taken in: a claim's picture of it (hit_claim.odin)
+	word_pre:     [game.MAX_PLAYERS]int, // the steps it was taken with, on its last keys
+	word_steps:   [game.MAX_PLAYERS]int, // and the ticks' steps since, the one running counted
 	pending:      Wire_Pending,          // the server's words heard, each done in the tick of its frame
 	last_word:    [game.MAX_PLAYERS]u32, // the snapshot tick each soldier was last heard of in
 	// What a correction moved each soldier by, still to be shown: a new word snaps the
@@ -259,7 +262,7 @@ frame_apply :: proc(c: ^Client_Stream, g: ^game.Game, me: game.Soldier_Id, frame
 // a corpse: its body is the corpse here, started from the served vitals.death, and its
 // place the corpse's head.
 @(private = "file")
-soldier_apply :: proc(c: ^Client_Stream, g: ^game.Game, id: game.Soldier_Id, frame: ^Snap_Frame, steps: int, scratch: ^game.Tick_Output) {
+soldier_apply :: proc(c: ^Client_Stream, g: ^game.Game, id: game.Soldier_Id, frame: ^Snap_Frame, steps: int, scratch: ^game.Tick_Output) -> (stepped: int) {
 	w := &g.world
 	s := &w.soldiers[id]
 	heard := &frame.soldiers[id]
@@ -274,7 +277,7 @@ soldier_apply :: proc(c: ^Client_Stream, g: ^game.Game, id: game.Soldier_Id, fra
 		s.arsenal.fired = false
 		c.blend[id] = {}
 		c.blend_vel[id] = {}
-		return
+		return 0
 	}
 	soldier_take_owned(g.resources.animations, s, heard)
 	steps_left := min(steps, STREAM_STEPS_MAX)
@@ -292,6 +295,7 @@ soldier_apply :: proc(c: ^Client_Stream, g: ^game.Game, id: game.Soldier_Id, fra
 		c.blend_vel[id] = {}
 	}
 	if !placed do c.stats.correction += utils.length(jump)
+	return steps_left
 }
 
 // Every other soldier from its newest word no later than the tick on show, stepped on
@@ -306,8 +310,10 @@ soldiers_apply :: proc(c: ^Client_Stream, g: ^game.Game, me: game.Soldier_Id, v:
 		for t := min(v, c.newest); t > c.word_applied[i] && c.newest - t < STREAM_RING; t -= 1 {
 			frame := &c.snaps[t % STREAM_RING]
 			if frame.tick != t || frame.word[i] != .State do continue
-			soldier_apply(c, g, id, frame, int(v - t), scratch)
+			c.word_pre[i] = soldier_apply(c, g, id, frame, int(v - t), scratch)
 			c.word_applied[i] = t
+			c.word_taken[i] = v
+			c.word_steps[i] = 0
 			break
 		}
 	}
@@ -327,6 +333,7 @@ client_stream_begin_tick :: proc(c: ^Client_Stream, g: ^game.Game, me: game.Sold
 	v := g.world.tick
 	frame_on_show_apply(c, g, me, v)
 	soldiers_apply(c, g, me, v)
+	for i in 0 ..< game.MAX_PLAYERS do c.word_steps[i] += 1 // the step about to run steps every other soldier once
 	wire_pending_apply(&c.pending, &g.world, v)
 	c.event_last = c.pending.received // what is held here need not come again
 }
@@ -400,9 +407,24 @@ frame_on_show_apply :: proc(c: ^Client_Stream, g: ^game.Game, me: game.Soldier_I
 	}
 }
 
-// After the client's tick: its own decisions among the tick's events, for the server.
+// After the client's tick: its own decisions among the tick's events, for the server,
+// and the bodies its own shots met, each claimed with the picture of the target it met
+// (hit_claim.odin). None is claimed on a target the picture of which is no snapshot's
+// stepped as the server can step it again: one gone quiet (its keys let go), or taken
+// from a snapshot too old.
 client_stream_collect :: proc(c: ^Client_Stream, g: ^game.Game, me: game.Soldier_Id) {
-	wire_collect(&c.out, &g.output, g.world.tick - 1, me) // the tick just run
+	tick := g.world.tick - 1 // the tick just run
+	wire_collect(&c.out, &g.output, tick, me)
+	for event in sa.slice(&g.output.events) {
+		hit, is_hit := event.(game.Hit_Claimed)
+		if !is_hit || hit.owner != me || hit.target == me do continue
+		seen, taken := c.word_applied[hit.target], c.word_taken[hit.target]
+		pre, steps := c.word_pre[hit.target], c.word_steps[hit.target]
+		if seen == 0 || seen > taken || taken > tick || tick - seen > game.CLAIM_SEEN_MAX do continue
+		if pre > game.SEEN_STEPS_MAX || steps < 1 || steps > game.CLAIM_SEEN_MAX + 1 do continue
+		if client_stream_quiet(c, hit.target) do continue
+		wire_push(&c.out, game.Hit_Claim{claimed = hit, seen = u8(tick - seen), taken = u8(tick - taken), pre = u8(pre), steps = u8(steps)}, tick)
+	}
 }
 
 // Each frame: the offsets ease away, nine tenths of a correction gone `seconds` after

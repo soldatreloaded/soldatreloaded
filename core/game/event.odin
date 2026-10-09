@@ -31,6 +31,10 @@ Event :: union {
 	Antic,
 	Flag_Drop,
 	Shot_End,
+	// the hits on the shooter's word (hit_claim.odin): its client's claim, for the wire;
+	// the server's word of a hit, for the wire and for showing
+	Hit_Claimed,
+	Shot_Hit,
 }
 
 MAX_EVENTS :: 256
@@ -197,6 +201,7 @@ Flag_Drop :: struct {
 Shot_End :: struct {
 	owner:  Soldier_Id,
 	shot:   u32, // the owner's number for it
+	fired:  u32, // the tick it was fired in: with the number, which shot it was
 	weapon: res.Weapon,
 	pos:    utils.Vec2,
 	blast:  Maybe(Explosion_Kind),

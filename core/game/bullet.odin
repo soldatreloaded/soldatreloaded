@@ -33,6 +33,11 @@ Bullet :: struct {
 	knocked:        [4]Knocked_Thing,
 	catch_up:       i16, // a heard shot run forward to where its shooter has it: drawn as a trail
 	catch_up_start: i16,
+	fired:          u32, // the tick it was fired in, on its owner's machine: with its number, which shot it is
+	// On the server: a client's shot, heard; its hits on the living are its client's to
+	// claim, and its flight is kept in `record` (hit_claim.odin).
+	heard:          bool,
+	record:         int,
 }
 
 // A thing a bullet pushed recently, not to be pushed again every tick.
@@ -80,6 +85,7 @@ bullet_fire :: proc(world: ^World, resources: ^Resources, shot: Shot) -> (id: Bu
 			timeout    = info.timeout,
 			damage     = shot.damage,
 			last_hit   = shot.owner if shot.harmless else nil,
+			fired      = world.tick,
 		}
 		return Bullet_Id(i), true
 	}
@@ -104,14 +110,20 @@ bullet_remote_fire :: proc(world: ^World, resources: ^Resources, shot: Shot, out
 // has it, each step judged against the soldiers as the shooter saw them then
 // (bullet_target); caught up, it meets the present like any other. A client draws it
 // with a trail over the run. Heard at the start of the bullets' turn, after
-// bullets_fade_trails, as the C game takes them.
-bullet_hear :: proc(world: ^World, resources: ^Resources, shot: Shot, catch_up: u8, authority: ^Authority, out: ^Tick_Output) {
+// bullets_fade_trails, as the C game takes them. On the server its flight is recorded
+// from the tick it was fired in, `fired`, for its client's claims (hit_claim.odin).
+bullet_hear :: proc(world: ^World, resources: ^Resources, shot: Shot, catch_up: u8, fired: u32, authority: ^Authority, out: ^Tick_Output) {
 	id, made := bullet_fire(world, resources, shot)
 	if !made do return
 	bullet := &world.bullets[id]
 	if authority == nil {
 		bullet.catch_up = i16(catch_up)
 		bullet.catch_up_start = i16(catch_up)
+	}
+	bullet.fired = fired // as its owner's machine stamped it: the shot, by its number and this
+	if authority != nil {
+		bullet.heard = true
+		shot_record_begin(authority, bullet, id, fired)
 	}
 	for a in 0 ..< catch_up {
 		if !bullet.active do break
@@ -139,7 +151,7 @@ bullets_fade_trails :: proc(world: ^World) {
 // TODO(net): heard at the start of the bullets' turn, as the C game takes it.
 bullet_shot_end :: proc(world: ^World, resources: ^Resources, end: Shot_End, out: ^Tick_Output) {
 	for &bullet, i in world.bullets {
-		if !bullet.active || bullet.owner != end.owner || bullet.shot != end.shot || bullet.weapon != end.weapon do continue
+		if !bullet.active || bullet.owner != end.owner || bullet.shot != end.shot || bullet.weapon != end.weapon || bullet.fired != end.fired do continue
 		bullet.pos = end.pos
 		bullet.old_pos = end.pos
 		if kind, blast := end.blast.?; blast {

@@ -76,7 +76,7 @@ explode :: proc(
 // with authority: a client's shots end as the server's word puts them (bullet_shot_end).
 shot_end_tell :: proc(authority: ^Authority, bullet: ^Bullet, pos: utils.Vec2, blast: Maybe(Explosion_Kind), target: Maybe(Soldier_Id), out: ^Tick_Output) {
 	if authority == nil do return
-	emit(out, Shot_End{owner = bullet.owner, shot = bullet.shot, weapon = bullet.weapon, pos = pos, blast = blast, target = target})
+	emit(out, Shot_End{owner = bullet.owner, shot = bullet.shot, fired = bullet.fired, weapon = bullet.weapon, pos = pos, blast = blast, target = target})
 }
 
 @(private = "file")

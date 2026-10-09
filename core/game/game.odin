@@ -50,6 +50,7 @@ game_start_round :: proc(game: ^Game, map_name: string, seed: u64, data_dir := D
 	game.round = round_init(&game.settings)
 	if game.authority != nil {
 		game.authority.history = {} // the past was another map's
+		shot_records_reset(&game.authority.shots)
 	}
 	world_init(&game.world, &game.polymap, game.settings.gravity, seed)
 	game.world.rules = round_rules(&game.round, &game.settings)
@@ -71,6 +72,7 @@ game_tick :: proc(game: ^Game, commands: ^[MAX_PLAYERS]Command) {
 game_destroy :: proc(game: ^Game) {
 	res.map_destroy(&game.polymap)
 	resources_destroy(&game.resources)
+	if game.authority != nil do shot_records_destroy(&game.authority.shots)
 	free(game.authority)
 	game^ = {}
 }
