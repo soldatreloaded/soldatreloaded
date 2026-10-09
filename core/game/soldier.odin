@@ -80,7 +80,7 @@ Body :: struct {
 	on_ground_for_law:   bool,
 	jet_fuel:            i32 `net:"owned"`,
 	background:          Background_State,
-	spawn_still:         bool `net:"owned"`, // not moved since spawning: the weapons menu still applies
+	spawn_still:         bool `net:"owned"`, // not moved since spawning
 }
 
 // Walking into background polygons: they block only when entered from outside.

@@ -191,8 +191,11 @@ menu_choice :: proc(match: ^Match, config: ^res.Client_Config, sounds: ^sound.So
 	if action == nil do return false
 	sound.sound_flat(sounds, "menuclick.wav")
 	me := &match.game.world.soldiers[match.me]
-	// the weapons are the next spawn's, and this life's too if I haven't moved since it began
-	now := !me.vitals.dead && me.body.spawn_still
+	// the weapons are the next spawn's, and this life's too while I live, as the original's
+	// (GameMenus.pas): the menu holds me still while it is up. Not only if I haven't moved
+	// since the spawn: keys held through it move me the tick before the menu comes up, and
+	// every pick after was the next life's, the soldier left with fists
+	now := !me.vitals.dead
 	switch a in action {
 	case hud.Leave:
 		return true
