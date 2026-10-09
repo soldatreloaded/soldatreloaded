@@ -57,6 +57,12 @@ soldier_pose :: proc(animations: ^res.Animations, soldier: ^Soldier, pos: utils.
 	}
 }
 
+// The soldier's skeleton (Pose.skeleton) built where it stands now: in its update, and
+// wherever its place or its pose is taken from the wire.
+soldier_skeleton_build :: proc(animations: ^res.Animations, soldier: ^Soldier) {
+	soldier.pose.skeleton = soldier_pose(animations, soldier, soldier.body.pos)
+}
+
 // The body animations in which the arms do their own thing rather than follow the aim.
 @(private = "file")
 arms_animated :: proc(id: res.Animation_Id) -> bool {

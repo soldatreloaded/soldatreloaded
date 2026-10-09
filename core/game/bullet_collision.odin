@@ -363,8 +363,7 @@ body_collide :: proc(
 
 		start: utils.Vec2
 		if melee {
-			owner_joints := soldier_pose(resources.animations, owner, owner.body.pos)
-			start = owner_joints[14] + hands_aim_direction(&owner_joints) * 4.0
+			start = owner.pose.skeleton[14] + hands_aim_direction(&owner.pose.skeleton) * 4.0
 		} else {
 			start = bullet.pos
 		}
@@ -373,7 +372,7 @@ body_collide :: proc(
 		// A corpse is met where its body lies this tick, not where it was `lag` ticks ago:
 		// it moves slowly, and no history is kept of it.
 		corpse := live.vitals.dead
-		joints := corpse_joints(&world.corpses[ti]) if corpse else soldier_pose(resources.animations, target, target.body.pos)
+		joints := corpse_joints(&world.corpses[ti]) if corpse else target.pose.skeleton
 
 		// The part is the one met nearest the start; the point is the last one met, in
 		// priority order, which is what the original's variable holds when it is done.

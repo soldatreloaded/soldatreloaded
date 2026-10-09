@@ -1,7 +1,6 @@
 package draw
 
 import sim "../../../core/game"
-import res "../../../core/resources"
 import "../../../core/utils"
 
 // The world drawn between its last two ticks, so it moves smoothly at any frame rate. A
@@ -53,7 +52,6 @@ frame_build :: proc(frame: ^Frame, before: ^Snapshot, game: ^sim.Game, alpha: f3
 	world := &game.world
 	for id in 0 ..< sim.MAX_PLAYERS {
 		frame.figures[id] = figure_between(
-			game.resources.animations,
 			&before.soldiers[id], &world.soldiers[id],
 			&before.corpses[id], &world.corpses[id],
 			frame.alpha,
@@ -73,7 +71,7 @@ between :: proc(a, b: utils.Vec2, t: f32) -> utils.Vec2 {
 // journey, and the step from living to dead shows the latest tick's alone. A dead
 // soldier is its corpse once that has started; until then it holds its last pose.
 @(private = "file")
-figure_between :: proc(animations: ^res.Animations, from, to: ^sim.Soldier, corpse_from, corpse_to: ^sim.Corpse, alpha: f32, offset: utils.Vec2) -> (figure: Figure) {
+figure_between :: proc(from, to: ^sim.Soldier, corpse_from, corpse_to: ^sim.Corpse, alpha: f32, offset: utils.Vec2) -> (figure: Figure) {
 	if !to.active do return
 	continuous := from.active && from.vitals.life == to.vitals.life
 	figure.pos = (between(from.body.pos, to.body.pos, alpha) if continuous else to.body.pos) + offset
@@ -86,17 +84,17 @@ figure_between :: proc(animations: ^res.Animations, from, to: ^sim.Soldier, corp
 		return
 	}
 
-	joints := sim.soldier_pose(animations, to, figure.pos)
-	if continuous && from.vitals.dead == to.vitals.dead {
-		last := sim.soldier_pose(animations, from, figure.pos)
-		for &joint, i in joints {
-			joint = between(last[i], joint, alpha)
-		}
+	// the skeleton the bullets meet (Pose.skeleton), as it lies from the body: at a tick
+	// itself it is drawn exactly where it is hit
+	blend := continuous && from.vitals.dead == to.vitals.dead
+	for &point, i in figure.points[:len(to.pose.skeleton)] {
+		shape := to.pose.skeleton[i] - to.body.pos
+		if blend do shape = between(from.pose.skeleton[i] - from.body.pos, shape, alpha)
+		point = figure.pos + shape
 	}
-	copy(figure.points[:], joints[:])
 	for k in 0 ..< len(to.pose.swing) {
 		swing := between(from.pose.swing[k], to.pose.swing[k], alpha) if continuous else to.pose.swing[k]
-		figure.points[len(joints) + k] = swing + offset
+		figure.points[len(to.pose.skeleton) + k] = swing + offset
 	}
 	return
 }

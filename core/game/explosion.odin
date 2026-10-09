@@ -111,7 +111,7 @@ blast_soldier :: proc(
 ) {
 	stats := &resources.weapons[explosion_weapon(kind)].stats
 	radius := explosion_radius(kind)
-	joints := soldier_pose(resources.animations, soldier, soldier.body.pos)
+	joints := &soldier.pose.skeleton
 
 	part := hit_part
 	if struck, direct := hit_soldier.?; !direct || struck != id || hit_part < 0 {

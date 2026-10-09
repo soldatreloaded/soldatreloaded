@@ -202,11 +202,13 @@ net_round :: proc(b: ^Buffer, round: ^game.Round, base: ^game.Round) {
 // The halves taken
 
 // The owned half of `src` onto `dst`, the animations' speed set from the anims as the
-// fields cannot.
+// fields cannot, and the skeleton built where the word puts it: a soldier not stepped
+// after is drawn there, not where it stood before.
 soldier_take_owned :: proc(animations: ^res.Animations, dst, src: ^game.Soldier) {
 	fields_copy(SOLDIER_OWNED_FIELDS, dst, src)
 	dst.pose.legs.speed = animations[dst.pose.legs.id].speed
 	dst.pose.body.speed = animations[dst.pose.body.id].speed
+	game.soldier_skeleton_build(animations, dst)
 }
 
 soldier_take_served :: proc(dst, src: ^game.Soldier) {

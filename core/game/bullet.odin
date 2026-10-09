@@ -93,7 +93,7 @@ bullet_fire :: proc(world: ^World, resources: ^Resources, shot: Shot) -> (id: Bu
 bullet_remote_fire :: proc(world: ^World, resources: ^Resources, shot: Shot, out: ^Tick_Output) {
 	soldier := &world.soldiers[shot.owner]
 	if !soldier.active do return
-	joints := soldier_pose(resources.animations, soldier, soldier.body.pos)
+	joints := &soldier.pose.skeleton
 	aim := utils.normalize(soldier.controls.aim - joints[14])
 	muzzle := utils.Vec2{joints[14].x - aim.x * 4.0, joints[14].y - aim.y * 4.0 - 2.0}
 	soldier.arsenal.fired = true // the gostek's muzzle flash
