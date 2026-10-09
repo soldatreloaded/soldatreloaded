@@ -20,6 +20,11 @@ Credits named in the upstream `Credits.md`:
 
 ## What here is not from base
 
+The remastered sounds in `sfx-remastered/` are by **Coso**, licensed under CC BY 4.0
+as base's are (the full text is in [LICENSE.txt](LICENSE.txt)). Each takes the place
+of the sound of the same name in `sfx/` while the Remastered sounds option is on; the
+sounds it doesn't have are base's.
+
 The fonts sit in `fonts/` without being part of that content, and they are not
 under CC BY 4.0. (The game's own configs, `*.config.mjson` at the install's root, under
 the MIT licence in the game's `license.md`, sit apart from this directory.) Each is

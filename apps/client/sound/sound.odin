@@ -65,12 +65,12 @@ Sound :: struct {
 	ringing:    i32,                          // ticks of ringing ears left
 }
 
-// The sounds of `mod`, on the audio device main opened. Without a device, a warning,
-// and the game plays silent.
-sound_init :: proc(s: ^Sound, mod: res.Mod) {
+// The sounds of `mod`, Classic's `remastered` or its own, on the audio device main
+// opened. Without a device, a warning, and the game plays silent.
+sound_init :: proc(s: ^Sound, mod: res.Mod, remastered: bool) {
 	s^ = {
 		ready   = rl.IsAudioDeviceReady(),
-		bank    = res.sounds_make(mod, decode_compressed),
+		bank    = res.sounds_make(mod, remastered, decode_compressed),
 		samples = make(map[string]Sample),
 		rng     = {0x9E3779B1},
 	}
@@ -105,13 +105,32 @@ sound_destroy :: proc(s: ^Sound) {
 
 // The settings, which may change at any time: the volume (0 to 100, through the
 // original's curve: 50 is a quarter of the way up, and quiet enough there), the effects,
-// and whether the weather, and so its wind, is on.
+// whether the weather, and so its wind, is on, and Classic's sounds remastered or not.
 sound_configure :: proc(s: ^Sound, config: ^res.Client_Config) {
+	if config.sound.remastered != s.bank.remastered do bank_reload(s, config.sound.remastered)
 	v := clamp(f32(config.sound.volume) / 100, 0, 1)
 	s.volume = v * v * 0.48
 	s.battle = config.sound.battle_effects
 	s.explosions = config.sound.explosion_effects
 	s.weather = config.graphics.weather
+}
+
+// The samples let go of and the bank made anew, Classic's `remastered` or its own: each
+// sound is loaded again as it is next asked for. What is playing stops; a loop still
+// wanted starts again on the next tick.
+@(private = "file")
+bank_reload :: proc(s: ^Sound, remastered: bool) {
+	for &voice in s.voices do voice_unload(&voice)
+	for name, sample in s.samples {
+		if len(sample.frames) > 0 do rl.UnloadSound(sample.sound)
+		delete(name)
+	}
+	clear(&s.samples)
+	mod := s.bank.mod
+	res.sounds_destroy(&s.bank)
+	s.bank = res.sounds_make(mod, remastered, decode_compressed)
+	s.reserved = {}
+	s.wind = {}
 }
 
 // Every frame: the loops fed what they play next.

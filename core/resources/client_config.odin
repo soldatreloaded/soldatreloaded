@@ -158,6 +158,7 @@ Sound_Settings :: struct {
 	volume:            i32 `jsoncomment:"0 to 100"`,
 	battle_effects:    bool `jsoncomment:"a far shot or blast also plays its distant sound"`,
 	explosion_effects: bool `jsoncomment:"a blast next to you rings your ears and muffles the rest for a few seconds"`,
+	remastered:        bool `jsoncomment:"Classic's sounds remastered, by Coso; with another mod in use, its sounds and Classic's own"`,
 }
 
 Network_Settings :: struct {
@@ -253,7 +254,7 @@ DEFAULT_CLIENT_CONFIG := Client_Config {
 		console_lines   = 6,
 		discord         = true,
 	},
-	sound = {volume = 18},
+	sound = {volume = 18, remastered = true},
 	network = {server = "127.0.0.1:23073", lobby = LOBBY_URL, mods_index = MODS_INDEX_URL, smooth = 100},
 	offline = {time_limit = 15, capture_limit = 10, bots = {difficulty = 100, chat = true}},
 	radio = {

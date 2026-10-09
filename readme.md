@@ -145,5 +145,6 @@ community's, are at
 The code is under the MIT licence ([license.md](license.md)). The game's data and
 Classic's art and sounds are from [OpenSoldat's base
 content](https://github.com/opensoldat/base), under CC BY 4.0, and the menu's fonts under
-the SIL Open Font License; `assets/data/NOTICE.md` and `assets/mods/classic/NOTICE.md`
-say what is whose.
+the SIL Open Font License. Classic's remastered sounds (`sfx-remastered/`, heard with
+the Remastered sounds option) are Coso's, under CC BY 4.0. `assets/data/NOTICE.md` and
+`assets/mods/classic/NOTICE.md` say what is whose.

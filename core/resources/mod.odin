@@ -16,6 +16,7 @@ import "../utils"
 // a mod's but data/'s, the same for everyone in a game.
 
 MOD_CLASSIC :: "classic"
+SFX_REMASTERED :: "sfx-remastered" // Classic's remastered sounds, beside its sfx/ (sounds.odin)
 MODS_DIR :: "mods" // where the mods are, from the client's working directory
 
 Mod :: struct {

@@ -146,7 +146,7 @@ START_STEPS := [?]Start_Step {
 
 start_sound :: proc(client: ^Client) {
 	rl.InitAudioDevice()
-	sound.sound_init(&client.sound, client.mod)
+	sound.sound_init(&client.sound, client.mod, client.config.sound.remastered)
 }
 
 start_menu :: proc(client: ^Client) {
@@ -290,7 +290,7 @@ mod_use :: proc(client: ^Client, name: string) {
 	ui.ui_destroy(&client.ui)
 	ui.ui_init(&client.ui, client.mod)
 	sound.sound_destroy(&client.sound)
-	sound.sound_init(&client.sound, client.mod)
+	sound.sound_init(&client.sound, client.mod, client.config.sound.remastered)
 	m := menu_open(client)
 	menu.go_page(m.(^menu.Menu), .Mods)
 	screen_switch(client, m)
