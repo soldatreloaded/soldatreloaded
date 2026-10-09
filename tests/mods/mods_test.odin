@@ -235,35 +235,29 @@ picture :: proc(shade: u8, w := 6, h := 4) -> string {
 	return string(out[:])
 }
 
-// An old mod's art, from before Soldat 1.6 drew it finer, with a mod.ini of the new art's
-// scale (as qb's): its folder is found to be old art, and drawn a pixel a unit; not one
-// of the new art's size, nor one its mod.ini sizes itself.
+// A mod's art is drawn at the scale its mod.ini gives it, whatever its size: an old
+// mod's small art, from before Soldat 1.6 drew it finer, at its DefaultScale, as nothing
+// is guessed from its size; a mod.ini that sizes its folder, as it says.
 @(test)
-old_art :: proc(t: ^testing.T) {
-	dir := scratch(t, "old_art")
+scale_as_the_mod_ini_says :: proc(t: ^testing.T) {
+	dir := scratch(t, "scale_as_said")
 	defer os.remove_all(dir)
 	parts := []string{"klata.png", "morda.png", "noga.png", "udo.png"}
 	for name, i in parts {
 		write(utils.temp_path(dir, "classic", "gostek-gfx", name), picture(u8(i), 27, 18))
 		write(utils.temp_path(dir, "Old", "gostek-gfx", name), picture(u8(i), 6, 4))
-		write(utils.temp_path(dir, "New", "gostek-gfx", name), picture(u8(i), 27, 18))
 		write(utils.temp_path(dir, "Said", "gostek-gfx", name), picture(u8(i), 6, 4))
 	}
-	write(utils.temp_path(dir, "classic", "weapons-gfx", "ak74.png"), picture(1, 27, 18))
 	write(utils.temp_path(dir, "classic", "mod.ini"), "[SCALE]\nDefaultScale=4.5\n")
 	write(utils.temp_path(dir, "Old", "mod.ini"), "[SCALE]\nDefaultScale=4.5\n")
-	write(utils.temp_path(dir, "Old", "weapons-gfx", "ak74.png"), picture(1, 27, 18))
 	write(utils.temp_path(dir, "Said", "mod.ini"), "[SCALE]\nDefaultScale=4.5\ngostek-gfx=1\n")
 
-	mod := res.mod_make(dir, []string{"Old", "New", "Said"})
+	mod := res.mod_make(dir, []string{"Old", "Said"})
 	defer res.mod_destroy(&mod)
-	testing.expect(t, res.mod_old_art(mod, 0, "gostek-gfx"), "the old mod's soldier is old art")
-	testing.expect(t, !res.mod_old_art(mod, 0, "weapons-gfx"), "its guns, of the new art's size, aren't")
-	testing.expect(t, !res.mod_old_art(mod, 1, "gostek-gfx"), "nor a mod of the new art's size")
-	testing.expect(t, !res.mod_old_art(mod, 2, "gostek-gfx"), "nor one whose mod.ini sizes it")
-	scale, set := res.mod_scale(mod, 2, "gostek-gfx/klata.png")
-	testing.expect(t, set && scale == 1, "which sizes it as it says")
-	testing.expect(t, !res.mod_old_art(mod, 3, "gostek-gfx"), "and Classic is never old art")
+	scale, set := res.mod_scale(mod, 0, "gostek-gfx/klata.png")
+	testing.expect(t, !set && scale == 4.5, "an old mod's small art is drawn at its DefaultScale")
+	scale, set = res.mod_scale(mod, 1, "gostek-gfx/klata.png")
+	testing.expect(t, set && scale == 1, "and a mod.ini that sizes its folder, as it says")
 }
 
 // A .png's picture as the original keeps one: a 24-bit .bmp, pure green where it is

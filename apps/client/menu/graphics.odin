@@ -79,20 +79,30 @@ page_graphics :: proc(menu: ^Menu) {
 	}
 }
 
+// The largest a window may be on a screen of `screen`: nine tenths of its width and
+// 85 hundredths of its height, room for the window's borders, its title bar and the
+// taskbar at any scaling of the desktop's (window_windowed places it). A window as large
+// as the screen has its title bar above the screen's top and its bottom under the
+// taskbar, and can't be seen whole, nor moved.
+windowed_fit :: proc(screen: [2]i32) -> [2]i32 {
+	return {screen.x * 9 / 10, screen.y * 85 / 100}
+}
+
 // The resolutions offered on this screen, smallest first, with `current` among them
-// however it was set. A window must fit the screen. Fullscreen may be drawn at up to
-// twice the screen's size and shrunk to it, which smooths it further at a cost; shrunk
-// further than half, the smooth scaling would skip pixels and shimmer.
+// however it was set. A window must fit the screen (windowed_fit). Fullscreen may be
+// drawn at up to twice the screen's size and shrunk to it, which smooths it further at a
+// cost; shrunk further than half, the smooth scaling would skip pixels and shimmer.
 @(private = "file")
 resolutions :: proc(current: [2]i32, mode: res.Window_Mode) -> [][2]i32 {
 	monitor := rl.GetCurrentMonitor()
 	screen := [2]i32{rl.GetMonitorWidth(monitor), rl.GetMonitorHeight(monitor)}
-	largest := screen if mode == .Windowed else screen * 2
+	largest := windowed_fit(screen) if mode == .Windowed else screen * 2
 	sizes := make([dynamic][2]i32, context.temp_allocator)
 	for size in RESOLUTIONS {
 		if size.x <= largest.x && size.y <= largest.y do append(&sizes, size)
 	}
 	for size in ([?][2]i32{screen, current}) {
+		if size == screen && mode == .Windowed do continue // the screen's own size, fullscreen's alone
 		if !slice.contains(sizes[:], size) do append(&sizes, size)
 	}
 	slice.sort_by(sizes[:], proc(a, b: [2]i32) -> bool {return a.x < b.x || (a.x == b.x && a.y < b.y)})

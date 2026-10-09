@@ -44,7 +44,6 @@ Mod_Layer :: struct {
 	archive:    ^Mod_Archive, // an .smod's
 	config:     ^Mod_Config,  // its mod.ini's, else Classic's
 	own_config: bool,
-	old_art:    map[string]bool, // by folder, whether its art is the old, small kind (mod_old_art), as found
 }
 
 // An .smod open: its files, by their path below the mod's root in lower case.
@@ -92,7 +91,6 @@ mod_make :: proc(mods_dir: string, names: []string, allocator := context.allocat
 			layer.config = classic.config
 		}
 	}
-	for &layer in layers do layer.old_art = make(map[string]bool)
 	mod.layers = layers[:]
 	return
 }
@@ -104,8 +102,6 @@ mod_destroy :: proc(mod: ^Mod, allocator := context.allocator) {
 			mod_config_destroy(layer.config)
 			free(layer.config)
 		}
-		for dir in layer.old_art do delete(dir)
-		delete(layer.old_art)
 		layer_close(&layer)
 	}
 	delete(mod.layers)

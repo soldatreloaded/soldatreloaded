@@ -123,6 +123,19 @@ borderless_is_fullscreen :: proc(t: ^testing.T) {
 }
 
 @(test)
+both_sunglasses_are_the_sunglasses :: proc(t: ^testing.T) {
+	dir := scratch(t, "sunglasses")
+	defer os.remove_all(dir)
+	path := utils.temp_path(dir, "client.config.mjson")
+	for eyewear in ([]string{`"sunglasses_a"`, `"sunglasses_b"`, `"sunglasses"`}) {
+		write(path, strings.concatenate({`player: {eyewear: `, eyewear, `}`}, context.temp_allocator))
+		config := res.client_config_load(path)
+		testing.expectf(t, !config.broken && config.player.eyewear == .Sunglasses, "an older config's eyewear of %s reads as the sunglasses", eyewear)
+		res.client_config_destroy(config)
+	}
+}
+
+@(test)
 mjson_as_people_write_it :: proc(t: ^testing.T) {
 	dir := scratch(t, "hand")
 	defer os.remove_all(dir)

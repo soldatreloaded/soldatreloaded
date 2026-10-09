@@ -19,7 +19,7 @@ HAIR_NAMES := [?]string{"Army", "Dreadlocks", "Punk", "Mr. T", "Normal", "Fringe
 @(rodata)
 HEAD_NAMES := [?]string{"None", "Helmet", "Hat", "Waifu helmet", "Backwards cap"}
 @(rodata)
-EYEWEAR_NAMES := [?]string{"None", "Sunglasses A", "Sunglasses B"}
+EYEWEAR_NAMES := [?]string{"None", "Sunglasses"}
 @(rodata)
 CHAIN_NAMES := [?]string{"None", "Dog tags", "Gold chain"}
 @(rodata)

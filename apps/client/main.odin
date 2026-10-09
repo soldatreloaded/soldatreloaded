@@ -440,7 +440,10 @@ window_open :: proc(window: ^Window, graphics: ^res.Graphics_Settings) {
 	flags := rl.ConfigFlags{.MSAA_4X_HINT}
 	if graphics.vsync do flags += {.VSYNC_HINT}
 	rl.SetConfigFlags(flags)
-	rl.InitWindow(graphics.screen_width, graphics.screen_height, "Soldat Reloaded")
+	// made small, the screen's size not known until it is, then sized and placed as the
+	// config has it below: one made at a resolution chosen for fullscreen, larger than the
+	// screen, would sit off it, its title bar above the top
+	rl.InitWindow(min(graphics.screen_width, 800), min(graphics.screen_height, 600), "Soldat Reloaded")
 	when ODIN_OS != .Windows { // the badge as the window's icon; on Windows it is the executable's own
 		icon := rl.LoadImage("data/icon.png")
 		if icon.data != nil {
@@ -449,7 +452,7 @@ window_open :: proc(window: ^Window, graphics: ^res.Graphics_Settings) {
 		}
 	}
 	rl.SetExitKey(.KEY_NULL) // Escape is the screens'
-	window^ = {mode = .Windowed, size = {graphics.screen_width, graphics.screen_height}, vsync = graphics.vsync, fps = -1}
+	window^ = {mode = .Windowed, size = {-1, -1}, vsync = graphics.vsync, fps = -1} // nothing applied yet: all of it is
 	window_follow(window, graphics)
 }
 
@@ -480,12 +483,19 @@ window_follow :: proc(window: ^Window, graphics: ^res.Graphics_Settings) {
 	}
 }
 
-// Windowed at the size `wanted`, with its borders, in the middle of its display; no
-// larger than it, as a resolution chosen for fullscreen may be.
+// Windowed at the size `wanted`, with its borders, in the middle of its display. A size
+// that doesn't fit it with its borders, its title bar and the taskbar (menu.windowed_fit),
+// as a resolution chosen for fullscreen may not, is shrunk to one that does, of the same
+// shape: the view is the window's own, whatever its size (draw/view.odin).
 window_windowed :: proc(wanted: [2]i32) {
 	monitor := rl.GetCurrentMonitor()
 	screen := [2]i32{rl.GetMonitorWidth(monitor), rl.GetMonitorHeight(monitor)}
-	size := [2]i32{min(wanted.x, screen.x), min(wanted.y, screen.y)}
+	fit := menu.windowed_fit(screen)
+	size := [2]i32{max(wanted.x, 1), max(wanted.y, 1)}
+	if size.x > fit.x || size.y > fit.y {
+		shrink := min(f32(fit.x) / f32(size.x), f32(fit.y) / f32(size.y))
+		size = {max(i32(f32(size.x) * shrink), 1), max(i32(f32(size.y) * shrink), 1)}
+	}
 	at := rl.GetMonitorPosition(monitor)
 	when ODIN_OS == .Linux {
 		if rl.IsWindowState({.BORDERLESS_WINDOWED_MODE}) do rl.ToggleBorderlessWindowed() // out of the fullscreen, its borders back
@@ -493,7 +503,8 @@ window_windowed :: proc(wanted: [2]i32) {
 		rl.ClearWindowState({.WINDOW_UNDECORATED})
 	}
 	rl.SetWindowSize(size.x, size.y)
-	rl.SetWindowPosition(i32(at.x) + (screen.x - size.x) / 2, i32(at.y) + (screen.y - size.y) / 2)
+	// a little above the middle: the taskbar below is taller than the title bar above
+	rl.SetWindowPosition(i32(at.x) + (screen.x - size.x) / 2, i32(at.y) + (screen.y - size.y) * 2 / 5)
 }
 
 // Fullscreen. On Windows an ordinary window, undecorated and over the whole of its
