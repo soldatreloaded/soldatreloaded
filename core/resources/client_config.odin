@@ -49,7 +49,7 @@ Player_Settings :: struct {
 	jet:              utils.Rgba `jsoncomment:"the jet flame's colour, RRGGBB"`,
 	hair_style:       Hair_Style `jsoncomment:"army; the male's dreadlocks, punk, mr_t or normal; the waifu's fringe or bob; mullet, wolfcut, baldcut, afro or emo. The rat and the furry wear only army, dreadlocks, punk, mr_t, mullet or wolfcut."`,
 	head_style:       Head_Style `jsoncomment:"none; the male's helmet or hat; the waifu's own; or backwards_cap. The rat and the furry wear none."`,
-	eyewear:          Eyewear `jsoncomment:"none, sunglasses_a or sunglasses_b"`,
+	eyewear:          Eyewear `jsoncomment:"none or sunglasses"`,
 	chain_style:      Chain_Style `jsoncomment:"none, dog_tags or gold_chain"`,
 	secondary_weapon: Weapon `jsoncomment:"the secondary each round begins with: ussocom, knife, chainsaw or law. The primary is picked anew each round, in the weapons menu."`,
 }
@@ -88,8 +88,7 @@ Head_Style :: enum {
 // What is worn over the eyes, by any style.
 Eyewear :: enum {
 	None,
-	Sunglasses_A,
-	Sunglasses_B,
+	Sunglasses,
 }
 
 Chain_Style :: enum {

@@ -120,8 +120,7 @@ PARTS := [?]Part {
 	{id = "Hip_Dmg", file = "ranny/biodro", p1 = 5, p2 = 6, center = {0.25, 0.6}, flip = true, team = true, shown = .Wounded},
 	{id = "Head", file = "morda", p1 = 9, p2 = 12, center = {0, 0.5}, flip = true, team = true, color = .Skin},
 	// over the eyes, under the hair and the headgear; the same size as the male's head
-	{id = "Sunglasses_A", file = "sunglasses_a", p1 = 9, p2 = 12, center = {0, 0.5}, flip = true, eyewear = .Sunglasses_A},
-	{id = "Sunglasses_B", file = "sunglasses_b", p1 = 9, p2 = 12, center = {0, 0.5}, flip = true, eyewear = .Sunglasses_B},
+	{id = "Sunglasses", file = "sunglasses", p1 = 9, p2 = 12, center = {0, 0.5}, flip = true, eyewear = .Sunglasses},
 	{id = "Head_Dmg", file = "ranny/morda", p1 = 9, p2 = 12, center = {0, 0.5}, flip = true, team = true, color = .Head_Blood, shown = .Wounded},
 	// The hair, the headgear and the chain, in the original's order. A helmet or a hat
 	// covers every hair style but Mr. T's.
