@@ -86,7 +86,7 @@ hud_draw :: proc(u: ^ui.Ui, hud: ^Hud, data: ^Hud_Data, minimap: ^draw.Minimap) 
 	draw_big_message(u, feed)
 	if playing {
 		draw_bars(u, art, mine)
-		if !menus_any_open(menus) && !mine.dead do draw_crosshair(u, art, data)
+		if !menus_any_open(menus) && !mine.dead && !data.ended do draw_crosshair(u, art, data) // gone as the round ends, as the original's
 		draw_my_arrow(u, art, data)
 	}
 	draw_kill_icons(u, art, feed, data.kill_log, kill_feed_top(data), hud.scoreboard)

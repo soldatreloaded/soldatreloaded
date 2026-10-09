@@ -132,8 +132,10 @@ camera_tick :: proc(match: ^Match) {
 	if shot, tracking := w.tracking.?; tracking {
 		if bullet := my_shot(match, shot); bullet != nil do camera.pos = bullet.pos + bullet.velocity * TRACK_LEAD
 	}
-	_, paused := match.game.round.phase.(sim.Paused) // a paused round's sparks hang, and don't flare on
-	if !w.free && match.mode != .Demo && !paused do camera_wobble(match, followed) // its sparks, after
+	// a standing round's sparks, paused or ended, hang, and don't flare on: a blast caught
+	// by the round's end would shake the camera every tick till the next map
+	standing := sim.round_standing(&match.game.round)
+	if !w.free && match.mode != .Demo && !standing do camera_wobble(match, followed) // its sparks, after
 	cursor := cursor_aimed(match)
 	if w.free {
 		// still with the cursor in the middle: 10 either way, wider with a wider view
