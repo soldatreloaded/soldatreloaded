@@ -9,6 +9,11 @@ description: >
 # Linux lacks is built here from pinned sources, checked against their published hashes,
 # and cached: ENet for the server, and curl on mbedTLS for the server and the launcher.
 #
+# Windows' raylib is built here too, over Odin's: the one Odin ships is raylib's own
+# release, whose Visual Studio project asks for AVX2, and a game built on it dies at its
+# first frame on a CPU before 2013 (Ivy Bridge and older), an illegal instruction.
+# raylib's CMake asks for nothing beyond what every x64 CPU has.
+#
 # The step exports ODIN_FLAGS, which every build and test passes to Odin: on Linux the
 # directory the static libraries are in, searched before the system's. What stays the
 # system's is what every machine has: the C library, and on Linux X11 and OpenGL.
@@ -28,6 +33,43 @@ runs:
       if: runner.os == 'Linux'
       shell: bash
       run: bash "$(odin root)/vendor/stb/src/build_stb.sh" unix
+
+    # raylib at the version Odin's bindings are for (raylib.odin's VERSION), linked
+    # against the same C runtime as the library it replaces (/MD).
+    - name: raylib version
+      if: runner.os == 'Windows'
+      shell: bash
+      run: |
+        {
+          echo "RAYLIB_TAG=6.0"
+          echo "RAYLIB_COMMIT=dbc56a87da87d973a9c5baa4e7438a9d20121d28"
+          echo "RAYLIB_LIB=$HOME/raylib-lib"
+        } >> "$GITHUB_ENV"
+
+    - name: raylib cache
+      id: raylib-cache
+      if: runner.os == 'Windows'
+      uses: actions/cache@v5
+      with:
+        path: ~/raylib-lib
+        key: raylib-${{ runner.os }}-${{ env.RAYLIB_COMMIT }}
+
+    - name: build raylib
+      if: runner.os == 'Windows' && steps.raylib-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p "$RAYLIB_LIB" && cd "$RUNNER_TEMP"
+        git clone -q --depth 1 --branch "$RAYLIB_TAG" https://github.com/raysan5/raylib.git
+        test "$(git -C raylib rev-parse HEAD)" = "$RAYLIB_COMMIT"
+        cmake -S raylib -B raylib-build -A x64 -DBUILD_EXAMPLES=OFF -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL
+        cmake --build raylib-build --config Release --target raylib -j
+        cp raylib-build/raylib/Release/raylib.lib "$RAYLIB_LIB/"
+
+    - name: link raylib
+      if: runner.os == 'Windows'
+      shell: bash
+      run: cp "$RAYLIB_LIB/raylib.lib" "$(odin root)/vendor/raylib/windows/raylib.lib"
 
     - name: versions
       if: runner.os == 'Linux'
