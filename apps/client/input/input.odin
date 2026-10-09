@@ -36,7 +36,12 @@ Input :: struct {
 	prev:    [2]f32,      // the cursor as the last tick began
 	view:   [2]f32,      // the view's size it was last kept in, so a resized window keeps its place
 	clicked: bool,        // a menu took the left button's press: it is no bind's until let go
+	alone:   sim.Buttons, // of the CONFLICTING buttons, the one a tick last had alone
 }
+
+// The buttons of which a tick takes one at a time (AreConflictingKeysPressed): the
+// grenade, the change, the drop and the reload.
+CONFLICTING :: sim.Buttons{.Throw, .Change, .Drop, .Reload}
 
 // What an open menu takes this frame, before the binds: the left click, a number key and
 // whether Ctrl is held with it.
@@ -149,9 +154,34 @@ input_menu_keys :: proc(input: ^Input) -> (keys: Menu_Keys) {
 // together throw the flag too, as the original's LocalInput has it.
 input_take_command :: proc(input: ^Input, sequence: u32, aim: [2]f32, legacy_flag_throw := false) -> sim.Command {
 	command := sim.Command{sequence = sequence, buttons = input.held + input.pressed, aim = aim}
+	command.buttons = one_at_a_time(input, command.buttons)
 	if legacy_flag_throw && (sim.Buttons{.Jump, .Crouch} <= command.buttons) do command.buttons += {.Flag_Throw}
 	input.pressed = {}
 	return command
+}
+
+// Of the CONFLICTING buttons, one a tick, as the original's ControlSprite has it: the one
+// held before a second goes down is let go of, so a grenade wound up is thrown as the
+// change, the drop or the reload is pressed; of several gone down at once, the reload
+// gives way first, then the change, the drop and the grenade.
+@(private = "file")
+one_at_a_time :: proc(input: ^Input, buttons: sim.Buttons) -> sim.Buttons {
+	buttons := buttons
+	if card(buttons & CONFLICTING) <= 1 {
+		input.alone = buttons & CONFLICTING
+		return buttons
+	}
+	switch {
+	case .Throw in input.alone:  buttons -= {.Throw}
+	case .Change in input.alone: buttons -= {.Change}
+	case .Drop in input.alone:   buttons -= {.Drop}
+	case .Reload in input.alone: buttons -= {.Reload}
+	}
+	for button in ([?]sim.Button{.Reload, .Change, .Drop, .Throw}) {
+		if card(buttons & CONFLICTING) <= 1 do break
+		buttons -= {button}
+	}
+	return buttons
 }
 
 // With the radio menu open, after input_poll: the call chosen this frame, a digit from

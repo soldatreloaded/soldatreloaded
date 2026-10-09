@@ -16,6 +16,7 @@ import "core:testing"
 import "core:time"
 
 import "../../apps/client/demo"
+import "../../apps/client/input"
 import "../../apps/client/online"
 import "../../apps/server"
 import "../../core/game"
@@ -303,4 +304,49 @@ test_target_split :: proc(t: ^testing.T) {
 	testing.expect(t, address == "1.2.3.4:23073" && password == "" && !has)
 	testing.expect_value(t, online.target_join("1.2.3.4:23073", "abc"), "1.2.3.4:23073/abc")
 	testing.expect_value(t, online.target_join("1.2.3.4:23073", ""), "1.2.3.4:23073")
+}
+
+// A grenade wound up and the change pressed: the grenade is let go of, as the original's
+// ControlSprite lets go of a key held before a second goes down, and is thrown; the
+// change is the tick's. Two gone down together, the reload gives way.
+@(test)
+test_grenade_out_on_change :: proc(t: ^testing.T) {
+	g := new(game.Game)
+	defer free(g)
+	testing.expect(t, game.game_init(g, game.DEFAULT_GAME_SETTINGS, true))
+	testing.expect(t, game.game_start_round(g, "ctf_Ash", seed = 7))
+	defer game.game_destroy(g)
+	game.apply_ruling(&g.world, &g.resources, game.Respawn{
+		target = 0, life = 1, team = .Alpha, primary = .AK74, secondary = .Knife,
+		pos = game.spawn_point(g.world.polymap, .Alpha, &g.world.rng),
+	})
+	keys: input.Input
+	me := &g.world.soldiers[0]
+	step :: proc(g: ^game.Game, keys: ^input.Input) -> game.Command {
+		commands: [game.MAX_PLAYERS]game.Command
+		commands[0] = input.input_take_command(keys, g.world.tick + 1, g.world.soldiers[0].body.pos + {100, 0})
+		game.game_tick(g, &commands)
+		return commands[0]
+	}
+	for _ in 0 ..< 120 do step(g, &keys) // past the cease-fire
+	testing.expect_value(t, me.arsenal.grenades, 1)
+
+	keys.held = {.Throw}
+	for i := 0; me.pose.body.id != .Throw || me.pose.body.frame <= 20; i += 1 {
+		step(g, &keys)
+		if i > 200 {
+			testing.fail_now(t, "the grenade wound up")
+		}
+	}
+	testing.expect_value(t, me.arsenal.grenades, 1)
+	keys.held = {.Throw, .Change}
+	keys.pressed = {.Change}
+	command := step(g, &keys)
+	testing.expect(t, .Throw not_in command.buttons && .Change in command.buttons, "the grenade let go of, the change pressed")
+	testing.expect_value(t, me.arsenal.grenades, 0)
+	testing.expect_value(t, me.pose.body.id, res.Animation_Id.Change)
+
+	keys = {held = {.Reload, .Change}}
+	command = step(g, &keys)
+	testing.expect(t, .Change in command.buttons && .Reload not_in command.buttons, "the reload gives way")
 }
