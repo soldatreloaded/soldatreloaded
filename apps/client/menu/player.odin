@@ -55,9 +55,6 @@ page_player :: proc(menu: ^Menu) {
 	ui.color_row(k, "Jets", &player.jet)
 	ui.color_row(k, "Grenades", &menu.config.graphics.grenade_color)
 	ui.section(k, "LOADOUT")
-	primaries: [int(res.Weapon.Minigun) - int(res.Weapon.Desert_Eagles) + 1]string
-	for &name, i in primaries do name = menu.weapon_names[res.Weapon(int(res.Weapon.Desert_Eagles) + i)]
-	primary := weapon_select(k, "Primary", &player.primary_weapon, .Desert_Eagles, primaries[:])
 	secondary := weapon_select(k, "Secondary", &player.secondary_weapon, .USSOCOM, SECONDARY_NAMES[:])
 	ui.gap(k, 4)
 	if note := ui.row(k, 22, false); note.shown {
@@ -76,8 +73,8 @@ page_player :: proc(menu: ^Menu) {
 	ui.rrect(u, px + pw / 2 - 34, floor_y - 2, 60, 5, 2.5, {0, 0, 0, 90}) // the ground under it
 	dress := draw.Dress {
 		look          = look,
-		primary       = primary,
-		secondary     = secondary,
+		primary       = secondary, // in hand: the primary is picked in a game
+		secondary     = .Punch,
 		grenade_color = menu.config.graphics.grenade_color,
 	}
 	at := rl.Vector2{px + pw / 2 - 2 * scale, floor_y}

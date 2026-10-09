@@ -249,6 +249,7 @@ streams :: proc(t: ^testing.T) {
 		free(server)
 		free(client)
 	}
+	server.world.soldiers[0].loadout = {.Desert_Eagles, .Knife} // a gun to fire: none picked is the fists
 	game.soldier_place(server, 0, .Alpha, remote = true)
 	game.soldier_place(server, 1, .Bravo, remote = false)
 	run(server, 120, {.Right, .Jet}) // past the spawn protection

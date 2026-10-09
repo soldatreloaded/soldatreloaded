@@ -79,6 +79,7 @@ Match :: struct {
 	sequence:   u32, // my last command's
 	hud:        hud.Hud,
 	limbo:      Limbo,
+	loadout:    sim.Loadout, // the weapons menu's picks this round: no primary (the fists) till one is, the config's secondary
 	team_asked: Maybe(res.Team), // offline, chosen in the team menu, for the next tick to place me on
 	suicide:    Maybe(bool), // offline, /kill or /brutalkill (true) said: my death, asked of the world at the next tick
 	bots:       ai.Bots,

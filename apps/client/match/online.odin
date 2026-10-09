@@ -111,7 +111,7 @@ online_step :: proc(match: ^Match, config: ^res.Client_Config) -> sim.Command {
 	if !playing { // my look, my loadout and my typing are mine to say
 		me.player.typing = prompt_up(match)
 		me.player.look = look_of(config)
-		me.loadout = {config.player.primary_weapon, config.player.secondary_weapon}
+		me.loadout = match.loadout
 	} else {
 		n.stream.view_at = match.playback.tick.view // the tick shown is the one it showed
 	}

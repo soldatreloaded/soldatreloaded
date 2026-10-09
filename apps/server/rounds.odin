@@ -73,10 +73,11 @@ next_round :: proc(sv: ^Server) -> bool {
 round_start :: proc(sv: ^Server, map_name: string) -> bool {
 	g := sv.game
 	// What is the player's and not the round's outlives the world made anew: the look and
-	// the loadout, said once in the Hello and in the weapons menu since, and whether a bot
-	// plays it. The original keeps them on TPlayer, which a map change leaves alone
+	// the secondary, said once in the Hello and in the weapons menu since, and whether a
+	// bot plays it. The original keeps them on TPlayer, which a map change leaves alone
 	// (ChangeMap, Game.pas); wiped, everyone was black to the others, and spawned with
-	// an Eagle and a knife.
+	// an Eagle and a knife. A player's primary is the round's: the original's SelWeapon,
+	// none again at a map change, till the weapons menu picks one; a bot keeps its own.
 	Kept :: struct {
 		look:    game.Look,
 		loadout: game.Loadout,
@@ -88,6 +89,7 @@ round_start :: proc(sv: ^Server, map_name: string) -> bool {
 	for &soldier, i in g.world.soldiers {
 		soldier.player.look = kept[i].look
 		soldier.loadout = kept[i].loadout
+		if !kept[i].bot do soldier.loadout.primary = .Punch
 		soldier.player.bot = kept[i].bot
 	}
 

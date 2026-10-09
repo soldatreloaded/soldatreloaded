@@ -48,8 +48,7 @@ Player_Settings :: struct {
 	hair_style:       Hair_Style `jsoncomment:"army; the male's dreadlocks, punk, mr_t or normal; the waifu's fringe or bob. The rat and the furry wear only army, punk and mr_t."`,
 	head_style:       Head_Style `jsoncomment:"none; the male's helmet or hat; the waifu's own. The rat and the furry wear none."`,
 	chain_style:      Chain_Style `jsoncomment:"none, dog_tags or gold_chain"`,
-	primary_weapon:   Weapon `jsoncomment:"the primary at the next spawn: desert_eagles to minigun"`,
-	secondary_weapon: Weapon `jsoncomment:"the secondary at the next spawn: ussocom, knife, chainsaw or law"`,
+	secondary_weapon: Weapon `jsoncomment:"the secondary each round begins with: ussocom, knife, chainsaw or law. The primary is picked anew each round, in the weapons menu."`,
 }
 
 Gostek :: enum {
@@ -224,7 +223,6 @@ DEFAULT_CLIENT_CONFIG := Client_Config {
 		hair_style       = .Dreadlocks,
 		head_style       = .None,
 		chain_style      = .None,
-		primary_weapon   = .M79,
 		secondary_weapon = .Knife,
 	},
 	controls = {sensitivity = 1.0, legacy_flag_throw = true},

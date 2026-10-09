@@ -309,14 +309,14 @@ leave :: proc(client: ^Client) {
 
 // The line to `target` (host:port, with /password after it if the server asks one: else
 // the config's), saying who I am in the Hello: my name, the password to join with, my
-// look, my loadout.
+// look, my secondary; no primary, which the weapons menu picks.
 connect :: proc(client: ^Client, target: string) {
 	config := client.config
 	address, password, has_password := online.target_split(target)
 	if !has_password do password = config.network.password
 	hello := network.Msg_Hello {
 		look      = match.look_of(config),
-		primary   = config.player.primary_weapon,
+		primary   = .Punch,
 		secondary = config.player.secondary_weapon,
 	}
 	utils.short_string_set(&hello.name, config.player.name)

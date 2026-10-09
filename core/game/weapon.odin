@@ -103,10 +103,10 @@ weapon_is_secondary :: proc(weapon: res.Weapon) -> bool {
 }
 
 // A loadout as a host allows it: the original's first loadout for a choice that isn't
-// one.
+// one. No primary picked yet is the fists, as the original spawns one with NOWEAPON.
 loadout_allowed :: proc(chosen: Loadout) -> Loadout {
 	return {
-		primary   = chosen.primary if weapon_is_primary(chosen.primary) else .Desert_Eagles,
+		primary   = chosen.primary if weapon_is_primary(chosen.primary) || chosen.primary == .Punch else .Desert_Eagles,
 		secondary = chosen.secondary if weapon_is_secondary(chosen.secondary) else .Knife,
 	}
 }

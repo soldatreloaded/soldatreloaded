@@ -75,7 +75,7 @@ offline_step :: proc(match: ^Match, config: ^res.Client_Config) -> sim.Command {
 	ai.bots_hear(&match.bots, game)
 	track_shot(match, scoped)
 	if team, asked := match.team_asked.?; asked {
-		spawn(game, match.me, team, game.world.soldiers[match.me].loadout)
+		spawn(game, match.me, team, match.loadout)
 		match.team_asked = nil
 	}
 	return commands[match.me]
@@ -112,7 +112,8 @@ round_start :: proc(match: ^Match) -> bool {
 	soldier := &game.world.soldiers[me]
 	soldier.player.look = look_of(config)
 	my_team := kept if kept == .Alpha || kept == .Bravo else .Alpha
-	spawn(game, me, my_team, {player.primary_weapon, player.secondary_weapon})
+	match.loadout = {.Punch, player.secondary_weapon}
+	spawn(game, me, my_team, match.loadout)
 	// the bots by team, alpha's first; the slots after them are let go
 	counts := match.bot_counts
 	alpha := bot_count(counts.alpha)
