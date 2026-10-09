@@ -416,15 +416,37 @@ client_stream_collect :: proc(c: ^Client_Stream, g: ^game.Game, me: game.Soldier
 	tick := g.world.tick - 1 // the tick just run
 	wire_collect(&c.out, &g.output, tick, me)
 	for event in sa.slice(&g.output.events) {
-		hit, is_hit := event.(game.Hit_Claimed)
-		if !is_hit || hit.owner != me || hit.target == me do continue
-		seen, taken := c.word_applied[hit.target], c.word_taken[hit.target]
-		pre, steps := c.word_pre[hit.target], c.word_steps[hit.target]
-		if seen == 0 || seen > taken || taken > tick || tick - seen > game.CLAIM_SEEN_MAX do continue
-		if pre > game.SEEN_STEPS_MAX || steps < 1 || steps > game.CLAIM_SEEN_MAX + 1 do continue
-		if client_stream_quiet(c, hit.target) do continue
-		wire_push(&c.out, game.Hit_Claim{claimed = hit, seen = u8(tick - seen), taken = u8(tick - taken), pre = u8(pre), steps = u8(steps)}, tick)
+		#partial switch e in event {
+		case game.Hit_Claimed:
+			if e.owner != me || e.target == me do continue
+			view := claim_view(c, e.target, tick) or_continue
+			wire_push(&c.out, game.Hit_Claim{claimed = e, seen = view.seen, taken = view.taken, pre = view.pre, steps = view.steps}, tick)
+		case game.Blast_Claimed:
+			// the blast is claimed whoever it reached, none too: the server lets it go off
+			// as the claim says, not as its own flight here would have
+			if e.owner != me do continue
+			claim := game.Blast_Claim{claimed = e}
+			for i in e.victims {
+				if game.Soldier_Id(i) == me || int(claim.view_count) >= game.BLAST_VIEWS do continue
+				view := claim_view(c, game.Soldier_Id(i), tick) or_continue
+				claim.views[claim.view_count] = view
+				claim.view_count += 1
+			}
+			wire_push(&c.out, claim, tick)
+		}
 	}
+}
+
+// The picture of soldier `id` this tick, as a claim names it; none for one quiet, or taken
+// from a snapshot too old, which the server couldn't make again.
+@(private = "file")
+claim_view :: proc(c: ^Client_Stream, id: game.Soldier_Id, tick: u32) -> (view: game.Blast_View, ok: bool) {
+	seen, taken := c.word_applied[id], c.word_taken[id]
+	pre, steps := c.word_pre[id], c.word_steps[id]
+	if seen == 0 || seen > taken || taken > tick || tick - seen > game.CLAIM_SEEN_MAX do return
+	if pre > game.SEEN_STEPS_MAX || steps < 1 || steps > game.CLAIM_SEEN_MAX + 1 do return
+	if client_stream_quiet(c, id) do return
+	return {target = id, seen = u8(tick - seen), taken = u8(tick - taken), pre = u8(pre), steps = u8(steps)}, true
 }
 
 // Each frame: the offsets ease away, nine tenths of a correction gone `seconds` after

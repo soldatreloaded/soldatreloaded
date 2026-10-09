@@ -15,6 +15,7 @@ Word :: union {
 	Ruling,     // the server's decision
 	Hit_Claim,  // an owner's: a body its own shot met on its screen (hit_claim.odin)
 	Shot_Hit,   // the server's word of a hit on the living, claimed or its own
+	Blast_Claim, // an owner's: its own grenade or rocket gone off on its screen, and whom it reached
 }
 
 MAX_HEARD :: 256
@@ -68,6 +69,7 @@ heard_apply :: proc(world: ^World, resources: ^Resources, authority: ^Authority,
 		case Shot_End:   if turn == .Bullets do bullet_shot_end(world, resources, w, out)
 		case Shot_Hit:   if turn == .Bullets && authority == nil do bullet_shot_hit(world, resources, w, out)
 		case Hit_Claim:  if turn == .Bullets && authority != nil do hit_claim_judge(world, resources, authority, w, hearing.tick, out)
+		case Blast_Claim: if turn == .Bullets && authority != nil do blast_claim_judge(world, resources, authority, w, hearing.tick, out)
 		// recorded as the server's own are, for the sounds, the sparks and the feed; a
 		// client's collection for the wire leaves rulings out, so none goes back
 		case Ruling:     if turn == ruling_turn(w) do rule(world, resources, w, out)

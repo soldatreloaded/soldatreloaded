@@ -38,6 +38,11 @@ Bullet :: struct {
 	// claim, and its flight is kept in `record` (hit_claim.odin).
 	heard:          bool,
 	record:         int,
+	// Its end waiting for word of it (hit_claim.odin): the ticks it waits more, stopped and
+	// unseen; the blast it would be, for the server's own if none comes.
+	held:           i32,
+	held_kind:      Explosion_Kind,
+	met_body:       bool, // a client's flight of another's grenade or rocket went through the living
 }
 
 // A thing a bullet pushed recently, not to be pushed again every tick.
@@ -155,7 +160,8 @@ bullet_shot_end :: proc(world: ^World, resources: ^Resources, end: Shot_End, out
 		bullet.pos = end.pos
 		bullet.old_pos = end.pos
 		if kind, blast := end.blast.?; blast {
-			explode(world, resources, Bullet_Id(i), kind, nil, -1, nil, out)
+			bullet.held = 0
+			explode(world, resources, Bullet_Id(i), kind, nil, -1, nil, .Told, out)
 			return
 		}
 		if target, told := end.target.?; told && bullet.last_hit != target {
@@ -175,19 +181,24 @@ bullet_update :: proc(world: ^World, resources: ^Resources, id: Bullet_Id, autho
 	bullet := &world.bullets[id]
 	polymap := world.polymap
 	bound := f32(polymap.sector_reach * polymap.sector_size - 10)
+	if bullet.held > 0 { // waiting for word of its end, stopped
+		bullet.held -= 1
+		if bullet.held == 0 do bullet_lapse(world, resources, id, authority, out)
+		return
+	}
 	if abs(bullet.pos.x) > bound || abs(bullet.pos.y) > bound {
 		bullet_end(world, id, out)
 		return
 	}
 
 	bullet_collide(world, resources, id, authority, out)
-	if !bullet.active do return
+	if !bullet.active || bullet.held > 0 do return
 
 	bullet.timeout -= 1
 	if bullet.timeout == 0 {
 		#partial switch bullet.style {
 		case .Frag_Grenade, .M79, .LAW:
-			explode(world, resources, id, .Frag, nil, -1, authority, out) // the M79 too: a spent round goes off as a frag
+			if !explode_flight(world, resources, id, .Frag, authority, out) do return // the M79 too: a spent round goes off as a frag; held, it waits
 		}
 		bullet_end(world, id, out)
 		return
@@ -206,6 +217,7 @@ bullet_update :: proc(world: ^World, resources: ^Resources, id: Bullet_Id, autho
 
 // Euler on the bullet, after every bullet's tick (Parts.pas).
 bullet_fly :: proc(bullet: ^Bullet, gravity: f32) {
+	if bullet.held > 0 do return // stopped where it ended, waiting for word of it
 	bullet.forces.y += gravity * BULLET_GRAVITY
 	previous := bullet.pos
 	bullet.velocity += bullet.forces

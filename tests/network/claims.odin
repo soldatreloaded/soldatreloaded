@@ -5,7 +5,8 @@ package network_test
 // firing all over a soldier who strafes as a player does, and a client watching. On the
 // ticks no snapshot came in time the shooter's screen shows its target stepped on its
 // last keys; every hit it saw must land on the server, and the watcher must show every
-// one, and no other.
+// one, and no other. So with every weapon: the guns, the grenades and the rockets (their
+// blasts), the thrown knife.
 
 import "core:fmt"
 import "core:slice"
@@ -15,6 +16,7 @@ import sa "core:container/small_array"
 
 import "../../core/game"
 import net "../../core/network"
+import res "../../core/resources"
 
 @(private = "file")
 SHOOTER :: game.Soldier_Id(0)
@@ -23,17 +25,78 @@ TARGET :: game.Soldier_Id(1)
 @(private = "file")
 WATCHER :: game.Soldier_Id(2)
 
+// What the shooter does.
+@(private = "file")
+Arm :: enum {
+	Rifle,   // the AK-74, held down
+	M79,     // a grenade launched as soon as it can be
+	LAW,     // a rocket, the same
+	Grenade, // a frag grenade wound up and thrown
+	Knife,   // a combat knife thrown, and another taken up
+}
+
+// What a play left: the hits the shooter's screen made on its target, and the wounds the
+// server gave it from them; what the server told, and what the watcher showed; the
+// blasts, the knives laid down; the ticks the shooter's screen guessed; the server's
+// words the watcher heard.
+@(private = "file")
+Play :: struct {
+	claimed, landed, told, watched: int,
+	seen_damage, landed_damage:     f32, // a blast's, its wounds summed: the shooter's screen, the server
+	fired:                          int, // grenades, rockets or knives let go
+	blasts_shooter, blasts_server, blasts_watcher: int,
+	knives_laid:                    int,
+	guessed, heard:                 int,
+}
+
 @(test)
 claims_land_what_the_shooter_saw :: proc(t: ^testing.T) {
 	for delay in ([]int{1, 6, 12, 20}) { // ticks each way: a round trip of 33 ms, 200, 400 and 667
-		claimed, landed, told, watched, guessed, _ := claims_play(delay)
+		p := claims_play(delay, .Rifle)
 		fmt.printfln("a line %d ticks each way: %d hits the shooter saw, %d landed, %d told, %d shown to the watcher; %d ticks it guessed",
-			delay, claimed, landed, told, watched, guessed)
-		testing.expect(t, claimed >= 20, "the shooter hit its target, often")
-		testing.expect(t, guessed >= 20, "the shooter's screen guessed, often")
-		testing.expect_value(t, landed, claimed)
-		testing.expect_value(t, told, landed)
-		testing.expect_value(t, watched, told)
+			delay, p.claimed, p.landed, p.told, p.watched, p.guessed)
+		testing.expect(t, p.claimed >= 20, "the shooter hit its target, often")
+		testing.expect(t, p.guessed >= 20, "the shooter's screen guessed, often")
+		testing.expect_value(t, p.landed, p.claimed)
+		testing.expect_value(t, p.told, p.landed)
+		testing.expect_value(t, p.watched, p.told)
+	}
+}
+
+// Each grenade and rocket goes off once everywhere, and its blast wounds the target on
+// the server as it did on the shooter's screen, by the same distance there.
+@(test)
+blasts_land_what_the_shooter_saw :: proc(t: ^testing.T) {
+	for arm in ([]Arm{.M79, .LAW, .Grenade}) {
+		for delay in ([]int{1, 8, 16}) {
+			p := claims_play(delay, arm)
+			fmt.printfln("%v, %d ticks each way: %d let go; gone off %d on the shooter's screen, %d on the server, %d on the watcher's; the target %d times hit there for %.1f, %d here for %.1f",
+				arm, delay, p.fired, p.blasts_shooter, p.blasts_server, p.blasts_watcher, p.claimed, p.seen_damage, p.landed, p.landed_damage)
+			testing.expect(t, p.fired >= 5, "it was let go of, often")
+			testing.expect(t, p.claimed >= 3, "and its blast reached the target")
+			testing.expect_value(t, p.blasts_shooter, p.fired)
+			testing.expect_value(t, p.blasts_server, p.fired)
+			testing.expect_value(t, p.blasts_watcher, p.fired)
+			testing.expect_value(t, p.landed, p.claimed)
+			testing.expectf(t, abs(p.landed_damage - p.seen_damage) <= 0.02 * max(p.seen_damage, 1), "the same wounds, by the same distances (%.2f there, %.2f here)", p.seen_damage, p.landed_damage)
+		}
+	}
+}
+
+// A thrown knife that sticks in the target lands on the server as it did on the
+// shooter's screen, the watcher sees it stick, and every knife lies somewhere once.
+@(test)
+knives_land_what_the_shooter_saw :: proc(t: ^testing.T) {
+	for delay in ([]int{1, 8, 16}) {
+		p := claims_play(delay, .Knife)
+		fmt.printfln("knife, %d ticks each way: %d thrown, %d laid down; %d hits the shooter saw, %d landed, %d told, %d shown to the watcher",
+			delay, p.fired, p.knives_laid, p.claimed, p.landed, p.told, p.watched)
+		testing.expect(t, p.fired >= 5, "knives were thrown, often")
+		testing.expect(t, p.claimed >= 3, "and stuck in the target")
+		testing.expect_value(t, p.knives_laid, p.fired)
+		testing.expect_value(t, p.landed, p.claimed)
+		testing.expect_value(t, p.told, p.landed)
+		testing.expect_value(t, p.watched, p.told)
 	}
 }
 
@@ -72,6 +135,30 @@ claims_held_to_the_flight :: proc(t: ^testing.T) {
 	}
 }
 
+// A client's grenade no claim comes for goes off on the server all the same, as its own
+// flight there had it, once it has waited long enough for one.
+@(test)
+blast_unclaimed_goes_off :: proc(t: ^testing.T) {
+	server := claims_game(true)
+	defer {
+		game.game_destroy(server)
+		free(server)
+	}
+	game.soldier_place(server, SHOOTER, .Alpha, remote = true)
+	game.soldier_place(server, TARGET, .Bravo, remote = false)
+	claims_run(server, 150)
+	from := server.world.soldiers[SHOOTER].body.pos - {0, 30}
+	game.world_hear(&server.world, game.Shot{owner = SHOOTER, weapon = .Frag_Grenade, pos = from, velocity = {4, -3}, damage = 1, number = 1}, server.world.tick) // away: not back onto its thrower, which the server judges
+	went_off := -1
+	for tick in 0 ..< game.GRENADE_TIMEOUT + game.HOLD_BLAST + 10 {
+		claims_run(server, 1)
+		for event in sa.slice(&server.output.events) {
+			if e, is := event.(game.Explosion); is && e.owner == SHOOTER do went_off = tick
+		}
+	}
+	testing.expectf(t, went_off >= game.GRENADE_TIMEOUT + game.HOLD_BLAST - 5, "it went off once the wait for a claim was over (at %d)", went_off)
+}
+
 @(private = "file")
 Packet :: struct {
 	due:  int,
@@ -79,11 +166,9 @@ Packet :: struct {
 	data: []u8,
 }
 
-// A minute of the shooter firing over a line `delay` ticks each way: the hits its screen
-// saw, those that landed, those the server told of, those the watcher showed, and the
-// ticks the shooter's screen guessed.
+// A minute of the shooter armed with `arm` over a line `delay` ticks each way.
 @(private = "file")
-claims_play :: proc(delay: int) -> (claimed, landed, told, watched, guessed, heard: int) {
+claims_play :: proc(delay: int, arm: Arm) -> (p: Play) {
 	server := claims_game(true)
 	shooter := claims_game(false)
 	watcher := claims_game(false)
@@ -93,7 +178,15 @@ claims_play :: proc(delay: int) -> (claimed, landed, told, watched, guessed, hea
 			free(g)
 		}
 	}
-	server.world.soldiers[SHOOTER].loadout = {.AK74, .Knife} // fast enough to go through a body
+	primary: res.Weapon
+	switch arm {
+	case .Rifle:   primary = .AK74 // fast enough to go through a body
+	case .M79:     primary = .M79
+	case .LAW:     primary = .AK74 // the LAW is a secondary
+	case .Grenade: primary = .AK74
+	case .Knife:   primary = .Knife
+	}
+	server.world.soldiers[SHOOTER].loadout = {primary, .LAW if arm == .LAW else .Knife}
 	game.soldier_place(server, SHOOTER, .Alpha, remote = true)
 	game.soldier_place(server, TARGET, .Alpha, remote = false) // a teammate: hit, and never killed
 	game.soldier_place(server, WATCHER, .Alpha, remote = true)
@@ -115,7 +208,7 @@ claims_play :: proc(delay: int) -> (claimed, landed, told, watched, guessed, hea
 
 	line: [dynamic]Packet
 	defer {
-		for p in line do delete(p.data)
+		for packet in line do delete(packet.data)
 		delete(line)
 	}
 	dice: u32 = 12345
@@ -128,19 +221,20 @@ claims_play :: proc(delay: int) -> (claimed, landed, told, watched, guessed, hea
 	sequence: u32
 	buf: [net.MTU]u8
 	TICKS :: 3600
-	for wall in 0 ..< TICKS + 4 * delay + 60 {
+	explosive := arm == .M79 || arm == .LAW || arm == .Grenade
+	for wall in 0 ..< TICKS + 4 * delay + game.HOLD_BLAST + 240 {
 		firing := wall > 150 && wall < TICKS // past the spawn protection; then the words drain
 
 		// the server: the states due, its tick, its words, a snapshot to each client
 		for i := 0; i < len(line); {
-			p := line[i]
-			if p.to >= 0 || p.due > wall {
+			packet := line[i]
+			if packet.to >= 0 || packet.due > wall {
 				i += 1
 				continue
 			}
-			slot := game.Soldier_Id(-p.to - 1)
-			net.server_stream_receive(&streams[slot], server, slot, p.data, &words)
-			delete(p.data)
+			slot := game.Soldier_Id(-packet.to - 1)
+			net.server_stream_receive(&streams[slot], server, slot, packet.data, &words)
+			delete(packet.data)
 			unordered_remove(&line, i)
 		}
 		commands: [game.MAX_PLAYERS]game.Command
@@ -154,9 +248,16 @@ claims_play :: proc(delay: int) -> (claimed, landed, told, watched, guessed, hea
 		game.game_tick(server, &commands)
 		for event in sa.slice(&server.output.events) {
 			#partial switch e in event {
-			case game.Hit:      if e.shooter == SHOOTER && e.target == TARGET do landed += 1
-			case game.Shot_Hit: if e.owner == SHOOTER && e.target == TARGET do told += 1
+			case game.Hit:
+				if e.shooter != SHOOTER || e.target != TARGET do continue
+				p.landed += 1
+				p.landed_damage += e.amount
+			case game.Shot_Hit:  if e.owner == SHOOTER && e.target == TARGET && !e.blast do p.told += 1
+			case game.Explosion: if e.owner == SHOOTER do p.blasts_server += 1
 			}
+		}
+		for ruling in sa.slice(&server.output.rulings) {
+			if laid, is := ruling.(game.Knife_Land); is && laid.owner == SHOOTER do p.knives_laid += 1
 		}
 		net.wire_collect(&words, &server.output, server.world.tick - 1, nil)
 		for i in 0 ..< 2 {
@@ -179,18 +280,18 @@ claims_play :: proc(delay: int) -> (claimed, landed, told, watched, guessed, hea
 			me := slots[i]
 			c := &client_streams[i]
 			for j := 0; j < len(line); {
-				p := line[j]
-				if p.to != i || p.due > wall {
+				packet := line[j]
+				if packet.to != i || packet.due > wall {
 					j += 1
 					continue
 				}
-				net.client_stream_hear(c, g, me, p.data)
-				delete(p.data)
+				net.client_stream_hear(c, g, me, packet.data)
+				delete(packet.data)
 				unordered_remove(&line, j)
 			}
 			missed := c.stats.misses
 			net.client_stream_begin_tick(c, g, me, 0)
-			if i == 0 do guessed += int(c.stats.misses - missed)
+			if i == 0 do p.guessed += int(c.stats.misses - missed)
 			cmds: [game.MAX_PLAYERS]game.Command
 			for &s, k in g.world.soldiers {
 				s.remote = game.Soldier_Id(k) != me
@@ -200,13 +301,26 @@ claims_play :: proc(delay: int) -> (claimed, landed, told, watched, guessed, hea
 			// aimed all over the body, as a player's aim is: its edges are where a guess decides
 			spread := [2]f32{f32(roll(&dice, 13)) - 6, -f32(roll(&dice, 26))}
 			mine := game.Command{sequence = sequence, aim = g.world.soldiers[TARGET].body.pos + spread}
-			if i == 0 && firing do mine.buttons = {.Fire}
+			if i == 0 && firing do mine.buttons = shooter_keys(&g.world.soldiers[me], arm, wall)
 			cmds[me] = mine
 			game.game_tick(g, &cmds)
 			for event in sa.slice(&g.output.events) {
 				#partial switch e in event {
-				case game.Hit_Claimed: if e.owner == me && e.target == TARGET do claimed += 1
-				case game.Blood:       if i == 1 && e.target == TARGET do watched += 1
+				case game.Hit_Claimed:
+					if e.owner == me && e.target == TARGET do p.claimed += 1
+				case game.Hit:
+					if i == 0 && explosive && e.shooter == me && e.target == TARGET {
+						p.claimed += 1
+						p.seen_damage += e.amount
+					}
+				case game.Shot_Fired:
+					if i == 0 && e.shot.weapon != .AK74 && e.shot.weapon != .Knife && e.shot.weapon != .Punch do p.fired += 1
+				case game.Explosion:
+					if e.owner != SHOOTER do continue
+					if i == 0 do p.blasts_shooter += 1
+					else do p.blasts_watcher += 1
+				case game.Blood:
+					if i == 1 && e.target == TARGET do p.watched += 1
 				}
 			}
 			net.client_stream_collect(c, g, me)
@@ -215,8 +329,37 @@ claims_play :: proc(delay: int) -> (claimed, landed, told, watched, guessed, hea
 			}
 		}
 	}
-	heard = int(client_streams[1].pending.received)
+	p.heard = int(client_streams[1].pending.received)
 	return
+}
+
+// The shooter's keys for `arm`, and what it is given to keep at it: a launcher always
+// loaded, a grenade always to throw, a knife always in hand.
+@(private = "file")
+shooter_keys :: proc(me: ^game.Soldier, arm: Arm, wall: int) -> game.Buttons {
+	switch arm {
+	case .Rifle:
+		return {.Fire}
+	case .M79:
+		if me.arsenal.primary.ammo == 0 do me.arsenal.primary.ammo = 1
+		me.arsenal.primary.reload_count = 0
+		return {.Fire} if wall % 40 == 0 else {}
+	case .LAW:
+		if me.arsenal.primary.weapon != .LAW do me.arsenal.primary.weapon = .LAW
+		if me.arsenal.primary.ammo == 0 do me.arsenal.primary.ammo = 1
+		me.arsenal.primary.reload_count = 0
+		return {.Crouch, .Fire} if wall % 40 < 25 else {.Crouch} // fired crouched, held through its start up
+	case .Grenade:
+		me.arsenal.grenades = max(me.arsenal.grenades, 1)
+		return {.Throw} if wall % 60 < 25 else {} // wound up a while, then let go
+	case .Knife:
+		if me.arsenal.primary.weapon != .Knife {
+			me.arsenal.primary.weapon = .Knife
+			me.arsenal.primary.ammo = 1
+		}
+		return {.Drop} if wall % 40 == 0 else {}
+	}
+	return {}
 }
 
 @(private = "file")
@@ -316,6 +459,6 @@ claims_on_a_long_flight :: proc(t: ^testing.T) {
 // a whole snapshot fitted with none, and none ever went.
 @(test)
 words_on_a_whole_snapshot :: proc(t: ^testing.T) {
-	_, _, _, _, _, heard := claims_play(32)
+	heard := claims_play(32, .Rifle).heard
 	testing.expectf(t, heard > 100, "the watcher heard the server's words (%d)", heard)
 }

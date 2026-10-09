@@ -33,8 +33,8 @@ Wire_Side :: enum {
 
 wire_side :: proc(word: game.Word) -> Wire_Side {
 	switch _ in word {
-	case game.Shot, game.Gun_Drop, game.Flag_Throw, game.Hit_Claim: return .Owner
-	case game.Shot_End, game.Ruling, game.Shot_Hit:                 return .Server
+	case game.Shot, game.Gun_Drop, game.Flag_Throw, game.Hit_Claim, game.Blast_Claim: return .Owner
+	case game.Shot_End, game.Ruling, game.Shot_Hit:                                   return .Server
 	}
 	return .Server
 }
@@ -46,6 +46,7 @@ wire_owner :: proc(word: game.Word) -> Maybe(game.Soldier_Id) {
 	case game.Gun_Drop:   return w.owner
 	case game.Flag_Throw: return w.soldier
 	case game.Hit_Claim:  return w.owner
+	case game.Blast_Claim: return w.owner
 	}
 	return nil
 }

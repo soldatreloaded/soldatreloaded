@@ -54,19 +54,22 @@ a test holds that every event type is classified.
   with the life, cleared while dead, and with the gun put away.
 - **The owner's decisions, in its client state:** the shot (EVENT_SHOT, numbered so the
   same bullet comes out everywhere), the weapon throw (EVENT_WEAPON_DROP), the flag
-  throw (EVENT_FLAG_THROW), and the claim (Hit_Claim): a living body its own bullet or
-  blade met on its screen, with which snapshot that body's picture was taken from and
-  how it was stepped (see Time). A claim goes to the server alone.
+  throw (EVENT_FLAG_THROW), and the claims: a living body its own bullet, blade or
+  thrown knife met on its screen (Hit_Claim); its own grenade or rocket gone off there,
+  where and when, the body it went off on if one, and the living it reached
+  (Blast_Claim). Each with which snapshot each body's picture was taken from and how it
+  was stepped (see Time). A claim goes to the server alone.
 - **The server's decisions, in its snapshot:** damage, kill, respawn, flag grab, return
   and score, kit and weapon pickup, the match's end, a new round; a hit on the living
   (Shot_Hit), claimed or its bots', for every machine but the shooter's to show: the
   blood on the target where it is drawn there, the knock to the target's own client,
-  the bullet ended if it stopped; and where a shot ended (EVENT_SHOT_END), for the shots
-  slow enough that a miss shows: a blast (grenades, rockets, clusters, flak) and an
-  arrow or thrown knife stopped in a body. Those the server judges itself, against the
-  shooter's view; hearing the word, a client puts its flight of the shot where the
-  server's ended and ends it the same way; one it has already ended stays ended. A
-  plain bullet's miss is not told: too quick to show, and many enough to crowd the queue.
+  the bullet ended if it stopped (a blast's, the knock alone); and where a grenade or
+  rocket went off (EVENT_SHOT_END). Hearing that, a client sets off its flight of it
+  there, unless it went off already: another's grenade or rocket goes off on a client
+  by its own flight (a wall, its time) as anywhere, the same everywhere, unless it went
+  through a living body there, which its thrower's screen may have met; then it waits,
+  unseen, for the word. A plain bullet's miss is not told: too quick to show, and many
+  enough to crowd the queue.
 - **Neither, and never sent:** what one system asks of another within a machine, such
   as a bullet's knock on a flag (EVENT_THING_KNOCK) or a landed knife (EVENT_KNIFE_LAND);
   every machine produces these for itself.
@@ -134,26 +137,39 @@ drawn on after the bullet is gone until they have; so a shot at a high ping is s
 leaving the muzzle rather than starting out ahead of it.
 
 A shot is an event from the owner, stamped with its tick, which names the frame the
-shooter had. The server runs the bullet forward from that tick to its own present and,
-each step of the way, judges a blast or a thrown knife against the frame the shooter's
-screen held at that step, out of the history ring (bullet_target, history_targets),
-until it has caught up and meets the present like any other bullet.
+shooter had. The server runs the bullet forward from that tick to its own present.
 
-A bullet or a blade on the living is judged on the shooter's screen itself, which is
-not quite any frame the server had: on a tick whose snapshot hadn't come, the target
-was stepped there on its last keys from an older one. So the shooter's client claims
-each body its own shot met, naming the snapshot the target was taken from, the tick it
-was taken in, and the steps it was stepped since (client_stream_collect), and the server
-sees the claim again (core/game/hit_claim.odin): it keeps the flight of every client
-shot it has heard, a tick of it at a time, to the end; it makes the target again from
-that snapshot out of the history ring, stepped as the client stepped it, in the
-target's own slot and put back after; and the claim lands if the bullet it names was on
-the shot's flight there, no faster, and met the target so made. The server's own flight
-of a client's shot passes through the living, and ends where a claim says it stopped.
-So what landed on the shooter's screen lands on the server, guessed or not, and every
-other screen is told of it; the price falls on the target, who can be hit a round trip
-after reaching cover, as in every game that favours the shooter. The shooter plays its
-own flash, sound and blood at once, and the health on the server's damage event.
+Everything a soldier fires, throws or swings is judged on the living on its shooter's
+screen itself, which is not quite any frame the server had: on a tick whose snapshot
+hadn't come, the target was stepped there on its last keys from an older one. So the
+shooter's client claims what its own shots did, naming for each body the snapshot it
+was taken from, the tick it was taken in, and the steps it was stepped since
+(client_stream_collect), and the server sees the claim again (core/game/hit_claim.odin).
+It keeps the flight of every client shot it has heard, a tick of it at a time, to its
+end, and makes each body again from that snapshot out of the history ring, stepped as
+the client stepped it (and shoved by the hits that client's own shots gave it since), in
+its own slot and put back after.
+
+- A bullet, a blade or a thrown knife (Hit_Claim) lands if the bullet it names was on
+  the shot's flight there, no faster, and met the body so made. A knife that lands so is
+  laid where it stuck.
+- A grenade or a rocket (Blast_Claim) goes off where the claim says, if that is on its
+  flight (and on a body named, exactly where the flight was then, the body so made met
+  there); every soldier it reached is made again and wounded as the blast does it by
+  its distance there, the server's own numbers, never the client's. A rocket or an M79
+  grenade on a body wounds it by its speed besides.
+
+The server's own flight of a client's shot passes through the living. Where it would
+end on the map or by its time, a grenade, rocket or knife is held there, unseen, for its
+claim: a round trip, after which (90 ticks; a knife's 20, since it lies to be picked up)
+it goes off, or lands, as the server's own, which the server judges. A blast that sets
+off another's grenade is the server's, and a claim for one gone off already lands
+nothing. So what landed on the shooter's screen lands on the server, guessed or not,
+and every other screen is told of it; the price falls on the target, who can be hit a
+round trip after reaching cover, as in every game that favours the shooter. The shooter
+plays its own flash, sound, blood and blast at once, and the health on the server's
+damage event. A shooter's hit on itself is the server's to judge: its own soldier on its
+own screen is no snapshot's.
 
 ## Things
 
@@ -170,10 +186,11 @@ Numbers in range. A life that is still being lived (`life`: word from before a
 placing is never taken for word from after it). A shot the weapon in hand could make,
 with the ammo it has, from within a few units of where the shooter has stood over the
 last quarter second: the history ring (history.c) keeps where everyone claimed to be,
-for this, not for rewinding. A hit claim (see Time): of a shot heard from the claimant,
-on its flight there, no faster than it flew, on a body made again from a snapshot at
-most half a second old and stepped no further than the client could have; a claim that
-fails lands nothing, and nothing is told. Duplicate events by number. A movement claim that fails
+for this, not for rewinding. A hit or blast claim (see Time): of a shot heard from the
+claimant, on its flight there, no faster than it flew, on bodies made again from
+snapshots at most half a second old and stepped no further than the client could have;
+a blast's wounds the server's own reckoning by distance; a claim that fails lands
+nothing, and nothing is told. Duplicate events by number. A movement claim that fails
 is dropped and the server's version of the soldier goes out in the snapshot as usual;
 there is no correction message, because the owned half in the snapshot is that.
 

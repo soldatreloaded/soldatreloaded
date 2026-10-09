@@ -35,6 +35,7 @@ Event :: union {
 	// the server's word of a hit, for the wire and for showing
 	Hit_Claimed,
 	Shot_Hit,
+	Blast_Claimed,
 }
 
 MAX_EVENTS :: 256
