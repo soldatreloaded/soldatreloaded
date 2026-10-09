@@ -79,6 +79,7 @@ Match :: struct {
 	sequence:   u32, // my last command's
 	hud:        hud.Hud,
 	limbo:      Limbo,
+	weapons_up: bool, // the weapons menu was up as the last frame's keys were read
 	loadout:    sim.Loadout, // the weapons menu's picks this round: no primary (the fists) till one is, the config's secondary
 	team_asked: Maybe(res.Team), // offline, chosen in the team menu, for the next tick to place me on
 	suicide:    Maybe(bool), // offline, /kill or /brutalkill (true) said: my death, asked of the world at the next tick
@@ -337,9 +338,18 @@ keys :: proc(match: ^Match, config: ^res.Client_Config, sounds: ^sound.Sound) {
 			radio_took = true
 		}
 	}
+	// the weapons menu come up with a number key already held (a round begun, a first
+	// spawn): the key is its pick, as pressed now. Held through the menu's coming, it never
+	// went down while the menu was up, and the soldier spawned with no gun.
+	weapons_up := .Weapons in match.hud.menus.open
+	just_up := weapons_up && !match.weapons_up
+	match.weapons_up = weapons_up
 	if !typing && menu {
 		taken := input.input_menu_keys(&match.input)
 		if radio_took do taken.digit = nil // the press was the radio's, not a weapon too
+		if just_up && taken.digit == nil && !radio_took {
+			if digit, held := input.input_held_digit(); held do taken.digit = digit
+		}
 		if menu_keys(match, config, sounds, taken) {
 			match.request = Leave{}
 			return

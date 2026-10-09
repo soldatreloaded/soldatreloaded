@@ -149,6 +149,16 @@ input_menu_keys :: proc(input: ^Input) -> (keys: Menu_Keys) {
 	return
 }
 
+// A number key held down, plain or with Ctrl, and which: the weapons menu, come up while
+// it is held (a round begun, a first spawn, a key held through it), takes it as pressed.
+input_held_digit :: proc() -> (digit: int, held: bool) {
+	if modifier_down(.Alt) || modifier_down(.Shift) do return
+	for d in 0 ..= 9 {
+		if rl.IsKeyDown(digit_key(d)) do return d, true
+	}
+	return
+}
+
 // The command for a tick, aimed at `aim` in the world: the buttons held, and the
 // presses since the last, which it takes. With `legacy_flag_throw`, jump and crouch held
 // together throw the flag too, as the original's LocalInput has it.
