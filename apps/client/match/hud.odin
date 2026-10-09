@@ -258,6 +258,9 @@ limbo_tick :: proc(match: ^Match) {
 	} else if !dead {
 		limbo.died_at = nil
 	}
+	// already up (open as I died, or by its key since): this death has had its menu, and
+	// a show still due would bring it back the moment a primary shuts it
+	if .Weapons in menus.open do limbo.died_at = nil
 	first_life := !limbo.placed && !dead
 	limbo.placed = true
 	died_at, dying := limbo.died_at.?
