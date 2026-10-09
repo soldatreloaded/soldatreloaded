@@ -20,6 +20,13 @@ Credits named in the upstream `Credits.md`:
 
 ## What here is not from base
 
+The soldier's art the community has added since, in `gostek-gfx/`:
+
+- **tin0ob** ([@tin0ob](https://github.com/tin0ob)): the mullet, wolfcut, baldcut, afro
+  and emo haircuts (`hair7`–`hair11`, and their `team2/` and mirrored images)
+- **Crasher**: the backwards cap (`backcap`) and the sunglasses (`sunglasses_a`,
+  `sunglasses_b`)
+
 The fonts sit in `fonts/` without being part of that content, and they are not
 under CC BY 4.0. (The game's own configs, `*.config.mjson` at the install's root, under
 the MIT licence in the game's `license.md`, sit apart from this directory.) Each is

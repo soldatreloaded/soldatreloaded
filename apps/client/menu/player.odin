@@ -17,7 +17,9 @@ STYLE_NAMES := [?]string{"Male", "Female", "Waifu", "Rat", "Furry"}
 @(rodata)
 HAIR_NAMES := [?]string{"Army", "Dreadlocks", "Punk", "Mr. T", "Normal", "Fringe", "Bob", "Mullet", "Wolfcut", "Baldcut", "Afro", "Emo"}
 @(rodata)
-HEAD_NAMES := [?]string{"None", "Helmet", "Hat", "Waifu helmet"}
+HEAD_NAMES := [?]string{"None", "Helmet", "Hat", "Waifu helmet", "Backwards cap"}
+@(rodata)
+EYEWEAR_NAMES := [?]string{"None", "Sunglasses A", "Sunglasses B"}
 @(rodata)
 CHAIN_NAMES := [?]string{"None", "Dog tags", "Gold chain"}
 @(rodata)
@@ -28,7 +30,7 @@ SECONDARY_NAMES := [?]string{"USSOCOM", "Combat Knife", "Chainsaw", "LAW"}
 @(rodata)
 FURRED_HAIR_LOCKED := [?]bool{false, false, false, false, true, true, true, false, false, true, true, true}
 @(rodata)
-FURRED_HEAD_LOCKED := [?]bool{false, true, true, true}
+FURRED_HEAD_LOCKED := [?]bool{false, true, true, true, true}
 
 page_player :: proc(menu: ^Menu) {
 	k := &menu.kit
@@ -47,6 +49,7 @@ page_player :: proc(menu: ^Menu) {
 	furred := look.gostek == .Rat || look.gostek == .Furry
 	look.hair_style = ui.enum_select(k, "Hair", &player.hair_style, HAIR_NAMES[:], FURRED_HAIR_LOCKED[:] if furred else nil)
 	look.head_style = ui.enum_select(k, "Headgear", &player.head_style, HEAD_NAMES[:], FURRED_HEAD_LOCKED[:] if furred else nil)
+	look.eyewear = ui.enum_select(k, "Eyewear", &player.eyewear, EYEWEAR_NAMES[:])
 	look.chain_style = ui.enum_select(k, "Chain", &player.chain_style, CHAIN_NAMES[:])
 	ui.section(k, "COLOURS")
 	ui.color_row(k, "Shirt", &player.shirt)
@@ -113,5 +116,6 @@ look_of :: proc(player: ^res.Player_Settings) -> sim.Look {
 		hair_style  = player.hair_style,
 		head_style  = player.head_style,
 		chain_style = player.chain_style,
+		eyewear     = player.eyewear,
 	}
 }

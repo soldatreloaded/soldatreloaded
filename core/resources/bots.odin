@@ -19,6 +19,7 @@ Bot_Profile :: struct {
 	hair_style:        Hair_Style,
 	head_style:        Head_Style,
 	chain_style:       Chain_Style,
+	eyewear:           Eyewear,
 	favourite:         Weapon, // the primary it spawns with
 	secondary:         Weapon, // the USSOCOM, the knife, the chainsaw or the LAW
 	friend:            utils.Short_String(24), // a player it never fires at
@@ -47,6 +48,7 @@ Bot_File :: struct {
 	hair_style:        Hair_Style,
 	head_style:        Head_Style,
 	chain_style:       Chain_Style,
+	eyewear:           Eyewear,
 	friend:            string,
 	accuracy:          i32,
 	shoot_dead:        bool,
@@ -97,6 +99,7 @@ bot_profile_load :: proc(path: string) -> (profile: Bot_Profile, ok: bool) {
 		hair_style        = f.hair_style,
 		head_style        = f.head_style,
 		chain_style       = f.chain_style,
+		eyewear           = f.eyewear,
 		favourite         = f.primary_weapon,
 		secondary         = f.secondary_weapon,
 		accuracy          = f.accuracy,

@@ -54,6 +54,7 @@ Part :: struct {
 	hair:    res.Hair_Style, // shown for this hair style
 	dread:   int,    // the nth dreadlock, hanging from the head's top toward point 24
 	head:    res.Head_Style, // shown for this headgear
+	eyewear: res.Eyewear,    // shown for this eyewear
 	grabbed: bool,   // the headgear in the hand rather than on the head
 	chain:   res.Chain_Style, // shown for this chain
 }
@@ -95,6 +96,7 @@ PARTS := [?]Part {
 	{id = "Grabbed_Helmet", file = "helm", p1 = 15, p2 = 19, center = {0, 0.5}, flip = true, team = true, color = .Shirt, head = .Helmet, grabbed = true},
 	{id = "Grabbed_Hat", file = "kap", p1 = 15, p2 = 19, center = {0.1, 0.4}, flip = true, team = true, color = .Shirt, head = .Hat, grabbed = true},
 	{file = "helm3", p1 = 15, p2 = 19, center = {0, 0.5}, flip = true, team = true, color = .Shirt, head = .Waifu, grabbed = true},
+	{id = "Grabbed_Backwards_Cap", file = "backcap", p1 = 15, p2 = 19, center = {0.1, 0.4}, flip = true, color = .Shirt, head = .Backwards_Cap, grabbed = true},
 	{id = "Left_Thigh", file = "udo", p1 = 6, p2 = 3, center = {0.2, 0.5}, flex = 5, flip = true, team = true, color = .Pants},
 	{id = "Left_Thigh_Dmg", file = "ranny/udo", p1 = 6, p2 = 3, center = {0.2, 0.5}, flex = 5, flip = true, team = true, shown = .Wounded},
 	{id = "Left_Foot", file = "stopa", p1 = 2, p2 = 18, center = {0.35, 0.35}, flip = true, team = true, shown = .Standing},
@@ -117,6 +119,9 @@ PARTS := [?]Part {
 	{id = "Hip", file = "biodro", p1 = 5, p2 = 6, center = {0.25, 0.6}, flip = true, team = true, color = .Shirt},
 	{id = "Hip_Dmg", file = "ranny/biodro", p1 = 5, p2 = 6, center = {0.25, 0.6}, flip = true, team = true, shown = .Wounded},
 	{id = "Head", file = "morda", p1 = 9, p2 = 12, center = {0, 0.5}, flip = true, team = true, color = .Skin},
+	// over the eyes, under the hair and the headgear; the same size as the male's head
+	{id = "Sunglasses_A", file = "sunglasses_a", p1 = 9, p2 = 12, center = {0, 0.5}, flip = true, eyewear = .Sunglasses_A},
+	{id = "Sunglasses_B", file = "sunglasses_b", p1 = 9, p2 = 12, center = {0, 0.5}, flip = true, eyewear = .Sunglasses_B},
 	{id = "Head_Dmg", file = "ranny/morda", p1 = 9, p2 = 12, center = {0, 0.5}, flip = true, team = true, color = .Head_Blood, shown = .Wounded},
 	// The hair, the headgear and the chain, in the original's order. A helmet or a hat
 	// covers every hair style but Mr. T's.
@@ -124,6 +129,7 @@ PARTS := [?]Part {
 	{id = "Helmet", file = "helm", p1 = 9, p2 = 12, center = {-0.1, 0.52}, flip = true, team = true, color = .Shirt, head = .Helmet},
 	{id = "Hat", file = "kap", p1 = 9, p2 = 12, center = {0, 0.5}, flip = true, team = true, color = .Shirt, head = .Hat},
 	{file = "helm3", p1 = 9, p2 = 12, center = {0, 0.5}, flip = true, team = true, color = .Shirt, head = .Waifu},
+	{id = "Backwards_Cap", file = "backcap", p1 = 9, p2 = 12, center = {0, 0.5}, flip = true, color = .Shirt, head = .Backwards_Cap},
 	{id = "Hair_Dreadlocks", file = "hair1", p1 = 9, p2 = 12, center = {0, 0.5}, flip = true, team = true, color = .Hair, hair = .Dreadlocks},
 	{id = "Hair_Dreadlock1", file = "dred", p1 = 23, p2 = 24, center = {0, 1.22}, team = true, color = .Hair, hair = .Dreadlocks, dread = 1},
 	{id = "Hair_Dreadlock2", file = "dred", p1 = 23, p2 = 24, center = {0.1, 0.5}, team = true, color = .Hair, hair = .Dreadlocks, dread = 2},
@@ -287,14 +293,22 @@ outfit_of :: proc(soldier: ^sim.Soldier, corpse: bool, original: bool) -> (outfi
 }
 
 // A look as Soldat 1 would draw it, which has the male alone: the male, his hair and
-// headgear as they were; the waifu's fringe and bob his normal hair, her headgear his
-// helmet. A mod made for Soldat 1 dresses every soldier then.
+// headgear as they were; the cuts it hasn't (the waifu's fringe and bob, the mullet,
+// the wolfcut, the baldcut, the afro, the emo) his normal hair, the waifu's headgear his
+// helmet, the backwards cap his hat, and no eyewear. A mod made for Soldat 1 dresses
+// every soldier then.
 @(private = "file")
 as_original :: proc(look: sim.Look) -> sim.Look {
 	look := look
 	look.gostek = .Male
-	if look.hair_style == .Fringe || look.hair_style == .Bob do look.hair_style = .Normal
-	if look.head_style == .Waifu do look.head_style = .Helmet
+	#partial switch look.hair_style {
+	case .Fringe, .Bob, .Mullet, .Wolfcut, .Baldcut, .Afro, .Emo: look.hair_style = .Normal
+	}
+	#partial switch look.head_style {
+	case .Waifu:         look.head_style = .Helmet
+	case .Backwards_Cap: look.head_style = .Hat
+	}
+	look.eyewear = .None
 	return look
 }
 
@@ -318,6 +332,7 @@ part_shown :: proc(part: Part, outfit: Outfit) -> bool {
 		if furred || part.head != look.head_style || !outfit.capped || part.grabbed != outfit.grabbed do return false
 	}
 	if part.chain != .None && part.chain != look.chain_style do return false
+	if part.eyewear != .None && part.eyewear != look.eyewear do return false
 	return true
 }
 
@@ -365,7 +380,7 @@ part_color :: proc(color: Part_Color, look: sim.Look, shirt: utils.Rgba, soldier
 // A part every style wears the same, loaded once, as the male's.
 @(private = "file")
 part_shared :: proc(part: Part) -> bool {
-	return part.dir != "" || part.hair != .Army || part.head != .None
+	return part.dir != "" || part.hair != .Army || part.head != .None || part.eyewear != .None
 }
 
 // Where a part's image is, as the original keeps it (gfx.inc): the male's, the hair and

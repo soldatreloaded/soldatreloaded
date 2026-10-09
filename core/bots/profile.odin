@@ -17,6 +17,7 @@ profile_look :: proc(profile: ^res.Bot_Profile) -> game.Look {
 		hair_style  = profile.hair_style,
 		head_style  = profile.head_style,
 		chain_style = profile.chain_style,
+		eyewear     = profile.eyewear,
 	}
 }
 

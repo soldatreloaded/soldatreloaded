@@ -217,6 +217,7 @@ Look :: struct {
 	hair_style:  res.Hair_Style,
 	head_style:  res.Head_Style,
 	chain_style: res.Chain_Style,
+	eyewear:     res.Eyewear,
 }
 
 // ---------------------------------------------------------------------------------
