@@ -194,6 +194,8 @@ words :: proc(t: ^testing.T) {
 		game.Ruling(game.Flag_Capture{soldier = 9, flag = 0}),
 		game.Ruling(game.Pickup{soldier = 1, thing = 5, kind = .Weapon, weapon = .Ruger77, ammo = 4}),
 		game.Ruling(game.Thing_Respawn{thing = 9}),
+		game.Hit_Claim{claimed = {owner = 2, shot = 40, fired = 900, airtime = 7, weapon = .AK74, target = 5, part = 9, pos = {1, 2}, velocity = {24, -1}, start = {1, 2}, point = {20, 1}, stopped = true}, seen = 3, taken = 2, pre = 1, steps = 3},
+		game.Shot_Hit{owner = 2, shot = 40, fired = 900, weapon = .AK74, target = 5, part = 9, offset = {1, -2}, velocity = {24, -1}, push = {0.3, 0}, stopped = true},
 	}
 	for word in words {
 		buf: [256]u8
@@ -214,6 +216,46 @@ words :: proc(t: ^testing.T) {
 	none: game.Word
 	net.net_word(&b, &none)
 	testing.expect(t, !net.buffer_ok(&b))
+}
+
+// A client whose own words ran past the ring, sent nobody's word between (its long burst
+// of fire, relayed to everyone else and left out to it), takes the server's next all the
+// same: before, it was past the count's window, refused, and refused again for good.
+@(test)
+words_past_my_own :: proc(t: ^testing.T) {
+	ME :: game.Soldier_Id(3)
+	q: net.Wire_Queue
+	net.wire_queue_init(&q)
+	p := new(net.Wire_Pending)
+	defer free(p)
+	world := new(game.World)
+	defer free(world)
+	world.tick = 10_000
+
+	hear :: proc(q: ^net.Wire_Queue, p: ^net.Wire_Pending, world: ^game.World) {
+		buf: [net.MTU]u8
+		b := net.buffer_writer(buf[:])
+		net.wire_write(&b, q, p.received, ME, net.WIRE_PER_PACKET)
+		b = net.buffer_reader(net.buffer_written(&b))
+		net.wire_read_pending(&b, p)
+		net.wire_pending_apply(p, world, world.tick)
+	}
+	net.wire_push(&q, game.Ruling(game.Respawn{target = ME, life = 1}), 1)
+	hear(&q, p, world)
+	testing.expect_value(t, p.received, 1)
+
+	for i in 0 ..< 200 do net.wire_push(&q, game.Shot{owner = ME, weapon = .Minigun, number = u32(i + 1)}, 2, ME)
+	net.wire_push(&q, game.Ruling(game.Kill{killer = 1, target = ME, weapon = .AK74}), 3)
+	sa.clear(&world.heard)
+	hear(&q, p, world)
+	testing.expect_value(t, p.received, q.next - 1)
+	killed := false
+	for hearing in sa.slice(&world.heard) {
+		if ruling, is_ruling := hearing.word.(game.Ruling); is_ruling {
+			if _, is_kill := ruling.(game.Kill); is_kill do killed = true
+		}
+	}
+	testing.expect(t, killed, "the server's word past my own burst is heard")
 }
 
 @(test)

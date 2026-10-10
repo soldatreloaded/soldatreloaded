@@ -13,6 +13,9 @@ Word :: union {
 	Flag_Throw, // an owner's flag thrown, for the referee to allow
 	Shot_End,   // the server's word of where a shot ended
 	Ruling,     // the server's decision
+	Hit_Claim,  // an owner's: a body its own shot met on its screen (hit_claim.odin)
+	Shot_Hit,   // the server's word of a hit on the living, claimed or its own
+	Blast_Claim, // an owner's: its own grenade or rocket gone off on its screen, and whom it reached
 }
 
 MAX_HEARD :: 256
@@ -21,6 +24,7 @@ CATCH_UP_MAX :: 30 // ticks a heard shot is run forward at most: half a second
 Hearing :: struct {
 	word:     Word,
 	catch_up: u8, // a shot's: how far behind the present it was fired
+	tick:     u32, // when it was said, on the machine that said it
 }
 
 // `word`, said at `tick` on the machine it came from, for the next step. Dropped if the
@@ -31,7 +35,7 @@ world_hear :: proc(world: ^World, word: Word, tick: u32) {
 		behind := world.tick - tick if world.tick > tick else 0
 		catch_up = u8(min(behind, CATCH_UP_MAX))
 	}
-	sa.push_back(&world.heard, Hearing{word, catch_up})
+	sa.push_back(&world.heard, Hearing{word, catch_up, tick})
 }
 
 // The turns of a step at which what was heard is done.
@@ -55,7 +59,7 @@ heard_apply :: proc(world: ^World, resources: ^Resources, authority: ^Authority,
 				flashed += {int(w.owner)}
 				bullet_remote_fire(world, resources, w, out)
 			}
-			bullet_hear(world, resources, w, hearing.catch_up, authority, out)
+			bullet_hear(world, resources, w, hearing.catch_up, hearing.tick, authority, out)
 			// a player's grenade, thrown on its own machine: the server keeps the count
 			// (stream_server.odin), so the throw is taken off it here
 			if authority != nil && w.weapon == .Frag_Grenade {
@@ -63,6 +67,9 @@ heard_apply :: proc(world: ^World, resources: ^Resources, authority: ^Authority,
 				arsenal.grenades = max(arsenal.grenades - 1, 0)
 			}
 		case Shot_End:   if turn == .Bullets do bullet_shot_end(world, resources, w, out)
+		case Shot_Hit:   if turn == .Bullets && authority == nil do bullet_shot_hit(world, resources, w, out)
+		case Hit_Claim:  if turn == .Bullets && authority != nil do hit_claim_judge(world, resources, authority, w, hearing.tick, out)
+		case Blast_Claim: if turn == .Bullets && authority != nil do blast_claim_judge(world, resources, authority, w, hearing.tick, out)
 		// recorded as the server's own are, for the sounds, the sparks and the feed; a
 		// client's collection for the wire leaves rulings out, so none goes back
 		case Ruling:

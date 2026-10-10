@@ -10,11 +10,13 @@ import "../game"
 // The words on the wire: what one machine decides and the others must hear
 // (game.Word). Who may say a word is its side's to say:
 //
-//   Owner   a decision of the soldier's owner: its shot, its gun or flag thrown. A
-//           client sends its own to the server, which does them as its own; a shot
-//           it relays to everyone else, since no ruling follows from it
-//   Server  a decision only the server makes: a ruling, or where a shot ended; sent
-//           to everyone, done where the C game's pass would have done it (word.odin)
+//   Owner   a decision of the soldier's owner: its shot, its gun or flag thrown, a body
+//           its shot met on its screen (a claim). A client sends its own to the
+//           server, which does them as its own; a shot it relays to everyone else,
+//           since no ruling follows from it, and a claim to no one
+//   Server  a decision only the server makes: a ruling, where a shot ended, a hit on
+//           the living; sent to everyone, done where the C game's pass would have
+//           done it (word.odin)
 //
 // Each side numbers the words it sends in a queue; a packet carries those the other
 // side has not acknowledged, capped, so a lost packet is covered by the next. The
@@ -31,8 +33,8 @@ Wire_Side :: enum {
 
 wire_side :: proc(word: game.Word) -> Wire_Side {
 	switch _ in word {
-	case game.Shot, game.Gun_Drop, game.Flag_Throw: return .Owner
-	case game.Shot_End, game.Ruling:                return .Server
+	case game.Shot, game.Gun_Drop, game.Flag_Throw, game.Hit_Claim, game.Blast_Claim: return .Owner
+	case game.Shot_End, game.Ruling, game.Shot_Hit:                                   return .Server
 	}
 	return .Server
 }
@@ -43,6 +45,8 @@ wire_owner :: proc(word: game.Word) -> Maybe(game.Soldier_Id) {
 	case game.Shot:       return w.owner
 	case game.Gun_Drop:   return w.owner
 	case game.Flag_Throw: return w.soldier
+	case game.Hit_Claim:  return w.owner
+	case game.Blast_Claim: return w.owner
 	}
 	return nil
 }
@@ -83,17 +87,31 @@ net_stamped :: proc(b: ^Buffer, seq: ^u32, item: ^Stamped) {
 	net_word(b, &item.word)
 }
 
-// The tables of the words' payloads, made as first needed.
+// The tables of the words' payloads, every variant's (the rulings' inside too), made
+// once as the program starts and only read after: words are written on many threads at
+// once in the tests, which a table made as first needed raced on.
+@(private = "file")
+word_tables: map[typeid]Field_Table
+
+@(init, private = "file")
+word_tables_init :: proc "contextless" () {
+	context = runtime.default_context()
+	word_tables = make(map[typeid]Field_Table, runtime.default_allocator())
+	add :: proc(info: ^runtime.Type_Info) {
+		for variant in runtime.type_info_base(info).variant.(runtime.Type_Info_Union).variants {
+			if _, is_union := runtime.type_info_base(variant).variant.(runtime.Type_Info_Union); is_union {
+				add(variant)
+			} else {
+				word_tables[variant.id] = fields_of(variant.id, "", runtime.default_allocator()) // for the program's life
+			}
+		}
+	}
+	add(type_info_of(game.Word))
+}
+
 @(private = "file")
 table_of :: proc(id: typeid) -> Field_Table {
-	@(static) tables: map[typeid]Field_Table
-	if tables == nil do tables = make(map[typeid]Field_Table, runtime.default_allocator())
-	table, known := tables[id]
-	if !known {
-		table = fields_of(id, "", runtime.default_allocator()) // for the program's life
-		tables[id] = table
-	}
-	return table
+	return word_tables[id]
 }
 
 // ---------------------------------------------------------------------------------
@@ -137,6 +155,8 @@ wire_collect :: proc(q: ^Wire_Queue, out: ^game.Tick_Output, tick: u32, only_own
 		case game.Flag_Thrown:
 			if is_client && e.soldier == me do wire_push(q, game.Flag_Throw{e.soldier}, tick)
 		case game.Shot_End:
+			if !is_client do wire_push(q, e, tick)
+		case game.Shot_Hit:
 			if !is_client do wire_push(q, e, tick)
 		}
 	}
@@ -230,6 +250,12 @@ wire_read_pending :: proc(b: ^Buffer, p: ^Wire_Pending) {
 		if !buffer_ok(b) do continue
 		// the first heard begins the count: what came before a newcomer is nobody's news
 		if p.received == 0 && p.applied == 0 && seq > 0 do p.applied = seq - 1
+		// The sender writes from the oldest the receiver hasn't acknowledged, leaving out
+		// the receiver's own words (wire_write): one far past the newest kept, with nothing
+		// waiting, has only those, or words the sender's queue let go, before it. The count
+		// moves up to it, or a receiver whose own words ran past the ring (a long burst of
+		// fire, with nobody else's word between) would never take the server's again.
+		if seq >= p.applied + WIRE_PENDING && p.received == p.applied do p.applied, p.received = seq - 1, seq - 1
 		if seq <= p.applied || seq >= p.applied + WIRE_PENDING do continue
 		if p.seq[seq % WIRE_PENDING] == seq do continue // a resend of one still waiting
 		p.items[seq % WIRE_PENDING] = item

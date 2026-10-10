@@ -9,6 +9,7 @@ import sa "core:container/small_array"
 // What the machine with authority has that others don't.
 Authority :: struct {
 	history: History,
+	shots:   Shot_Records, // the clients' shots' flights here, which their claims are held to
 }
 
 // Judges the events not yet judged, in the order they happened. A hit lands as the C

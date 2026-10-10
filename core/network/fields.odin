@@ -74,6 +74,7 @@ tables_init :: proc "contextless" () {
 
 // The fields of `id` in `group`, or all of them for "". Kept for the program's life.
 fields_of :: proc(id: typeid, group: string, allocator := context.allocator) -> Field_Table {
+	context.allocator = allocator // a nested field's name too
 	fields := make([dynamic]Field, allocator)
 	collect(&fields, id, group, 0, "", "")
 	return fields[:]
