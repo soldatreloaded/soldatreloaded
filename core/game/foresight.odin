@@ -26,6 +26,8 @@ Foresight :: struct {
 	deaths: [MAX_PLAYERS]Foreseen,
 	owed:   [MAX_PLAYERS]sa.Small_Array(OWED_MAX, Owed),
 	health: [MAX_PLAYERS]u32, // the tick of the snapshot each soldier's health here came from
+	shown:  [SHOWN_KEPT]Shown_Hit, // the hits on the living this client showed of others' shots, round the ring
+	shown_next: int,
 }
 
 // A death this client's own hit gave a soldier on its screen, the server's word of it to
@@ -183,4 +185,31 @@ Kill_Taken_Back :: struct {
 	target: Soldier_Id,
 	weapon: res.Weapon,
 	part:   u8,
+}
+
+// Another's hit on the living, shown on a client by its own flight of the shot: the
+// server's word of the same hit (Shot_Hit) shows no more blood.
+Shown_Hit :: struct {
+	set:    bool,
+	owner:  Soldier_Id,
+	shot:   u32,
+	fired:  u32,
+	target: Soldier_Id,
+}
+
+SHOWN_KEPT :: 64 // the hits shown remembered: far more than a round trip's
+
+// Another's bullet met soldier `target` here, shown.
+foresee_shown :: proc(world: ^World, bullet: ^Bullet, target: Soldier_Id) {
+	f := &world.foresight
+	f.shown[f.shown_next] = {set = true, owner = bullet.owner, shot = bullet.shot, fired = bullet.fired, target = target}
+	f.shown_next = (f.shown_next + 1) % SHOWN_KEPT
+}
+
+// Whether this client showed that hit already, by its own flight of the shot.
+foresee_was_shown :: proc(world: ^World, owner: Soldier_Id, shot, fired: u32, target: Soldier_Id) -> bool {
+	for s in world.foresight.shown {
+		if s.set && s.owner == owner && s.shot == shot && s.fired == fired && s.target == target do return true
+	}
+	return false
 }

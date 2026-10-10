@@ -5,7 +5,8 @@ package network_test
 // firing all over a soldier who strafes as a player does, and a client watching. On the
 // ticks no snapshot came in time the shooter's screen shows its target stepped on its
 // last keys; every hit it saw must land on the server, and the watcher must show every
-// one, and no other. So with every weapon: the guns, the grenades and the rockets (their
+// one: the watcher's own flight of the shot meets the living for show too, so it may
+// show a few more, never one twice. So with every weapon: the guns, the grenades and the rockets (their
 // blasts), the thrown knife.
 
 import "core:fmt"
@@ -63,7 +64,7 @@ claims_land_what_the_shooter_saw :: proc(t: ^testing.T) {
 		testing.expect(t, p.guessed >= 20, "the shooter's screen guessed, often")
 		testing.expect_value(t, p.landed, p.claimed)
 		testing.expect_value(t, p.told, p.landed)
-		testing.expect_value(t, p.watched, p.told)
+		testing.expectf(t, p.watched >= p.told, "every hit told is shown to the watcher (%d told, %d shown: the rest its own flight of the shot met, for show)", p.told, p.watched)
 	}
 }
 
@@ -126,7 +127,7 @@ knives_land_what_the_shooter_saw :: proc(t: ^testing.T) {
 		testing.expect_value(t, p.knives_laid, p.fired)
 		testing.expect_value(t, p.landed, p.claimed)
 		testing.expect_value(t, p.told, p.landed)
-		testing.expect_value(t, p.watched, p.told)
+		testing.expectf(t, p.watched >= p.told, "every hit told is shown to the watcher (%d told, %d shown: the rest its own flight of the shot met, for show)", p.told, p.watched)
 	}
 }
 

@@ -674,7 +674,8 @@ bullet_shot_hit :: proc(world: ^World, resources: ^Resources, told: Shot_Hit, ou
 	target := &world.soldiers[told.target]
 	part := int(told.part) if hit_part(int(told.part)) else 0
 	at := target.pose.skeleton[part] + told.offset
-	if target.active && !told.blast do emit(out, Blood{target = told.target, pos = at, velocity = told.velocity, bloodless = told.bloodless})
+	shown := foresee_was_shown(world, told.owner, told.shot, told.fired, told.target) // bled here already, by this machine's own flight of it
+	if target.active && !told.blast && !shown do emit(out, Blood{target = told.target, pos = at, velocity = told.velocity, bloodless = told.bloodless})
 	if target.active && !target.remote && !target.vitals.dead {
 		target.body.next_push += told.push
 		// the hit's spray, as a flight here meeting this soldier gave it: the server's word
