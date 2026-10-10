@@ -137,6 +137,9 @@ server_init :: proc(sv: ^Server, options: Options) -> bool {
 		server_destroy(sv)
 		return false
 	}
+	// EXPERIMENTAL, this build: every player's hits and kills taken as they say, unchecked
+	sv.game.authority.trust = true
+	log.warnf("this build trusts every claim: hits and kills are taken as players say, unchecked")
 	maps_list(sv)
 	first := options.first_map
 	if file, found := map_file_name(sv, first); found do first = file

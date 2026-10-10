@@ -5,7 +5,8 @@ package network_test
 // firing all over a soldier who strafes as a player does, and a client watching. On the
 // ticks no snapshot came in time the shooter's screen shows its target stepped on its
 // last keys; every hit it saw must land on the server, and the watcher must show every
-// one, and no other. So with every weapon: the guns, the grenades and the rockets (their
+// one: the watcher's own flight of the shot meets the living for show too, so it may
+// show a few more, never one twice. So with every weapon: the guns, the grenades and the rockets (their
 // blasts), the thrown knife.
 
 import "core:fmt"
@@ -63,7 +64,7 @@ claims_land_what_the_shooter_saw :: proc(t: ^testing.T) {
 		testing.expect(t, p.guessed >= 20, "the shooter's screen guessed, often")
 		testing.expect_value(t, p.landed, p.claimed)
 		testing.expect_value(t, p.told, p.landed)
-		testing.expect_value(t, p.watched, p.told)
+		testing.expectf(t, p.watched >= p.told, "every hit told is shown to the watcher (%d told, %d shown: the rest its own flight of the shot met, for show)", p.told, p.watched)
 	}
 }
 
@@ -126,7 +127,7 @@ knives_land_what_the_shooter_saw :: proc(t: ^testing.T) {
 		testing.expect_value(t, p.knives_laid, p.fired)
 		testing.expect_value(t, p.landed, p.claimed)
 		testing.expect_value(t, p.told, p.landed)
-		testing.expect_value(t, p.watched, p.told)
+		testing.expectf(t, p.watched >= p.told, "every hit told is shown to the watcher (%d told, %d shown: the rest its own flight of the shot met, for show)", p.told, p.watched)
 	}
 }
 
@@ -198,8 +199,9 @@ Packet :: struct {
 
 // A minute of the shooter armed with `arm` over a line `delay` ticks each way.
 @(private = "file")
-claims_play :: proc(delay: int, arm: Arm, enemy := false) -> (p: Play) {
+claims_play :: proc(delay: int, arm: Arm, enemy := false, trust := false) -> (p: Play) {
 	server := claims_game(true)
+	server.authority.trust = trust
 	shooter := claims_game(false)
 	watcher := claims_game(false)
 	defer {
@@ -470,6 +472,69 @@ shots_after_death_void :: proc(t: ^testing.T) {
 		}
 	}
 	testing.expect(t, !went_off, "the grenade thrown once dead never went off")
+}
+
+// A server that trusts its claims (Authority.trust) lands one its checks would turn
+// down, a shot nowhere near its target, with the wound the claim says; and a claim that
+// says it kills, kills, whatever the target's health was there. One that doesn't trust
+// lands neither.
+@(test)
+trusted_claims_taken :: proc(t: ^testing.T) {
+	for trust in ([]bool{false, true}) {
+		server := claims_game(true)
+		defer {
+			game.game_destroy(server)
+			free(server)
+		}
+		server.authority.trust = trust
+		game.soldier_place(server, SHOOTER, .Alpha, remote = true)
+		game.soldier_place(server, TARGET, .Bravo, remote = false)
+		claims_run(server, 150)
+		from := server.world.soldiers[SHOOTER].body.pos - {0, 30}
+		fired := server.world.tick
+		game.world_hear(&server.world, game.Shot{owner = SHOOTER, weapon = .AK74, pos = from, velocity = {4, -3}, damage = 1, number = 1}, fired)
+		claims_run(server, 1)
+		claim := game.Hit_Claim {
+			claimed = {owner = SHOOTER, shot = 1, fired = fired, weapon = .AK74, target = TARGET, part = 9, pos = from, velocity = {4, -3}, start = from, point = from, amount = 30},
+			seen = 2, taken = 2, steps = 1,
+		}
+		target := &server.world.soldiers[TARGET]
+		game.world_hear(&server.world, claim, server.world.tick)
+		claims_run(server, 1)
+		wounded := target.vitals.health < game.DEFAULT_HEALTH
+		testing.expectf(t, wounded == trust, "trusted %v: the claim off its target wounded it: %v (health %.1f)", trust, wounded, target.vitals.health)
+		if trust do testing.expect_value(t, target.vitals.health, game.DEFAULT_HEALTH - 30)
+
+		claim.claimed.kills = true // its screen saw it kill: the target dies, its health here what it may
+		game.world_hear(&server.world, claim, server.world.tick)
+		claims_run(server, 1)
+		testing.expectf(t, target.vitals.dead == trust, "trusted %v: the claimed kill killed: %v", trust, target.vitals.dead)
+	}
+}
+
+// With a server that trusts its claims, the shooter's screen kills and the server always
+// agrees: none taken back, every death shown before the server ruled it.
+@(test)
+trusted_kills_never_taken_back :: proc(t: ^testing.T) {
+	for delay in ([]int{1, 6, 12}) {
+		p := claims_play(delay, .Rifle, enemy = true, trust = true)
+		defer {
+			delete(p.killed_server)
+			delete(p.killed_shown)
+			delete(p.killed_watched)
+		}
+		early := 0
+		for k, i in p.killed_server {
+			if i < len(p.killed_shown) && p.killed_shown[i] < k do early += 1
+		}
+		fmt.printfln("trusted, a line %d ticks each way: %d deaths ruled; %d shown by the shooter's screen, %d before the server ruled them; %d taken back; %d shown to the watcher",
+			delay, len(p.killed_server), len(p.killed_shown), early, p.taken_back, len(p.killed_watched))
+		testing.expect(t, len(p.killed_server) >= 2, "the target was killed, again and again")
+		testing.expect_value(t, len(p.killed_shown), len(p.killed_server))
+		testing.expect_value(t, early, len(p.killed_server))
+		testing.expect_value(t, p.taken_back, 0)
+		testing.expect_value(t, len(p.killed_watched), len(p.killed_server))
+	}
 }
 
 // `ticks` of the server alone, the first two soldiers standing, aimed at each other.

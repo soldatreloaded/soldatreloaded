@@ -5,6 +5,7 @@ import "core:math"
 import sa "core:container/small_array"
 
 import "../game"
+import res "../resources"
 import "../utils"
 
 // The client's end of the two streams (stream.odin).
@@ -425,7 +426,9 @@ client_stream_collect :: proc(c: ^Client_Stream, g: ^game.Game, me: game.Soldier
 		case game.Hit_Claimed:
 			if e.owner != me || e.target == me do continue
 			view := claim_view(c, e.target, tick) or_continue
-			wire_push(&c.out, game.Hit_Claim{claimed = e, seen = view.seen, taken = view.taken, pre = view.pre, steps = view.steps}, tick)
+			claimed := e
+			claimed.kills = killed_here(g, me, e.target, tick)
+			wire_push(&c.out, game.Hit_Claim{claimed = claimed, seen = view.seen, taken = view.taken, pre = view.pre, steps = view.steps}, tick)
 		case game.Blast_Claimed:
 			// the blast is claimed whoever it reached, none too: the server lets it go off
 			// as the claim says, not as its own flight here would have
@@ -434,12 +437,30 @@ client_stream_collect :: proc(c: ^Client_Stream, g: ^game.Game, me: game.Soldier
 			for i in e.victims {
 				if game.Soldier_Id(i) == me || int(claim.view_count) >= game.BLAST_VIEWS do continue
 				view := claim_view(c, game.Soldier_Id(i), tick) or_continue
+				view.amount = blast_wounds(g, me, game.Soldier_Id(i), e.weapon)
+				view.kills = killed_here(g, me, game.Soldier_Id(i), tick)
 				claim.views[claim.view_count] = view
 				claim.view_count += 1
 			}
 			wire_push(&c.out, claim, tick)
 		}
 	}
+}
+
+// Whether my own hit killed soldier `id` on my screen in `tick` (game.foresee_hit).
+@(private = "file")
+killed_here :: proc(g: ^game.Game, me, id: game.Soldier_Id, tick: u32) -> bool {
+	death := g.world.foresight.deaths[id]
+	return death.set && death.killer == me && death.tick == tick
+}
+
+// The wounds my blast of `weapon` gave soldier `id` on my screen this tick.
+@(private = "file")
+blast_wounds :: proc(g: ^game.Game, me, id: game.Soldier_Id, weapon: res.Weapon) -> (amount: f32) {
+	for event in sa.slice(&g.output.events) {
+		if hit, is := event.(game.Hit); is && hit.shooter == me && hit.target == id && hit.weapon == weapon do amount += hit.amount
+	}
+	return
 }
 
 // The picture of soldier `id` this tick, as a claim names it; none for one quiet, or taken

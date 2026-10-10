@@ -76,6 +76,7 @@ Hit :: struct {
 	airtime:   i32,
 	ricochets: u8,
 	seen:      u32,        // the tick its shooter's screen showed as it landed, a claim's; 0 for this machine's present
+	kills:     bool,       // a trusted claim's: its shooter's screen showed it kill, so it kills
 }
 
 // The owner's decisions, which a client tells the server: every shot it fires, its gun

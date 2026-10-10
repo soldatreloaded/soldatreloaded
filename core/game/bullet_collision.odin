@@ -354,6 +354,7 @@ hit_tell :: proc(
 	push: utils.Vec2,
 	stops: bool,
 	bloodless: bool, // a teammate's thrown knife: heard, not bled
+	amount: f32, // the wound, as this screen reckoned it
 	out: ^Tick_Output,
 ) {
 	if authority == nil {
@@ -370,6 +371,7 @@ hit_tell :: proc(
 			start    = start,
 			point    = point,
 			stopped  = stops,
+			amount   = amount,
 		})
 		return
 	}
@@ -432,19 +434,12 @@ body_collide :: proc(
 		// A corpse is met where its body lies this tick, not where it was `lag` ticks ago:
 		// it moves slowly, and no history is kept of it.
 		corpse := live.vitals.dead
-		if !corpse && hit_decided_elsewhere(world, authority, bullet, target_id) { // told, or claimed (hit_claim.odin)
-			// another's grenade, rocket or knife through a body here may have met it on its
-			// thrower's screen: where it ends next waits for the word of it
-			if authority == nil && !bullet.met_body && claimed_end(bullet.style) {
-				for k in HIT_PARTS {
-					if _, met := utils.line_circle_collision(start, end, target.pose.skeleton[k] - {2, 0}, radius); met {
-						bullet.met_body = true
-						break
-					}
-				}
-			}
-			continue
-		}
+		// Another's shot on a client meets the living here for show alone: the blood, the
+		// bullet stopped or slowed, a grenade or rocket gone off; the wound, the shove and
+		// the claim are its shooter's and the server's, whose word of the hit then shows
+		// nothing more (foresee_shown).
+		shown_only := !corpse && authority == nil && world.soldiers[bullet.owner].remote
+		if !corpse && !shown_only && hit_decided_elsewhere(world, authority, bullet, target_id) do continue // claimed (hit_claim.odin)
 		joints := corpse_joints(&world.corpses[ti]) if corpse else target.pose.skeleton
 
 		// The part is the one met nearest the start; the point is the last one met, in
@@ -481,18 +476,19 @@ body_collide :: proc(
 			from, velocity := bullet.pos, bullet.velocity
 			bullet.pos = point
 			blood(bullet, target_id, point, out)
+			if shown_only do foresee_shown(world, bullet, target_id)
 			speed := utils.length(bullet.velocity)
 			amount := speed * bullet.damage * modifier
 			kills := !corpse && live.vitals.health - hit_damage(world, Hit{shooter = bullet.owner, target = target_id, amount = amount}) < 1.0
-			wound(resources, bullet, target_id, amount, &joints, part, point, push, true, out)
-			if !corpse {
+			if !shown_only do wound(resources, bullet, target_id, amount, &joints, part, point, push, true, out)
+			if !corpse && !shown_only {
 				stops := !kills && speed <= 23 && !(speed > 5 && speed / stats.speed >= 0.9) // as below
 				airtime := resources.weapons[bullet.weapon].timeout - bullet.timeout
-				hit_tell(authority, bullet, airtime, target_id, part, from, velocity, start, point, &joints, push, stops, false, out)
+				hit_tell(authority, bullet, airtime, target_id, part, from, velocity, start, point, &joints, push, stops, false, amount, out)
 			}
 
 			// a punched enemy starts throwing its gun away
-			if bullet.style == .Punch && (live.team == .None || live.team != owner.team) {
+			if bullet.style == .Punch && !shown_only && (live.team == .None || live.team != owner.team) {
 				res.animation_switch(resources.animations, &live.pose.body, .Throw_Weapon, 11)
 			}
 			bullet.last_hit = target_id
@@ -515,6 +511,7 @@ body_collide :: proc(
 			return
 		case .Frag_Grenade:
 			if corpse do return // grenades roll over corpses, and look no further
+			if shown_only do foresee_shown(world, bullet, target_id) // gone off here for show: its blast wounds nobody here
 			explode(world, resources, id, .Frag, target_id, part, authority, .Flight, out)
 			return
 		case .M79, .LAW:
@@ -522,20 +519,22 @@ body_collide :: proc(
 			explode(world, resources, id, .M79, target_id, part, authority, .Flight, out)
 			bullet.pos = point
 			bullet_end(world, id, out)
-			wound(resources, bullet, target_id, utils.length(bullet.velocity) * bullet.damage, &joints, part, point, push, false, out)
+			if shown_only do foresee_shown(world, bullet, target_id)
+			else do wound(resources, bullet, target_id, utils.length(bullet.velocity) * bullet.damage, &joints, part, point, push, false, out)
 			return
 		case .Thrown_Knife:
 			// The hit's sound on whoever it meets, and its blood unless a teammate's. Through a
 			// corpse it hits it once (last_hit), so it is heard once.
 			friendly := owner.team != .None && owner.team == live.team && target_id != bullet.owner
 			emit(out, Blood{target = target_id, pos = point, velocity = bullet.velocity, bloodless = friendly})
-			wound(resources, bullet, target_id, utils.length(bullet.velocity) * bullet.damage * 0.01, &joints, part, point, push, false, out)
+			if shown_only do foresee_shown(world, bullet, target_id)
+			else do wound(resources, bullet, target_id, utils.length(bullet.velocity) * bullet.damage * 0.01, &joints, part, point, push, false, out)
 			if corpse { // it goes through a corpse rather than sticking in it
 				bullet.last_hit = target_id
 				return
 			}
 			airtime := resources.weapons[bullet.weapon].timeout - bullet.timeout
-			hit_tell(authority, bullet, airtime, target_id, part, bullet.pos, bullet.velocity, start, point, &joints, push, true, friendly, out)
+			if !shown_only do hit_tell(authority, bullet, airtime, target_id, part, bullet.pos, bullet.velocity, start, point, &joints, push, true, friendly, utils.length(bullet.velocity) * bullet.damage * 0.01, out)
 			knife_land(world, bullet)
 			bullet_end(world, id, out, point)
 			return

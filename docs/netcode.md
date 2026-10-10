@@ -179,6 +179,16 @@ then shown no more (core/game/foresight.odin). One never confirmed in 90 ticks, 
 another's kill first, is taken back, its feed lines with it. A shooter's hit on itself
 is the server's to judge: its own soldier on its own screen is no snapshot's.
 
+An experiment, for a group that trusts each other: this build's server takes
+every claim as its client says, nothing seen again but that its target is alive. A claim
+carries the wound its screen reckoned and whether its screen showed it kill (the
+foresight's), and the server lands that wound, and the kill whatever its own health
+says: the shooter's screen is never taken back. Any client can claim anything there.
+And every client meets the others' shots with the living for show: the blood, a bullet
+stopped or slowed, a grenade or rocket gone off there, but no wound, no shove and no
+claim; the server's word of the same hit then shows no more blood (foresee_shown). Its
+screen may show a hit the server never lands.
+
 A soldier killed fires on until its own screen is told, a trip to the server and one
 back. The kill is set in the game's time, the tick its killer's screen showed (a
 claim's, or the server's present for its own), and what the dead soldier fired after it,

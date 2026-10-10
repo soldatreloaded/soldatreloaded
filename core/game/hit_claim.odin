@@ -41,6 +41,10 @@ Hit_Claimed :: struct {
 	start:    utils.Vec2, // where the path met on began: the bullet, or a blade's hand
 	point:    utils.Vec2, // where it met the body
 	stopped:  bool,       // the bullet ended in it
+	// the wound as its screen reckoned it, and whether its screen showed it kill
+	// (foresight.odin): what a server that trusts its claims lands (Authority.trust)
+	amount:   f32,
+	kills:    bool,
 }
 
 // The claim on the wire: the event, and the picture of the target it was met in: the
@@ -100,6 +104,8 @@ Blast_Claim :: struct {
 Blast_View :: struct {
 	target:                    Soldier_Id,
 	seen, taken, pre, steps:   u8,
+	amount:                    f32,  // the blast's wounds on it, as its screen reckoned them
+	kills:                     bool, // and whether its screen showed them kill
 }
 
 BLAST_VIEWS :: 8 // soldiers a blast claims, at most
@@ -117,6 +123,7 @@ BLAST_PATH_SLACK :: f32(3)   // how far off its flight a grenade or rocket may g
 // ended: on the server a client's claim, which comes a round trip after (a knife lands
 // then, so not long); on a client the server's word, for another's that went through a
 // body here.
+TRUSTED_WOUND_MAX :: f32(5000) // a trusted claim's wound at most: past any weapon's, a sanity bound alone
 HOLD_BLAST :: 90
 HOLD_KNIFE :: 20
 HOLD_TOLD :: 120
@@ -330,35 +337,48 @@ hit_claim_judge :: proc(world: ^World, resources: ^Resources, authority: ^Author
 	if shot_after_death(world, authority, claim.owner, record.fired) do return // fired once dead here
 	info := &resources.weapons[claim.weapon]
 	if !hit_claimed_style(info.bullet_style) do return
+	// Trusted (Authority.trust), the claim is taken as its client says, the target alive
+	// here all that is asked: its wound and its kill the client's own, nothing seen again.
+	trusted := authority.trust
 	age := int(claim.airtime)
-	if age >= len(record.trace) do return
-	traced := record.trace[age]
-
-	// the bullet: on its shot's flight, going its way, and no faster
-	if !on_flight(record, age, claim.pos) do return
-	speed, traced_speed := utils.length(claim.velocity), utils.length(traced.velocity)
-	if speed > traced_speed + 0.01 do return
-	if speed > 0 && traced_speed > 0 && linalg.dot(claim.velocity / speed, traced.velocity / traced_speed) < 0.995 do return
-	melee := info.bullet_style == .Punch || info.bullet_style == .Knife
-	if melee {
-		if utils.length(claim.start - claim.pos) > MELEE_REACH do return
-	} else if utils.length(claim.start - claim.pos) > 0.01 {
-		return
+	if age >= len(record.trace) {
+		if !trusted || len(record.trace) == 0 do return
+		age = len(record.trace) - 1
 	}
-
-	// the target as the shooter's screen had it
-	if int(claim.target) >= MAX_PLAYERS || !world.soldiers[claim.target].active do return
-	if claim.seen < claim.taken || claim.seen > CLAIM_SEEN_MAX do return
-	if int(claim.pre) > SEEN_STEPS_MAX || claim.steps < 1 || claim.steps > CLAIM_SEEN_MAX + 1 do return
-	seen, taken := tick - u32(claim.seen), tick - u32(claim.taken)
-	target, made := target_as_seen(world, resources, authority, claim.owner, claim.target, seen, taken, int(claim.pre), int(claim.steps))
-	if !made || target.vitals.dead || target.vitals.cease_fire >= 0 do return
+	traced := record.trace[age]
+	speed := utils.length(claim.velocity)
 	part := int(claim.part)
-	if !hit_part(part) do return
-	center := target.pose.skeleton[part]
-	if !melee do center.x -= 2.0 // the sprites sit two pixels off
-	if _, met := utils.line_circle_collision(claim.start, claim.pos + claim.velocity, center, PART_RADIUS + CLAIM_BODY_SLACK); !met do return
-	if !on_body(&target.pose.skeleton, claim.point, melee) do return
+	if !hit_part(part) || int(claim.target) >= MAX_PLAYERS || !world.soldiers[claim.target].active do return
+
+	target: Soldier
+	if trusted {
+		target = world.soldiers[claim.target]
+		if target.vitals.dead || claim.target == claim.owner do return
+	} else {
+		// the bullet: on its shot's flight, going its way, and no faster
+		if !on_flight(record, age, claim.pos) do return
+		traced_speed := utils.length(traced.velocity)
+		if speed > traced_speed + 0.01 do return
+		if speed > 0 && traced_speed > 0 && linalg.dot(claim.velocity / speed, traced.velocity / traced_speed) < 0.995 do return
+		melee := info.bullet_style == .Punch || info.bullet_style == .Knife
+		if melee {
+			if utils.length(claim.start - claim.pos) > MELEE_REACH do return
+		} else if utils.length(claim.start - claim.pos) > 0.01 {
+			return
+		}
+
+		// the target as the shooter's screen had it
+		if claim.seen < claim.taken || claim.seen > CLAIM_SEEN_MAX do return
+		if int(claim.pre) > SEEN_STEPS_MAX || claim.steps < 1 || claim.steps > CLAIM_SEEN_MAX + 1 do return
+		seen, taken := tick - u32(claim.seen), tick - u32(claim.taken)
+		made: bool
+		target, made = target_as_seen(world, resources, authority, claim.owner, claim.target, seen, taken, int(claim.pre), int(claim.steps))
+		if !made || target.vitals.dead || target.vitals.cease_fire >= 0 do return
+		center := target.pose.skeleton[part]
+		if !melee do center.x -= 2.0 // the sprites sit two pixels off
+		if _, met := utils.line_circle_collision(claim.start, claim.pos + claim.velocity, center, PART_RADIUS + CLAIM_BODY_SLACK); !met do return
+		if !on_body(&target.pose.skeleton, claim.point, melee) do return
+	}
 
 	// it holds: the hit, as the flight here would have made it
 	record.hits += 1
@@ -366,6 +386,7 @@ hit_claim_judge :: proc(world: ^World, resources: ^Resources, authority: ^Author
 	owner := &world.soldiers[claim.owner]
 	knife := info.bullet_style == .Thrown_Knife // a hundredth the wound, no part of the body more than another, no spray, as body_collide's
 	amount := speed * traced.damage * 0.01 if knife else speed * traced.damage * hitbox_modifier(&info.stats, part)
+	if trusted do amount = clamp(claim.amount, 0, TRUSTED_WOUND_MAX)
 	friendly := knife && owner.team != .None && owner.team == live.team && claim.target != claim.owner
 	push: utils.Vec2
 	if !live.vitals.dead do push = claim.velocity * info.stats.push
@@ -388,6 +409,7 @@ hit_claim_judge :: proc(world: ^World, resources: ^Resources, authority: ^Author
 		airtime   = i32(age),
 		ricochets = u8(clamp(traced.ricochets, 0, 255)),
 		seen      = clamp(tick, record.fired, world.tick),
+		kills     = trusted && claim.kills,
 	})
 	if info.bullet_style == .Punch && !live.vitals.dead && (live.team == .None || live.team != owner.team) {
 		res.animation_switch(resources.animations, &live.pose.body, .Throw_Weapon, 11)
@@ -430,17 +452,21 @@ blast_claim_judge :: proc(world: ^World, resources: ^Resources, authority: ^Auth
 	if shot_after_death(world, authority, claim.owner, record.fired) do return // thrown once dead here
 	style := resources.weapons[claim.weapon].bullet_style
 	if style != .Frag_Grenade && style != .M79 && style != .LAW do return
+	trusted := authority.trust // taken as its client says (Authority.trust)
 	age := int(claim.airtime)
-	if age > len(record.trace) do return // past where its flight here had got to, or ended
+	if age > len(record.trace) && !trusted do return // past where its flight here had got to, or ended
 
 	// where it went off: on its flight; on a body, exactly where the flight was then,
 	// and the body met there as its client had it
 	last := min(age, len(record.trace) - 1)
-	if !on_flight_within(record, last, claim.pos, BLAST_PATH_SLACK) do return
+	if !trusted && !on_flight_within(record, last, claim.pos, BLAST_PATH_SLACK) do return
 	views := claim.views[:min(int(claim.view_count), BLAST_VIEWS)]
 	direct, has_direct := claim.direct.?
 	struck := -1
-	if has_direct {
+	if has_direct && trusted {
+		if int(direct) >= MAX_PLAYERS || !hit_part(int(claim.part)) do return
+		struck = int(claim.part)
+	} else if has_direct {
 		if age >= len(record.trace) || int(direct) >= MAX_PLAYERS do return
 		traced := record.trace[age]
 		if utils.length(claim.pos - traced.pos) > 0.05 || utils.length(claim.velocity - traced.velocity) > 0.05 do return
@@ -464,16 +490,27 @@ blast_claim_judge :: proc(world: ^World, resources: ^Resources, authority: ^Auth
 	traced := record.trace[last]
 	for view in views {
 		if view.target == claim.owner || int(view.target) >= MAX_PLAYERS || !world.soldiers[view.target].active do continue
-		target, seen := view_target(world, resources, authority, claim.owner, view, tick)
+		target: Soldier
+		seen: bool
+		if trusted {
+			target, seen = world.soldiers[view.target], true // as it is here: the wounds are the claim's
+		} else {
+			target, seen = view_target(world, resources, authority, claim.owner, view, tick)
+		}
 		if !seen || target.vitals.dead do continue
 		met := struck if has_direct && direct == view.target else -1
 		amount, part, push, impact, reached := blast_on(resources, claim.kind, claim.pos, &target.pose.skeleton, target.vitals.cease_fire, met)
-		if !reached do continue
-		emit(out, Hit{shooter = claim.owner, target = view.target, weapon = claim.weapon, amount = amount, part = 0, pos = target.pose.skeleton[part], push = push, impact = impact, spray = true, seen = clamp(tick, record.fired, world.tick)})
+		if trusted {
+			if view.amount <= 0 && !view.kills do continue
+			amount = clamp(view.amount, 0, TRUSTED_WOUND_MAX) // a rocket's wound by its speed among them
+		} else if !reached {
+			continue
+		}
+		emit(out, Hit{shooter = claim.owner, target = view.target, weapon = claim.weapon, amount = amount, part = 0, pos = target.pose.skeleton[part], push = push, impact = impact, spray = true, seen = clamp(tick, record.fired, world.tick), kills = trusted && view.kills})
 		emit(out, Shot_Hit{owner = claim.owner, shot = claim.shot, fired = claim.fired, weapon = claim.weapon, target = view.target, push = push, blast = true})
 		landed_add(authority, claim.owner, view.target, tick, push)
 		// a rocket or an M79 grenade on a body wounds it by its own speed besides
-		if met >= 0 && style != .Frag_Grenade {
+		if met >= 0 && style != .Frag_Grenade && !trusted {
 			wound_push := claim.velocity * resources.weapons[claim.weapon].stats.push
 			emit(out, Hit{shooter = claim.owner, target = view.target, weapon = claim.weapon, amount = utils.length(claim.velocity) * traced.damage, part = u8(met + 1), pos = target.pose.skeleton[met], push = wound_push, seen = clamp(tick, record.fired, world.tick)})
 			landed_add(authority, claim.owner, view.target, tick, wound_push)
@@ -637,7 +674,8 @@ bullet_shot_hit :: proc(world: ^World, resources: ^Resources, told: Shot_Hit, ou
 	target := &world.soldiers[told.target]
 	part := int(told.part) if hit_part(int(told.part)) else 0
 	at := target.pose.skeleton[part] + told.offset
-	if target.active && !told.blast do emit(out, Blood{target = told.target, pos = at, velocity = told.velocity, bloodless = told.bloodless})
+	shown := foresee_was_shown(world, told.owner, told.shot, told.fired, told.target) // bled here already, by this machine's own flight of it
+	if target.active && !told.blast && !shown do emit(out, Blood{target = told.target, pos = at, velocity = told.velocity, bloodless = told.bloodless})
 	if target.active && !target.remote && !target.vitals.dead {
 		target.body.next_push += told.push
 		// the hit's spray, as a flight here meeting this soldier gave it: the server's word
