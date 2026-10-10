@@ -92,12 +92,14 @@ GUN_FILES := [res.Weapon]string {
 
 Art :: struct {
 	book:           draw.Sprite_Book,
+	interface:      res.Interface_Layout,
 	pictures:       [Picture]draw.Sprite,
 	guns:           [res.Weapon]draw.Sprite,
 	kill_left_text: f32, // a kill feed line's start with the feed on the left, past the widest icon
 }
 
 art_load :: proc(art: ^Art, mod: res.Mod) {
+	art.interface = res.interface_read(mod)
 	draw.sprite_book_open(&art.book, mod, ART_SIDE)
 	listings := draw.source_listings() // interface-gfx read once for them all
 	for file, picture in PICTURE_FILES do art.pictures[picture] = interface_image(art, file, listings)
