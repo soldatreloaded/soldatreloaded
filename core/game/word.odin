@@ -54,7 +54,7 @@ heard_apply :: proc(world: ^World, resources: ^Resources, authority: ^Authority,
 		case Gun_Drop:   if turn == .Soldiers do things_ask(world, w)
 		case Flag_Throw: if turn == .Soldiers do things_ask(world, w)
 		case Shot:
-			if turn != .Bullets do continue
+			if turn != .Bullets || shot_after_death(world, authority, w.owner, hearing.tick) do continue
 			if authority == nil && int(w.owner) not_in flashed { // a client hearing of it: the flash
 				flashed += {int(w.owner)}
 				bullet_remote_fire(world, resources, w, out)
@@ -73,7 +73,9 @@ heard_apply :: proc(world: ^World, resources: ^Resources, authority: ^Authority,
 		// recorded as the server's own are, for the sounds, the sparks and the feed; a
 		// client's collection for the wire leaves rulings out, so none goes back
 		case Ruling:
+			if authority == nil && turn == .Soldiers do foresee_paid(world, w, hearing.tick) // before this step's own hits are reckoned
 			if turn != ruling_turn(w) do continue
+			if authority == nil && !foresee_ruling(world, resources, w, out) do continue // a death shown already
 			// a placing the snapshot has already made: the snapshot often comes before the
 			// word. Placed again, all the life's own is begun as the server began it (the
 			// randomness, and what is never on the wire), but the guns are kept: placed with

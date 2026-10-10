@@ -178,6 +178,8 @@ client_stream_hear :: proc(c: ^Client_Stream, g: ^game.Game, me: game.Soldier_Id
 			game.soldier_hit_spray(&g.world, &g.resources, me, damage.attacker, .Told)
 		}
 	}
+	wire_pending_eager(&c.pending, &g.world) // the hits and the blasts as they are heard
+
 	for i in 0 ..< game.MAX_PLAYERS {
 		if m.word[i] == .State {
 			c.last_word[i] = m.tick
@@ -266,6 +268,9 @@ soldier_apply :: proc(c: ^Client_Stream, g: ^game.Game, id: game.Soldier_Id, fra
 	w := &g.world
 	s := &w.soldiers[id]
 	heard := &frame.soldiers[id]
+	// a death my own hit gave it here, the server not yet saying so: it stays dead
+	if game.foresee_holds(w, id, heard) do return
+	game.foresee_health(w, id, frame.tick)
 	placed := heard.vitals.life != s.vitals.life
 	before := s.body.pos
 	soldier_take_served(s, heard)

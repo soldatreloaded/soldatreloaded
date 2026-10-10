@@ -119,6 +119,100 @@ respawn_heard_late :: proc(t: ^testing.T) {
 	testing.expect_value(t, me.arsenal.primary.weapon, res.Weapon.Punch)
 }
 
+// A hit and a blast's end are given the world as they are heard, past the view's tick,
+// and not again in their turn; but not while their shot still waits, nor a ruling ever.
+@(test)
+hits_heard_at_once :: proc(t: ^testing.T) {
+	g := make_game(authority = false)
+	defer {game.game_destroy(g); free(g)}
+	p: net.Wire_Pending
+	keep :: proc(p: ^net.Wire_Pending, seq: u32, word: game.Word, tick: u32) {
+		p.items[seq % net.WIRE_PENDING] = {word, tick}
+		p.seq[seq % net.WIRE_PENDING] = seq
+		p.received = max(p.received, seq)
+		sa.push_back(&p.fresh, seq)
+	}
+	view := g.world.tick
+	keep(&p, 1, game.Shot_Hit{owner = 0, shot = 7, fired = view + 3, target = 1}, view + 20)  // its shot flown already
+	keep(&p, 2, game.Shot{owner = 0, number = 8}, view + 30)                                 // a shot still to fly here
+	keep(&p, 3, game.Shot_End{owner = 0, shot = 8, fired = view + 30}, view + 40)            // its end
+	keep(&p, 4, game.Ruling(game.Damage{attacker = 0, target = 1, amount = 10}), view + 20)  // a ruling waits for its tick
+	net.wire_pending_eager(&p, &g.world)
+	testing.expect_value(t, sa.len(g.world.heard), 1)
+	_, is_hit := sa.get(g.world.heard, 0).word.(game.Shot_Hit)
+	testing.expect(t, is_hit, "the hit heard at once")
+
+	sa.clear(&g.world.heard)
+	net.wire_pending_apply(&p, &g.world, view + 100)
+	testing.expect_value(t, sa.len(g.world.heard), 3) // the shot, its end after it, the ruling: the hit not again
+	_, first_shot := sa.get(g.world.heard, 0).word.(game.Shot)
+	_, then_end := sa.get(g.world.heard, 1).word.(game.Shot_End)
+	testing.expect(t, first_shot && then_end, "the shot flies before its end is heard")
+}
+
+// A death a client's own hit gave another soldier shows at once, and stays through the
+// server's snapshots of it alive until its word comes: then that word is the same death
+// and is shown no more. One the server never confirms is taken back; one another's kill
+// came first to is taken back for the server's.
+@(test)
+deaths_foreseen :: proc(t: ^testing.T) {
+	g := make_game(authority = false)
+	defer {game.game_destroy(g); free(g)}
+	place(g, 0, .Alpha)
+	place(g, 1, .Bravo)
+	place(g, 2, .Bravo)
+	g.world.soldiers[1].remote = true
+	g.world.soldiers[2].remote = true
+	target := &g.world.soldiers[1]
+	alive := target^ // the server's word of it, alive still
+	out: game.Tick_Output
+	kill :: proc(g: ^game.Game, out: ^game.Tick_Output) {
+		game.clear_output(out)
+		game.foresee_hit(&g.world, &g.resources, game.Hit{shooter = 0, target = 1, weapon = .AK74, amount = 60, part = 12}, out)
+	}
+	kills_in :: proc(out: ^game.Tick_Output) -> (n: int) {
+		for r in sa.slice(&out.rulings) do if _, is := r.(game.Kill); is do n += 1
+		return
+	}
+
+	// wounds owed, then the one that kills
+	kill(g, &out)
+	kill(g, &out)
+	testing.expect(t, !target.vitals.dead, "two wounds of 60 leave 30")
+	kill(g, &out)
+	testing.expect(t, target.vitals.dead, "the third kills, here, at once")
+	testing.expect_value(t, kills_in(&out), 1)
+	testing.expect(t, game.foresee_holds(&g.world, 1, &alive), "the server's snapshot of it alive is not taken")
+
+	// confirmed: its snapshot dead, then its Kill, shown no more
+	dead := alive
+	dead.vitals.dead = true
+	testing.expect(t, !game.foresee_holds(&g.world, 1, &dead), "its snapshot dead is taken")
+	testing.expect(t, !game.foresee_ruling(&g.world, &g.resources, game.Kill{killer = 0, target = 1}, &out), "the server's Kill is the death shown")
+
+	// never confirmed: taken back after the hold, and its snapshot alive taken again
+	target^ = alive
+	kill(g, &out); kill(g, &out); kill(g, &out)
+	testing.expect(t, target.vitals.dead, "foreseen again")
+	game.clear_output(&out)
+	for _ in 0 ..= game.FORESEEN_HOLD do g.world.tick += 1
+	game.foresee_tick(&g.world, &out)
+	back := 0
+	for e in sa.slice(&out.events) do if _, is := e.(game.Kill_Taken_Back); is do back += 1
+	testing.expect_value(t, back, 1)
+	testing.expect(t, !game.foresee_holds(&g.world, 1, &alive), "its snapshot alive is taken: it stands again")
+
+	// another's kill first: the foreseen one taken back, the server's carried out
+	target^ = alive
+	kill(g, &out); kill(g, &out); kill(g, &out)
+	game.clear_output(&out)
+	testing.expect(t, game.foresee_ruling(&g.world, &g.resources, game.Kill{killer = 2, target = 1}, &out), "another's Kill is carried out")
+	testing.expect(t, !target.vitals.dead, "the foreseen death taken back for it")
+	back = 0
+	for e in sa.slice(&out.events) do if _, is := e.(game.Kill_Taken_Back); is do back += 1
+	testing.expect_value(t, back, 1)
+}
+
 @(private = "file")
 run :: proc(g: ^game.Game, ticks: int, buttons: game.Buttons) {
 	for _ in 0 ..< ticks {

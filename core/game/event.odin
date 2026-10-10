@@ -36,6 +36,8 @@ Event :: union {
 	Hit_Claimed,
 	Shot_Hit,
 	Blast_Claimed,
+	// a death this client foresaw that the server never confirmed (foresight.odin), for showing
+	Kill_Taken_Back,
 }
 
 MAX_EVENTS :: 256
@@ -73,6 +75,7 @@ Hit :: struct {
 	distance:  f32,        // the bullet's flight, for the killer's readout
 	airtime:   i32,
 	ricochets: u8,
+	seen:      u32,        // the tick its shooter's screen showed as it landed, a claim's; 0 for this machine's present
 }
 
 // The owner's decisions, which a client tells the server: every shot it fires, its gun

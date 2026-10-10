@@ -80,7 +80,7 @@ server_stream_receive :: proc(s: ^Server_Stream, g: ^game.Game, slot: game.Soldi
 	// its decisions, each once, into the inbox: the step does them next tick. Those of a
 	// soldier not alive here are heard and dropped by the step's own rules.
 	event_last := s.event_last
-	wire_read(&b, &g.world, &event_last, slot, relay)
+	wire_read(&b, &g.world, &event_last, slot, relay, g.authority)
 	if !buffer_done(&b) {
 		s.stats.dropped += 1
 		return false
