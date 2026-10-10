@@ -195,6 +195,34 @@ bullet_record :: proc(authority: ^Authority, bullet: ^Bullet) -> ^Shot_Record {
 }
 
 // ---------------------------------------------------------------------------------
+// Shots fired once dead
+
+// A soldier killed here, its death in the game's time `tick`, the tick its killer's
+// screen showed. What it fires after that, its own screen not yet told, is void
+// (shot_after_death); such of its shots as already fly here are let go of, unseen, so
+// none goes off or lands later on the server's own.
+death_seen :: proc(world: ^World, authority: ^Authority, id: Soldier_Id, tick: u32) {
+	authority.deaths[id] = {life = world.soldiers[id].vitals.life, tick = tick, set = true}
+	for &bullet in world.bullets {
+		if !bullet.active || bullet.owner != id || !bullet.heard || bullet.fired <= tick do continue
+		if record := bullet_record(authority, &bullet); record != nil do record.settled = true
+		bullet.active = false
+	}
+}
+
+// Whether a shot its owner fired in `fired`, by its own screen's tick, came after its
+// death here in the game's time: later than the tick its killer saw it die in, in the
+// life it still lies dead in. Such a shot is void: not flown, not told to the others,
+// and its claims land nothing. One fired before counts though its shooter is dead by
+// the time it is heard: each fired before seeing the other's land, a trade.
+shot_after_death :: proc(world: ^World, authority: ^Authority, owner: Soldier_Id, fired: u32) -> bool {
+	if authority == nil || int(owner) >= MAX_PLAYERS do return false
+	death := &authority.deaths[owner]
+	soldier := &world.soldiers[owner]
+	return death.set && soldier.vitals.dead && soldier.vitals.life == death.life && fired > death.tick
+}
+
+// ---------------------------------------------------------------------------------
 // The server's records of the shots its clients fired: each tick of the flight as it
 // flew there, which a claim is held to.
 
@@ -299,6 +327,7 @@ shot_record_find :: proc(authority: ^Authority, owner: Soldier_Id, shot: u32, we
 hit_claim_judge :: proc(world: ^World, resources: ^Resources, authority: ^Authority, claim: Hit_Claim, tick: u32, out: ^Tick_Output) {
 	record := shot_record_find(authority, claim.owner, claim.shot, claim.weapon, claim.fired)
 	if record == nil || record.hits >= CLAIM_HITS_MAX do return
+	if shot_after_death(world, authority, claim.owner, record.fired) do return // fired once dead here
 	info := &resources.weapons[claim.weapon]
 	if !hit_claimed_style(info.bullet_style) do return
 	age := int(claim.airtime)
@@ -358,6 +387,7 @@ hit_claim_judge :: proc(world: ^World, resources: ^Resources, authority: ^Author
 		distance  = utils.length(claim.pos - record.fired_from) / 14.0,
 		airtime   = i32(age),
 		ricochets = u8(clamp(traced.ricochets, 0, 255)),
+		seen      = clamp(tick, record.fired, world.tick),
 	})
 	if info.bullet_style == .Punch && !live.vitals.dead && (live.team == .None || live.team != owner.team) {
 		res.animation_switch(resources.animations, &live.pose.body, .Throw_Weapon, 11)
@@ -397,6 +427,7 @@ blast_claim_judge :: proc(world: ^World, resources: ^Resources, authority: ^Auth
 	claim := claim
 	record := shot_record_find(authority, claim.owner, claim.shot, claim.weapon, claim.fired)
 	if record == nil || record.settled || len(record.trace) == 0 do return
+	if shot_after_death(world, authority, claim.owner, record.fired) do return // thrown once dead here
 	style := resources.weapons[claim.weapon].bullet_style
 	if style != .Frag_Grenade && style != .M79 && style != .LAW do return
 	age := int(claim.airtime)
@@ -438,13 +469,13 @@ blast_claim_judge :: proc(world: ^World, resources: ^Resources, authority: ^Auth
 		met := struck if has_direct && direct == view.target else -1
 		amount, part, push, impact, reached := blast_on(resources, claim.kind, claim.pos, &target.pose.skeleton, target.vitals.cease_fire, met)
 		if !reached do continue
-		emit(out, Hit{shooter = claim.owner, target = view.target, weapon = claim.weapon, amount = amount, part = 0, pos = target.pose.skeleton[part], push = push, impact = impact, spray = true})
+		emit(out, Hit{shooter = claim.owner, target = view.target, weapon = claim.weapon, amount = amount, part = 0, pos = target.pose.skeleton[part], push = push, impact = impact, spray = true, seen = clamp(tick, record.fired, world.tick)})
 		emit(out, Shot_Hit{owner = claim.owner, shot = claim.shot, fired = claim.fired, weapon = claim.weapon, target = view.target, push = push, blast = true})
 		landed_add(authority, claim.owner, view.target, tick, push)
 		// a rocket or an M79 grenade on a body wounds it by its own speed besides
 		if met >= 0 && style != .Frag_Grenade {
 			wound_push := claim.velocity * resources.weapons[claim.weapon].stats.push
-			emit(out, Hit{shooter = claim.owner, target = view.target, weapon = claim.weapon, amount = utils.length(claim.velocity) * traced.damage, part = u8(met + 1), pos = target.pose.skeleton[met], push = wound_push})
+			emit(out, Hit{shooter = claim.owner, target = view.target, weapon = claim.weapon, amount = utils.length(claim.velocity) * traced.damage, part = u8(met + 1), pos = target.pose.skeleton[met], push = wound_push, seen = clamp(tick, record.fired, world.tick)})
 			landed_add(authority, claim.owner, view.target, tick, wound_push)
 		}
 	}

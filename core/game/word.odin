@@ -54,7 +54,7 @@ heard_apply :: proc(world: ^World, resources: ^Resources, authority: ^Authority,
 		case Gun_Drop:   if turn == .Soldiers do things_ask(world, w)
 		case Flag_Throw: if turn == .Soldiers do things_ask(world, w)
 		case Shot:
-			if turn != .Bullets do continue
+			if turn != .Bullets || shot_after_death(world, authority, w.owner, hearing.tick) do continue
 			if authority == nil && int(w.owner) not_in flashed { // a client hearing of it: the flash
 				flashed += {int(w.owner)}
 				bullet_remote_fire(world, resources, w, out)

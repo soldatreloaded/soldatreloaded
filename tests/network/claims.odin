@@ -373,6 +373,59 @@ claims_game :: proc(authority: bool, gravity := game.DEFAULT_GAME_SETTINGS.gravi
 	return g
 }
 
+// A soldier killed fires on, its own screen not yet told: what it fired after its death,
+// by the game's time, is void on the server, not flown; what it fired before flies, a
+// trade; and a grenade it threw after, flying here already as the death came, never
+// goes off.
+@(test)
+shots_after_death_void :: proc(t: ^testing.T) {
+	server := claims_game(true)
+	defer {
+		game.game_destroy(server)
+		free(server)
+	}
+	game.soldier_place(server, SHOOTER, .Alpha, remote = true)
+	game.soldier_place(server, TARGET, .Bravo, remote = false)
+	claims_run(server, 150)
+	flying :: proc(g: ^game.Game) -> (n: int) {
+		for &bullet in g.world.bullets do if bullet.active && bullet.owner == SHOOTER do n += 1
+		return
+	}
+	recorded :: proc(g: ^game.Game, number: u32) -> bool {
+		for &record in g.authority.shots.records do if record.used && record.owner == SHOOTER && record.shot == number do return true
+		return false
+	}
+	shot :: proc(g: ^game.Game, weapon: res.Weapon, number: u32, fired: u32) {
+		from := g.world.soldiers[SHOOTER].body.pos - {0, 30}
+		game.world_hear(&g.world, game.Shot{owner = SHOOTER, weapon = weapon, pos = from, velocity = {4, -3}, damage = 1, number = number}, fired)
+	}
+
+	// thrown in a tick still to come by the server's count, so after the death below
+	shot(server, .Frag_Grenade, 1, server.world.tick + 10)
+	claims_run(server, 1)
+	testing.expect_value(t, flying(server), 1)
+	game.world_ask_kill(&server.world, SHOOTER, false)
+	claims_run(server, 1)
+	died := server.world.tick
+	testing.expect(t, server.world.soldiers[SHOOTER].vitals.dead, "killed")
+	testing.expect_value(t, flying(server), 0) // the grenade let go of, unseen
+
+	shot(server, .AK74, 2, died + 3) // fired after
+	shot(server, .AK74, 3, died - 2) // fired before: a trade
+	claims_run(server, 1)
+	testing.expect(t, !recorded(server, 2), "the shot fired after its death not flown")
+	testing.expect(t, recorded(server, 3), "the shot fired before it flown")
+
+	went_off := false
+	for _ in 0 ..< game.GRENADE_TIMEOUT + game.HOLD_BLAST + 10 {
+		claims_run(server, 1)
+		for event in sa.slice(&server.output.events) {
+			if e, is := event.(game.Explosion); is && e.owner == SHOOTER do went_off = true
+		}
+	}
+	testing.expect(t, !went_off, "the grenade thrown once dead never went off")
+}
+
 // `ticks` of the server alone, the first two soldiers standing, aimed at each other.
 @(private = "file")
 claims_run :: proc(g: ^game.Game, ticks: int) {

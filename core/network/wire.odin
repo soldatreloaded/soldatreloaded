@@ -205,8 +205,9 @@ heard_from :: proc(q: ^Wire_Queue, seq: u32, receiver: Maybe(game.Soldier_Id)) -
 // Reads what wire_write wrote and gives the world each word not yet heard (by `last`,
 // which advances). The server reads with `only_owner` the sender's slot: only that
 // owner's own decisions are taken, the rest dropped, since a client speaks for its
-// soldier alone; and a shot heard goes into `relay` for the others.
-wire_read :: proc(b: ^Buffer, world: ^game.World, last: ^u32, only_owner: game.Soldier_Id, relay: ^Wire_Queue) {
+// soldier alone; and a shot heard goes into `relay` for the others, unless it was fired
+// after its shooter's death there (game.shot_after_death, with `authority`).
+wire_read :: proc(b: ^Buffer, world: ^game.World, last: ^u32, only_owner: game.Soldier_Id, relay: ^Wire_Queue, authority: ^game.Authority = nil) {
 	count: u32
 	net_range(b, &count, WIRE_PER_PACKET)
 	for _ in 0 ..< count {
@@ -217,6 +218,7 @@ wire_read :: proc(b: ^Buffer, world: ^game.World, last: ^u32, only_owner: game.S
 		if !buffer_ok(b) || seq <= last^ do continue
 		last^ = seq
 		if wire_side(item.word) != .Owner || wire_owner(item.word) != only_owner do continue
+		if _, is_shot := item.word.(game.Shot); is_shot && game.shot_after_death(world, authority, only_owner, item.tick) do continue // fired once dead: nobody's news
 		game.world_hear(world, item.word, item.tick)
 		if shot, is_shot := item.word.(game.Shot); is_shot do wire_push(relay, shot, item.tick, only_owner)
 	}
