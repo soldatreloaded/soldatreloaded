@@ -178,6 +178,8 @@ client_stream_hear :: proc(c: ^Client_Stream, g: ^game.Game, me: game.Soldier_Id
 			game.soldier_hit_spray(&g.world, &g.resources, me, damage.attacker, .Told)
 		}
 	}
+	wire_pending_eager(&c.pending, &g.world) // the hits and the blasts as they are heard
+
 	for i in 0 ..< game.MAX_PLAYERS {
 		if m.word[i] == .State {
 			c.last_word[i] = m.tick

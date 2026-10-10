@@ -234,6 +234,7 @@ WIRE_PENDING :: 128
 Wire_Pending :: struct {
 	items:    [WIRE_PENDING]Stamped, // by seq
 	seq:      [WIRE_PENDING]u32,     // the seq held in each slot, 0 for none
+	done:     [WIRE_PENDING]bool,    // given the world already, as heard (wire_pending_eager): passed over in its turn
 	received: u32,                   // the newest seq kept: the acknowledgement
 	applied:  u32,                   // the newest seq applied
 	fresh:    sa.Small_Array(WIRE_PER_PACKET, u32), // the seqs the last read kept for the first time, for what can't wait for its tick
@@ -262,9 +263,44 @@ wire_read_pending :: proc(b: ^Buffer, p: ^Wire_Pending) {
 		if p.seq[seq % WIRE_PENDING] == seq do continue // a resend of one still waiting
 		p.items[seq % WIRE_PENDING] = item
 		p.seq[seq % WIRE_PENDING] = seq
+		p.done[seq % WIRE_PENDING] = false
 		sa.push_back(&p.fresh, seq)
 		if seq > p.received do p.received = seq
 	}
+}
+
+// The words heard that can't wait for their tick: a hit on the living (Shot_Hit) and
+// where a grenade or rocket ended (Shot_End) given the world now, and passed over when
+// their turn comes. The blood, the knock and the blast are no snapshot's, which nothing
+// shown later takes back; held for the view, kept behind the newest after late
+// snapshots, they came that much late. Not while the shot they tell of still waits
+// here, which they would end before it flew.
+wire_pending_eager :: proc(p: ^Wire_Pending, world: ^game.World) {
+	for seq in sa.slice(&p.fresh) {
+		k := seq % WIRE_PENDING
+		if p.seq[k] != seq || p.done[k] do continue
+		owner, shot, fired: u32
+		#partial switch w in p.items[k].word {
+		case game.Shot_Hit: owner, shot, fired = u32(w.owner), w.shot, w.fired
+		case game.Shot_End: owner, shot, fired = u32(w.owner), w.shot, w.fired
+		case: continue
+		}
+		if wire_pending_shot(p, game.Soldier_Id(owner), shot, fired) do continue
+		p.done[k] = true // still held by its seq, so a resend of it is known
+		game.world_hear(world, p.items[k].word, p.items[k].tick)
+	}
+}
+
+// Whether the shot `owner` numbered `shot`, fired in `fired`, is among the words still
+// waiting.
+@(private = "file")
+wire_pending_shot :: proc(p: ^Wire_Pending, owner: game.Soldier_Id, shot, fired: u32) -> bool {
+	for seq := p.applied + 1; seq <= p.received; seq += 1 {
+		k := seq % WIRE_PENDING
+		if p.seq[k] != seq do continue
+		if s, is_shot := p.items[k].word.(game.Shot); is_shot && s.owner == owner && s.number == shot && p.items[k].tick == fired do return true
+	}
+	return false
 }
 
 // Gives the world, in order, every word due by `tick`, each once; one stamped past
@@ -278,6 +314,10 @@ wire_pending_apply :: proc(p: ^Wire_Pending, world: ^game.World, tick: u32) {
 			continue
 		}
 		item := p.items[k]
+		if p.done[k] {
+			p.seq[k], p.done[k], p.applied = 0, false, seq
+			continue
+		}
 		if item.tick > tick do return // not yet
 		p.seq[k] = 0
 		p.applied = seq
