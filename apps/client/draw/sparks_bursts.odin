@@ -191,7 +191,7 @@ fired :: proc(sparks: ^Sparks, game: ^sim.Game, f: sim.Fired) {
 	shooter := &game.world.soldiers[f.soldier]
 	if !shooter.active do return
 	if SHELL_FILES[f.weapon] != "" && f.weapon != .Spas12 && f.weapon != .M79 {
-		joints := &shooter.pose.skeleton
+		joints := sim.soldier_pose(game.resources.animations, shooter, shooter.body.pos)
 		dir := f32(shooter.body.direction)
 		aim := utils.normalize(f.velocity)
 		side := utils.Vec2{dir * aim.y * (random(sparks) * 0.5 + 0.8), -dir * aim.x * (random(sparks) * 0.5 + 0.8)}
@@ -237,7 +237,7 @@ jets_burn :: proc(sparks: ^Sparks, game: ^sim.Game) {
 	}{{1, 4, 5}, {2, 3, 6}}
 	for &soldier in game.world.soldiers {
 		if !soldier.active || soldier.vitals.dead || !soldier_jetting(&soldier) do continue
-		joints := &soldier.pose.skeleton
+		joints := sim.soldier_pose(game.resources.animations, &soldier, soldier.body.pos)
 		jet := soldier.player.look.jet
 		jet.a = 255
 		for leg in legs {
@@ -265,7 +265,7 @@ reloads_drop :: proc(sparks: ^Sparks, game: ^sim.Game) {
 
 		clip_out := gun.reload_count == info.clip_out_time && gun.reload_count > 0 && last != gun.reload_count && gun.ammo == 0
 		if clip_out && CLIP_FILES[gun.weapon] != "" {
-			joints := &soldier.pose.skeleton
+			joints := sim.soldier_pose(game.resources.animations, &soldier, soldier.body.pos)
 			hand := joints[15 - 1]
 			vel := soldier.body.velocity
 			if clip := spark_add(sparks, .Clip, hand + {0, 6}, vel + {0, -0.001}, 255); clip != nil do clip.weapon = gun.weapon
@@ -282,7 +282,7 @@ reloads_drop :: proc(sparks: ^Sparks, game: ^sim.Game) {
 // PlayShell).
 @(private = "file")
 reload_shell :: proc(sparks: ^Sparks, game: ^sim.Game, soldier: ^sim.Soldier, weapon: res.Weapon, spin: f32) {
-	joints := &soldier.pose.skeleton
+	joints := sim.soldier_pose(game.resources.animations, soldier, soldier.body.pos)
 	hand := joints[15 - 1]
 	dir := f32(soldier.body.direction)
 	b := utils.normalize(soldier.controls.aim - hand) * game.resources.weapons[weapon].stats.speed
@@ -348,7 +348,7 @@ wounded_bleed :: proc(sparks: ^Sparks, game: ^sim.Game) {
 	for &soldier in game.world.soldiers {
 		if !soldier.active || soldier.vitals.dead || soldier.team == .Spectator || soldier.vitals.health >= HURT_HEALTH do continue
 		if below(sparks, odds) != 0 do continue
-		joints := &soldier.pose.skeleton
+		joints := sim.soldier_pose(game.resources.animations, &soldier, soldier.body.pos)
 		spark_add(sparks, .Blood, joints[5 - 1] + {2, 0}, soldier.body.velocity, 65 - f32(below(sparks, 10)))
 	}
 }

@@ -121,12 +121,6 @@ Pose :: struct {
 	legs, body: res.Animation_State `net:"owned"`,
 	swing:      [4]utils.Vec2, // gostek.po's points 21 to 24
 	swing_old:  [2]utils.Vec2, // 22's and 24's the tick before
-	// The skeleton as the original keeps it (TSprite.Update): built once a tick after
-	// the controls, before the frame advances and the map moves the body, so it trails
-	// the body by that much. It is what the bullets and the blasts meet, and what is
-	// drawn, as the original's Skeleton is both. Local, never on the wire: worked out
-	// again from the rest wherever the wire's word is taken (soldier_skeleton_build).
-	skeleton:   Joints,
 }
 
 // The weapons in hand and in reserve, and the grenades.
@@ -263,9 +257,8 @@ soldier_update :: proc(world: ^World, resources: ^Resources, id: Soldier_Id, com
 	soldier_control(world, resources, id, authority, out, armed)
 	body.direction = 1 if soldier.controls.aim.x >= body.pos.x else -1
 	// the skeleton the original builds here, before the frame advances and the map moves
-	// the body: this tick's bullets meet it, and the next tick's grenade leaves its hand
-	soldier_skeleton_build(resources.animations, soldier)
-	soldier.arsenal.throw_hand = soldier.pose.skeleton[14]
+	// the body: the next tick's grenade leaves this hand
+	soldier.arsenal.throw_hand = soldier_pose(resources.animations, soldier, body.pos)[14]
 	res.animation_advance(resources.animations, &soldier.pose.body)
 	res.animation_advance(resources.animations, &soldier.pose.legs)
 
@@ -346,8 +339,7 @@ soldier_spawn :: proc(world: ^World, resources: ^Resources, id: Soldier_Id, resp
 	}
 	res.animation_start(resources.animations, &soldier.pose.legs, .Stand)
 	res.animation_start(resources.animations, &soldier.pose.body, .Stand)
-	soldier_skeleton_build(resources.animations, soldier)
-	soldier.arsenal.throw_hand = soldier.pose.skeleton[14]
+	soldier.arsenal.throw_hand = soldier_pose(resources.animations, soldier, respawn.pos)[14]
 
 	seed_from_position :: proc(pos: utils.Vec2) -> u64 {
 		x, y := transmute(u32)pos.x, transmute(u32)pos.y

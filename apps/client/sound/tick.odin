@@ -76,7 +76,7 @@ clock_sounds :: proc(s: ^Sound, round: ^sim.Round) {
 @(private = "file")
 bullet_sounds :: proc(s: ^Sound, game: ^sim.Game, followed: Maybe(sim.Soldier_Id)) {
 	for &bullet, i in game.world.bullets {
-		if !bullet.active || bullet.held > 0 { // a held one, ended and waiting for word of it
+		if !bullet.active {
 			s.whizzed[i] = false
 			continue
 		}

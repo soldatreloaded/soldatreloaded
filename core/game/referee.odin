@@ -9,18 +9,6 @@ import sa "core:container/small_array"
 // What the machine with authority has that others don't.
 Authority :: struct {
 	history: History,
-	shots:   Shot_Records, // the clients' shots' flights here, which their claims are held to
-	deaths:  [MAX_PLAYERS]Death_Seen, // each soldier's last death, in the game's time (shot_after_death)
-	trust:   bool, // the clients' claims taken as they say, unseen again: an experiment, for a trusted group (hit_claim.odin)
-}
-
-// A soldier's last death here: the life it ended, and the tick it came in as its killer
-// saw it, the tick a claim's shooter's screen showed; a death of the server's own, its
-// present.
-Death_Seen :: struct {
-	life: u8,
-	tick: u32,
-	set:  bool,
 }
 
 // Judges the events not yet judged, in the order they happened. A hit lands as the C
@@ -109,8 +97,7 @@ rule :: proc(world: ^World, resources: ^Resources, ruling: Ruling, out: ^Tick_Ou
 hit_land :: proc(world: ^World, resources: ^Resources, authority: ^Authority, hit: Hit, out: ^Tick_Output) {
 	if !world.soldiers[hit.target].active do return
 	soldier_shove(world, resources, hit)
-	if authority != nil do judge_hit(world, resources, authority, hit, out)
-	else do foresee_hit(world, resources, hit, out) // a client's own hit: its wound owed, its death shown now
+	if authority != nil do judge_hit(world, resources, hit, out)
 }
 
 // A death asked for from outside the step: by the player's own word (/kill), or an
@@ -153,7 +140,7 @@ hit_damage :: proc(world: ^World, hit: Hit) -> f32 {
 // The wound of a hit, and the death of a soldier it leaves below 1. A corpse is wounded
 // too, which is what tears it apart, but dies once.
 @(private = "file")
-judge_hit :: proc(world: ^World, resources: ^Resources, authority: ^Authority, hit: Hit, out: ^Tick_Output) {
+judge_hit :: proc(world: ^World, resources: ^Resources, hit: Hit, out: ^Tick_Output) {
 	if hit.amount <= 0 || !wounds(world, hit) do return
 	target := &world.soldiers[hit.target]
 	damage := Damage {
@@ -164,7 +151,6 @@ judge_hit :: proc(world: ^World, resources: ^Resources, authority: ^Authority, h
 		part     = hit.part,
 	}
 	rule(world, resources, damage, out)
-	if hit.kills && !target.vitals.dead do target.vitals.health = min(target.vitals.health, 0) // a kill its shooter's screen showed, trusted
 	if target.vitals.dead || target.vitals.health >= 1.0 do return
 
 	// whether the body burns (Sprites.pas Die, "Fire on from bullet")
@@ -185,5 +171,4 @@ judge_hit :: proc(world: ^World, resources: ^Resources, authority: ^Authority, h
 		airtime   = hit.airtime,
 		ricochets = hit.ricochets,
 	}, out)
-	death_seen(world, authority, hit.target, hit.seen if hit.seen != 0 else world.tick)
 }

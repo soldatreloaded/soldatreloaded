@@ -31,13 +31,6 @@ Event :: union {
 	Antic,
 	Flag_Drop,
 	Shot_End,
-	// the hits on the shooter's word (hit_claim.odin): its client's claim, for the wire;
-	// the server's word of a hit, for the wire and for showing
-	Hit_Claimed,
-	Shot_Hit,
-	Blast_Claimed,
-	// a death this client foresaw that the server never confirmed (foresight.odin), for showing
-	Kill_Taken_Back,
 }
 
 MAX_EVENTS :: 256
@@ -75,8 +68,6 @@ Hit :: struct {
 	distance:  f32,        // the bullet's flight, for the killer's readout
 	airtime:   i32,
 	ricochets: u8,
-	seen:      u32,        // the tick its shooter's screen showed as it landed, a claim's; 0 for this machine's present
-	kills:     bool,       // a trusted claim's: its shooter's screen showed it kill, so it kills
 }
 
 // The owner's decisions, which a client tells the server: every shot it fires, its gun
@@ -206,7 +197,6 @@ Flag_Drop :: struct {
 Shot_End :: struct {
 	owner:  Soldier_Id,
 	shot:   u32, // the owner's number for it
-	fired:  u32, // the tick it was fired in: with the number, which shot it was
 	weapon: res.Weapon,
 	pos:    utils.Vec2,
 	blast:  Maybe(Explosion_Kind),

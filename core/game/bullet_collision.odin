@@ -54,7 +54,6 @@ bullet_collide :: proc(world: ^World, resources: ^Resources, id: Bullet_Id, auth
 
 	if bullet.style == .Frag_Grenade do map_collide(world, resources, id, {bullet.pos.x, bullet.pos.y - 2}, authority, out)
 	wall := map_collide(world, resources, id, bullet.pos, authority, out)
-	if bullet.held > 0 do return // ended where the word of it is waited for
 	if !bullet.active {
 		nearest = utils.length(wall - saved_old)
 		bullet.velocity, bullet.pos, bullet.old_pos = saved_velocity, saved_pos, saved_old
@@ -62,15 +61,11 @@ bullet_collide :: proc(world: ^World, resources: ^Resources, id: Bullet_Id, auth
 	}
 
 	collider, hit_collider := collider_collide(world, resources, id, nearest, authority, out)
-	if bullet.held > 0 do return
 	if !bullet.active {
 		nearest = utils.length((collider if hit_collider else wall) - saved_old)
 		bullet.velocity, bullet.pos, bullet.old_pos = saved_velocity, saved_pos, saved_old
 	}
 
-	// a client's shot as the bodies are met: past the map, which may have turned it, for
-	// its client's claims (hit_claim.odin)
-	if authority != nil && bullet.heard do shot_record_trace(authority, bullet)
 	body, hit_body := body_collide(world, resources, id, nearest, authority, out)
 	if !bullet.active {
 		stop := body if hit_body else collider if hit_collider else wall
@@ -81,6 +76,7 @@ bullet_collide :: proc(world: ^World, resources: ^Resources, id: Bullet_Id, auth
 }
 
 // A thrown knife stopped where it is: the things lay it down there, at their turn.
+@(private = "file")
 knife_land :: proc(world: ^World, bullet: ^Bullet) {
 	things_ask(world, Knife_Land{owner = bullet.owner, pos = bullet.pos})
 }
@@ -195,7 +191,7 @@ map_collide :: proc(world: ^World, resources: ^Resources, id: Bullet_Id, at: uti
 					// it goes off short of the wall, as it came in
 					bullet.pos = before
 					bullet.velocity = incoming
-					explode_flight(world, resources, id, .M79, authority, out)
+					explode(world, resources, id, .M79, nil, -1, authority, out)
 				}
 			case .Frag_Grenade:
 				if utils.length(bullet.velocity) > 1.5 do emit(out, Grenade_Bounce{bullet = id, pos = pos})
@@ -204,10 +200,6 @@ map_collide :: proc(world: ^World, resources: ^Resources, id: Bullet_Id, at: uti
 				bullet.velocity = (bullet.velocity - utils.normalize(normal) * distance) * GRENADE_SURFACE_COEFFICIENT
 			case .Thrown_Knife:
 				bullet.pos = pos - bullet.velocity
-				if bullet_held_for_word(world, authority, bullet) {
-					bullet_hold(bullet, .Frag, authority) // it may have stuck in someone first, the word will say
-					return result
-				}
 				knife_land(world, bullet)
 				wall_hit(id, bullet, pos, bullet.velocity, out)
 				bullet_end(world, id, out, pos)
@@ -242,22 +234,18 @@ collider_collide :: proc(
 		switch bullet.style {
 		case .Plain, .Shotgun, .Punch, .Knife, .Thrown_Knife:
 			bullet.pos = p - bullet.velocity
-			if bullet.style == .Thrown_Knife {
-				if bullet_held_for_word(world, authority, bullet) {
-					bullet_hold(bullet, .Frag, authority) // it may have stuck in someone first, the word will say
-					return p, true
-				}
-				knife_land(world, bullet)
-			}
+			if bullet.style == .Thrown_Knife do knife_land(world, bullet)
 			emit(out, Collider_Hit{bullet = id, pos = p, velocity = bullet.velocity})
 			bullet_end(world, id, out, p)
 		case .Frag_Grenade:
 			// not stopped by cover it was thrown from right next to
 			if bullet.timeout < GRENADE_TIMEOUT - 2 {
-				explode_flight(world, resources, id, .Frag, authority, out)
+				explode(world, resources, id, .Frag, nil, -1, authority, out)
+				bullet_end(world, id, out)
 			}
 		case .M79, .LAW:
-			explode_flight(world, resources, id, .M79, authority, out)
+			explode(world, resources, id, .M79, nil, -1, authority, out)
+			bullet_end(world, id, out)
 		}
 		return p, true
 	}
@@ -340,56 +328,6 @@ wound :: proc(
 	})
 }
 
-// A bullet's hit on the living, said for the other machines (hit_claim.odin): on its
-// shooter's client, the claim; on the server, its word to everyone.
-@(private = "file")
-hit_tell :: proc(
-	authority: ^Authority,
-	bullet: ^Bullet,
-	airtime: i32,
-	target: Soldier_Id,
-	part: int,
-	from, velocity, start, point: utils.Vec2,
-	joints: ^Joints,
-	push: utils.Vec2,
-	stops: bool,
-	bloodless: bool, // a teammate's thrown knife: heard, not bled
-	amount: f32, // the wound, as this screen reckoned it
-	out: ^Tick_Output,
-) {
-	if authority == nil {
-		emit(out, Hit_Claimed {
-			owner    = bullet.owner,
-			shot     = bullet.shot,
-			fired    = bullet.fired,
-			airtime  = u16(clamp(airtime, 0, 65535)),
-			weapon   = bullet.weapon,
-			target   = target,
-			part     = u8(part),
-			pos      = from,
-			velocity = velocity,
-			start    = start,
-			point    = point,
-			stopped  = stops,
-			amount   = amount,
-		})
-		return
-	}
-	emit(out, Shot_Hit {
-		owner     = bullet.owner,
-		shot      = bullet.shot,
-		fired     = bullet.fired,
-		weapon    = bullet.weapon,
-		target    = target,
-		part      = u8(part),
-		offset    = point - joints[part],
-		velocity  = velocity,
-		push      = push,
-		stopped   = stops,
-		bloodless = bloodless,
-	})
-}
-
 @(private = "file")
 blood :: proc(bullet: ^Bullet, target: Soldier_Id, point: utils.Vec2, out: ^Tick_Output) {
 	emit(out, Blood{target = target, pos = point, velocity = bullet.velocity})
@@ -425,7 +363,8 @@ body_collide :: proc(
 
 		start: utils.Vec2
 		if melee {
-			start = owner.pose.skeleton[14] + hands_aim_direction(&owner.pose.skeleton) * 4.0
+			owner_joints := soldier_pose(resources.animations, owner, owner.body.pos)
+			start = owner_joints[14] + hands_aim_direction(&owner_joints) * 4.0
 		} else {
 			start = bullet.pos
 		}
@@ -434,13 +373,7 @@ body_collide :: proc(
 		// A corpse is met where its body lies this tick, not where it was `lag` ticks ago:
 		// it moves slowly, and no history is kept of it.
 		corpse := live.vitals.dead
-		// Another's shot on a client meets the living here for show alone: the blood, the
-		// bullet stopped or slowed, a grenade or rocket gone off; the wound, the shove and
-		// the claim are its shooter's and the server's, whose word of the hit then shows
-		// nothing more (foresee_shown).
-		shown_only := !corpse && authority == nil && world.soldiers[bullet.owner].remote
-		if !corpse && !shown_only && hit_decided_elsewhere(world, authority, bullet, target_id) do continue // claimed (hit_claim.odin)
-		joints := corpse_joints(&world.corpses[ti]) if corpse else target.pose.skeleton
+		joints := corpse_joints(&world.corpses[ti]) if corpse else soldier_pose(resources.animations, target, target.body.pos)
 
 		// The part is the one met nearest the start; the point is the last one met, in
 		// priority order, which is what the original's variable holds when it is done.
@@ -473,22 +406,15 @@ body_collide :: proc(
 
 		switch bullet.style {
 		case .Plain, .Shotgun, .Punch, .Knife:
-			from, velocity := bullet.pos, bullet.velocity
 			bullet.pos = point
 			blood(bullet, target_id, point, out)
-			if shown_only do foresee_shown(world, bullet, target_id)
 			speed := utils.length(bullet.velocity)
 			amount := speed * bullet.damage * modifier
 			kills := !corpse && live.vitals.health - hit_damage(world, Hit{shooter = bullet.owner, target = target_id, amount = amount}) < 1.0
-			if !shown_only do wound(resources, bullet, target_id, amount, &joints, part, point, push, true, out)
-			if !corpse && !shown_only {
-				stops := !kills && speed <= 23 && !(speed > 5 && speed / stats.speed >= 0.9) // as below
-				airtime := resources.weapons[bullet.weapon].timeout - bullet.timeout
-				hit_tell(authority, bullet, airtime, target_id, part, from, velocity, start, point, &joints, push, stops, false, amount, out)
-			}
+			wound(resources, bullet, target_id, amount, &joints, part, point, push, true, out)
 
 			// a punched enemy starts throwing its gun away
-			if bullet.style == .Punch && !shown_only && (live.team == .None || live.team != owner.team) {
+			if bullet.style == .Punch && (live.team == .None || live.team != owner.team) {
 				res.animation_switch(resources.animations, &live.pose.body, .Throw_Weapon, 11)
 			}
 			bullet.last_hit = target_id
@@ -511,31 +437,28 @@ body_collide :: proc(
 			return
 		case .Frag_Grenade:
 			if corpse do return // grenades roll over corpses, and look no further
-			if shown_only do foresee_shown(world, bullet, target_id) // gone off here for show: its blast wounds nobody here
-			explode(world, resources, id, .Frag, target_id, part, authority, .Flight, out)
+			explode(world, resources, id, .Frag, target_id, part, authority, out)
+			bullet_end(world, id, out)
 			return
 		case .M79, .LAW:
 			if corpse do return // rockets fly over corpses, and look no further
-			explode(world, resources, id, .M79, target_id, part, authority, .Flight, out)
+			explode(world, resources, id, .M79, target_id, part, authority, out)
 			bullet.pos = point
 			bullet_end(world, id, out)
-			if shown_only do foresee_shown(world, bullet, target_id)
-			else do wound(resources, bullet, target_id, utils.length(bullet.velocity) * bullet.damage, &joints, part, point, push, false, out)
+			wound(resources, bullet, target_id, utils.length(bullet.velocity) * bullet.damage, &joints, part, point, push, false, out)
 			return
 		case .Thrown_Knife:
 			// The hit's sound on whoever it meets, and its blood unless a teammate's. Through a
 			// corpse it hits it once (last_hit), so it is heard once.
 			friendly := owner.team != .None && owner.team == live.team && target_id != bullet.owner
 			emit(out, Blood{target = target_id, pos = point, velocity = bullet.velocity, bloodless = friendly})
-			if shown_only do foresee_shown(world, bullet, target_id)
-			else do wound(resources, bullet, target_id, utils.length(bullet.velocity) * bullet.damage * 0.01, &joints, part, point, push, false, out)
+			wound(resources, bullet, target_id, utils.length(bullet.velocity) * bullet.damage * 0.01, &joints, part, point, push, false, out)
 			if corpse { // it goes through a corpse rather than sticking in it
 				bullet.last_hit = target_id
 				return
 			}
-			airtime := resources.weapons[bullet.weapon].timeout - bullet.timeout
-			if !shown_only do hit_tell(authority, bullet, airtime, target_id, part, bullet.pos, bullet.velocity, start, point, &joints, push, true, friendly, utils.length(bullet.velocity) * bullet.damage * 0.01, out)
 			knife_land(world, bullet)
+			shot_end_tell(authority, bullet, point, nil, target_id, out)
 			bullet_end(world, id, out, point)
 			return
 		}

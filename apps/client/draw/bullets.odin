@@ -72,7 +72,7 @@ bullets_load :: proc(source: Source) -> (art: Bullet_Art) {
 @(private = "package")
 draw_bullets :: proc(art: ^Bullet_Art, world: ^sim.World, alpha: f32, grenade_color: Maybe(utils.Rgba), trails: bool) {
 	for &bullet in world.bullets {
-		if (bullet.active && bullet.held == 0) || (bullet.catch_up > 0 && bullet.style == .Plain) do draw_bullet(art, &bullet, alpha, grenade_color, trails) // a held one, ended and waiting for word of it, unseen
+		if bullet.active || (bullet.catch_up > 0 && bullet.style == .Plain) do draw_bullet(art, &bullet, alpha, grenade_color, trails)
 	}
 }
 

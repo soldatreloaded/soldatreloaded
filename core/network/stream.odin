@@ -28,12 +28,9 @@ import res "../resources"
 // (soldier_last_command), one-shot buttons cleared so a throw is not thrown again;
 // after STREAM_RELEASE_TICKS of silence the keys are let go and it falls and stops.
 
-STREAM_RING :: 64          // states kept for deltas, each side: a baseline a second old is still in hand
-STREAM_WHOLE_AFTER :: 56   // a baseline older than this many states or ticks: whole (the server's history keeps 64)
+STREAM_RING :: 32          // states kept for deltas, each side
+STREAM_WHOLE_AFTER :: 24   // a baseline older than this many states or ticks: whole
 STREAM_RELEASE_TICKS :: 30 // no word for this long: the keys are let go
-STREAM_WORDS_MIN :: 4      // the server's words a snapshot carries at least, while anything else can wait instead
-
-#assert(STREAM_WHOLE_AFTER < STREAM_RING && STREAM_WHOLE_AFTER < game.HISTORY_TICKS) // a baseline young enough is still kept
 
 // ---------------------------------------------------------------------------------
 // The messages
@@ -205,13 +202,11 @@ net_round :: proc(b: ^Buffer, round: ^game.Round, base: ^game.Round) {
 // The halves taken
 
 // The owned half of `src` onto `dst`, the animations' speed set from the anims as the
-// fields cannot, and the skeleton built where the word puts it: a soldier not stepped
-// after is drawn there, not where it stood before.
+// fields cannot.
 soldier_take_owned :: proc(animations: ^res.Animations, dst, src: ^game.Soldier) {
 	fields_copy(SOLDIER_OWNED_FIELDS, dst, src)
 	dst.pose.legs.speed = animations[dst.pose.legs.id].speed
 	dst.pose.body.speed = animations[dst.pose.body.id].speed
-	game.soldier_skeleton_build(animations, dst)
 }
 
 soldier_take_served :: proc(dst, src: ^game.Soldier) {
