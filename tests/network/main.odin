@@ -96,6 +96,31 @@ place :: proc(g: ^game.Game, slot: int, team: res.Team) {
 	})
 }
 
+// The server's word of a placing heard after the snapshot made it: the soldier keeps the
+// life it has, and the weapon picked since, where it stands; a placing not yet made is.
+@(test)
+respawn_heard_late :: proc(t: ^testing.T) {
+	g := make_game(authority = false)
+	defer {game.game_destroy(g); free(g)}
+	place(g, 0, .Alpha)
+	me := &g.world.soldiers[0]
+	run(g, 30, {.Right})
+	me.arsenal.primary = game.weapon_state(&g.resources, .MP5) // picked in the weapons menu
+	moved := me.body.pos
+	late := game.Respawn{target = 0, life = 1, team = .Alpha, primary = .Punch, secondary = .Knife, pos = game.spawn_point(g.world.polymap, .Alpha, &g.world.rng)}
+	game.world_hear(&g.world, game.Ruling(late), g.world.tick)
+	run(g, 1, {})
+	testing.expect_value(t, me.arsenal.primary.weapon, res.Weapon.MP5)
+	testing.expect(t, me.body.pos != late.pos && abs(me.body.pos.x - moved.x) < 20, "where it stood, not put back at the spawn")
+
+	next := late
+	next.life = 2
+	game.world_hear(&g.world, game.Ruling(next), g.world.tick)
+	run(g, 1, {})
+	testing.expect_value(t, me.vitals.life, 2)
+	testing.expect_value(t, me.arsenal.primary.weapon, res.Weapon.Punch)
+}
+
 @(private = "file")
 run :: proc(g: ^game.Game, ticks: int, buttons: game.Buttons) {
 	for _ in 0 ..< ticks {

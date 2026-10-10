@@ -65,10 +65,26 @@ heard_apply :: proc(world: ^World, resources: ^Resources, authority: ^Authority,
 		case Shot_End:   if turn == .Bullets do bullet_shot_end(world, resources, w, out)
 		// recorded as the server's own are, for the sounds, the sparks and the feed; a
 		// client's collection for the wire leaves rulings out, so none goes back
-		case Ruling:     if turn == ruling_turn(w) do rule(world, resources, w, out)
+		case Ruling:
+			if turn != ruling_turn(w) do continue
+			// a placing the snapshot has already made: the snapshot often comes before the
+			// word, and placed again the soldier was put back at its spawn with the round's
+			// first loadout, a weapon picked since taken from it. Recorded, not done again.
+			if respawn, is_respawn := w.(Respawn); is_respawn && placed_already(world, respawn) {
+				sa.push_back(&out.rulings, w)
+				continue
+			}
+			rule(world, resources, w, out)
 		}
 	}
 	if turn == .Things do sa.clear(&world.heard)
+}
+
+// Whether the soldier is already alive in the life `respawn` begins.
+@(private = "file")
+placed_already :: proc(world: ^World, respawn: Respawn) -> bool {
+	soldier := &world.soldiers[respawn.target]
+	return soldier.active && !soldier.vitals.dead && soldier.vitals.life == respawn.life
 }
 
 @(private = "file")
