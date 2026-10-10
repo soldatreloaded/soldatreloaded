@@ -307,6 +307,7 @@ DEFAULT_BINDS := [?][2]string {
 	{"f5", "toggle ui_info"},
 	{"f7", "toggle ui_playernames"},
 	{"f9", "togglewindow"},
+	{"f10", "togglerecord"},
 	{"f6", "demo_pause"},
 	{"f8", "demo_fast"},
 	{"leftarrow", "demo_tick_r -600"},

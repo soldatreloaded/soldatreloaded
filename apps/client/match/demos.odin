@@ -188,6 +188,12 @@ record_ask :: proc(match: ^Match, name: string) {
 	match.record.asked = true // begun once the frame's packets are in
 }
 
+// togglerecord: a recording begun, or the one going stopped.
+record_toggle :: proc(match: ^Match) {
+	if demo.recording(&match.recorder) || match.record.asked do record_stop_asked(match)
+	else do record_ask(match, "")
+}
+
 // stop: the recording stopped, or the demo playing.
 record_stop_asked :: proc(match: ^Match) {
 	match.record.asked = false

@@ -20,7 +20,7 @@ CONTROLS := [?]Control {
 	{"Reload", "+reload"}, {"Change weapon", "+change"}, {"Throw weapon", "+drop"}, {"Throw flag", "+flagthrow"},
 	{"Chat", "chat"}, {"Team chat", "teamchat"}, {"Command", "cmd"},
 	{"Radio", "+radio"}, {"Weapons menu", "weaponsmenu"}, {"Team menu", "teammenu"}, {"Scoreboard", "fragsmenu"},
-	{"Weapon stats", "statsmenu"}, {"Minimap", "toggle ui_minimap"},
+	{"Weapon stats", "statsmenu"}, {"Minimap", "toggle ui_minimap"}, {"Record demo", "togglerecord"},
 }
 
 // The groups, as runs of CONTROLS, and the column each goes in.
@@ -36,7 +36,7 @@ CONTROL_GROUPS := [?]Control_Group {
 	{"MOVEMENT", 0, 6, 0},
 	{"COMBAT", 6, 6, 0},
 	{"TALK", 12, 4, 1},
-	{"MENUS", 16, 5, 1},
+	{"MENUS", 16, 6, 1},
 }
 
 page_controls :: proc(menu: ^Menu) {

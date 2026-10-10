@@ -20,7 +20,7 @@ import "../hud"
 //   emote <name>        an emote (/victory and the rest), done and said to nobody
 //   mute unmute <player | all>  muteall muteteam muteenemies mutespecs  mutes
 //   freecam             the free camera, while I watch or a demo plays
-//   record [name]  stop  playdemo <name>
+//   record [name]  stop  togglerecord (record, or stop the recording)  playdemo <name>
 //   demo_pause  demo_fast  demo_tick <tick>  demo_tick_r <ticks>
 //   connect <address>  disconnect  quit
 //   netstats            a line a second of how the line is doing
@@ -30,7 +30,7 @@ COMMANDS := [?]string {
 	"escmenu", "teammenu", "weaponsmenu", "fragsmenu", "statsmenu", "toggle", "togglewindow",
 	"chat", "teamchat", "cmd", "say", "say_team", "votemap", "votekick", "+radio", "-radio", "radio", "emote",
 	"mute", "unmute", "muteall", "muteteam", "muteenemies", "mutespecs", "mutes", "freecam",
-	"record", "stop", "playdemo", "demo_pause", "demo_fast", "demo_tick", "demo_tick_r",
+	"record", "stop", "togglerecord", "playdemo", "demo_pause", "demo_fast", "demo_tick", "demo_tick_r",
 	"connect", "disconnect", "quit", "netstats",
 }
 
@@ -98,6 +98,8 @@ command_run :: proc(match: ^Match, line: string) {
 		record_ask(match, rest)
 	case "stop":
 		record_stop_asked(match)
+	case "togglerecord":
+		record_toggle(match)
 	case "playdemo":
 		if rest == "" do usage(match, "playdemo <name>")
 		else do match.request = Play_Demo{strings.clone(rest, context.temp_allocator)}
