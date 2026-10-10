@@ -100,7 +100,11 @@ it sends, the receiver keeps the last number applied per sender and applies each
 so a lost packet is covered by the next and nothing needs a reliable channel. After
 heavy loss the backlog is capped, oldest held back, kills and pickups first. A client
 holds the server's events until the tick of their frame is on show (WirePending), and
-acknowledges them as it receives them: what is held need not come again.
+acknowledges them as it receives them: what is held need not come again. A hit on the
+living (Shot_Hit) and where a grenade or rocket ended (Shot_End) are given the world as
+they come instead, unless their shot still waits: their blood, knock and blast are no
+snapshot's to take back, and held, they came as late as the view keeps behind. The
+rulings wait, which the snapshot on show would undo.
 
 **Reliable, rarely:** Hello, Welcome, Denied, and Chat, which carries commands and
 votes as text as well. Nothing else.
@@ -168,8 +172,20 @@ nothing. So what landed on the shooter's screen lands on the server, guessed or 
 and every other screen is told of it; the price falls on the target, who can be hit a
 round trip after reaching cover, as in every game that favours the shooter. The shooter
 plays its own flash, sound, blood and blast at once, and the health on the server's
-damage event. A shooter's hit on itself is the server's to judge: its own soldier on its
-own screen is no snapshot's.
+damage event, but for a death: a hit that kills there by the target's health (the
+server's, less the wounds of its own claims not yet in it) kills there at once, the
+server's snapshots of it alive passed over until its word of the death comes, which is
+then shown no more (core/game/foresight.odin). One never confirmed in 90 ticks, or
+another's kill first, is taken back, its feed lines with it. A shooter's hit on itself
+is the server's to judge: its own soldier on its own screen is no snapshot's.
+
+A soldier killed fires on until its own screen is told, a trip to the server and one
+back. The kill is set in the game's time, the tick its killer's screen showed (a
+claim's, or the server's present for its own), and what the dead soldier fired after it,
+by its own screen's tick, is void: not flown, not relayed, its claims landing nothing.
+What it fired before counts, a trade. A victim whose word reaches the server before its
+killer's can still land a hit fired after its death, within the difference of their
+trips.
 
 ## Things
 

@@ -268,6 +268,9 @@ soldier_apply :: proc(c: ^Client_Stream, g: ^game.Game, id: game.Soldier_Id, fra
 	w := &g.world
 	s := &w.soldiers[id]
 	heard := &frame.soldiers[id]
+	// a death my own hit gave it here, the server not yet saying so: it stays dead
+	if game.foresee_holds(w, id, heard) do return
+	game.foresee_health(w, id, frame.tick)
 	placed := heard.vitals.life != s.vitals.life
 	before := s.body.pos
 	soldier_take_served(s, heard)

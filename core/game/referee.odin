@@ -109,6 +109,7 @@ hit_land :: proc(world: ^World, resources: ^Resources, authority: ^Authority, hi
 	if !world.soldiers[hit.target].active do return
 	soldier_shove(world, resources, hit)
 	if authority != nil do judge_hit(world, resources, authority, hit, out)
+	else do foresee_hit(world, resources, hit, out) // a client's own hit: its wound owed, its death shown now
 }
 
 // A death asked for from outside the step: by the player's own word (/kill), or an

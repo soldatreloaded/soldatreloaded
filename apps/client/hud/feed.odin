@@ -59,6 +59,11 @@ Kill_Line :: struct {
 	color:  rl.Color,
 	weapon: res.Weapon,
 	icon:   bool,
+	kill:   Kill_Of, // the kill it tells of, so one taken back takes its lines with it
+}
+
+Kill_Of :: struct {
+	killer, target: sim.Soldier_Id,
 }
 
 Console_Line :: struct {
@@ -144,6 +149,8 @@ feed_tick :: proc(feed: ^Feed, game: ^sim.Game, names: ^[sim.MAX_PLAYERS]string,
 		#partial switch e in event {
 		case sim.Fired:
 			if e.soldier == me do feed.stats[e.weapon].shots += 1
+		case sim.Kill_Taken_Back:
+			kill_taken_back(feed, e, me)
 		case sim.Flag_Drop:
 			flag := world.things[e.flag].kind
 			console_say(feed, flag_color(flag), "%s dropped the %s Flag", names[e.soldier], flag_name(flag))
@@ -239,12 +246,13 @@ feed_scroll :: proc(feed: ^Feed) {
 @(private = "file")
 kill_said :: proc(feed: ^Feed, world: ^sim.World, names: ^[sim.MAX_PLAYERS]string, kill: sim.Kill, me: sim.Soldier_Id) {
 	killer, victim := &world.soldiers[kill.killer], &world.soldiers[kill.target]
+	of := Kill_Of{kill.killer, kill.target}
 	tallied := fmt.tprintf("%s (%d)", names[kill.killer], killer.tally.kills)
 	if kill.killer != kill.target {
-		kill_line(feed, tallied, killer_color(killer.team), kill.weapon, true)
-		kill_line(feed, names[kill.target], victim_color(victim.team), kill.weapon, false)
+		kill_line(feed, tallied, killer_color(killer.team), kill.weapon, true, of)
+		kill_line(feed, names[kill.target], victim_color(victim.team), kill.weapon, false, of)
 	} else {
-		kill_line(feed, tallied, SUICIDE_COLOR, kill.weapon, kill.weapon != .Punch) // /kill: no icon
+		kill_line(feed, tallied, SUICIDE_COLOR, kill.weapon, kill.weapon != .Punch, of) // /kill: no icon
 	}
 
 	switch {
@@ -283,11 +291,11 @@ round_end_said :: proc(feed: ^Feed, winner: res.Team) {
 // A line at the bottom of the kill feed, which holds it still a while; the oldest goes
 // when it is full.
 @(private = "file")
-kill_line :: proc(feed: ^Feed, text: string, color: rl.Color, weapon: res.Weapon, icon: bool) {
+kill_line :: proc(feed: ^Feed, text: string, color: rl.Color, weapon: res.Weapon, icon: bool, kill: Kill_Of) {
 	length := min(feed.kill_length, KILL_LINES)
 	for sa.len(feed.kills) > 0 && sa.len(feed.kills) >= length do kill_scroll(feed)
 	if length <= 0 do return // no kill feed (interface.kill_log_length 0)
-	sa.append(&feed.kills, Kill_Line{text = utils.short_string(LINE_TEXT, text), color = color, weapon = weapon, icon = icon})
+	sa.append(&feed.kills, Kill_Line{text = utils.short_string(LINE_TEXT, text), color = color, weapon = weapon, icon = icon, kill = kill})
 	feed.kill_scroll = -KILL_LINE_WAIT
 }
 
@@ -374,4 +382,27 @@ flag_name :: proc(flag: sim.Thing_Kind) -> string {
 @(private = "file")
 flag_color :: proc(flag: sim.Thing_Kind) -> rl.Color {
 	return team_color(flag_team(flag))
+}
+
+// A kill my screen showed before the server's word, which its word never confirmed: its
+// lines out of the feed, and, mine, out of my kills and the big words.
+@(private = "file")
+kill_taken_back :: proc(feed: ^Feed, back: sim.Kill_Taken_Back, me: sim.Soldier_Id) {
+	for i := sa.len(feed.kills) - 1; i >= 0; i -= 1 {
+		line := sa.get(feed.kills, i)
+		if line.kill.killer != back.killer || line.kill.target != back.target do continue
+		sa.ordered_remove(&feed.kills, i)
+		if i > 0 {
+			before := sa.get(feed.kills, i - 1)
+			if before.kill.killer == back.killer && before.kill.target == back.target do sa.ordered_remove(&feed.kills, i - 1)
+		}
+		break
+	}
+	if back.killer != me do return
+	stat := &feed.stats[back.weapon]
+	stat.kills = max(stat.kills - 1, 0)
+	if back.part == HEAD_PART do stat.headshots = max(stat.headshots - 1, 0)
+	feed.multi_kills = max(feed.multi_kills - 1, 0)
+	feed.big.ticks = 0
+	feed.shot = {}
 }

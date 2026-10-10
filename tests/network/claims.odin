@@ -47,6 +47,10 @@ Play :: struct {
 	blasts_shooter, blasts_server, blasts_watcher: int,
 	knives_laid:                    int,
 	guessed, heard:                 int,
+	// with an enemy target, its deaths: each wall tick the server ruled one, the shooter's screen
+	// showed one of mine, and the watcher's; and those the shooter's screen took back
+	killed_server, killed_shown, killed_watched: [dynamic]int,
+	taken_back:                     int,
 }
 
 @(test)
@@ -60,6 +64,32 @@ claims_land_what_the_shooter_saw :: proc(t: ^testing.T) {
 		testing.expect_value(t, p.landed, p.claimed)
 		testing.expect_value(t, p.told, p.landed)
 		testing.expect_value(t, p.watched, p.told)
+	}
+}
+
+// An enemy shot dead on the shooter's screen dies there at once, before the server has
+// heard of it, and once: the server's word of the death shows nothing more, and none is
+// taken back. The watcher shows every death the server ruled, and no other.
+@(test)
+kills_shown_at_once :: proc(t: ^testing.T) {
+	for delay in ([]int{1, 6, 12}) {
+		p := claims_play(delay, .Rifle, enemy = true)
+		defer {
+			delete(p.killed_server)
+			delete(p.killed_shown)
+			delete(p.killed_watched)
+		}
+		early := 0
+		for k, i in p.killed_server {
+			if i < len(p.killed_shown) && p.killed_shown[i] < k do early += 1
+		}
+		fmt.printfln("a line %d ticks each way: %d deaths ruled; %d shown by the shooter's screen, %d of them before the server ruled them; %d taken back; %d shown to the watcher",
+			delay, len(p.killed_server), len(p.killed_shown), early, p.taken_back, len(p.killed_watched))
+		testing.expect(t, len(p.killed_server) >= 2, "the target was killed, again and again")
+		testing.expect_value(t, len(p.killed_shown), len(p.killed_server))
+		testing.expect_value(t, early, len(p.killed_server))
+		testing.expect_value(t, p.taken_back, 0)
+		testing.expect_value(t, len(p.killed_watched), len(p.killed_server))
 	}
 }
 
@@ -168,7 +198,7 @@ Packet :: struct {
 
 // A minute of the shooter armed with `arm` over a line `delay` ticks each way.
 @(private = "file")
-claims_play :: proc(delay: int, arm: Arm) -> (p: Play) {
+claims_play :: proc(delay: int, arm: Arm, enemy := false) -> (p: Play) {
 	server := claims_game(true)
 	shooter := claims_game(false)
 	watcher := claims_game(false)
@@ -188,7 +218,7 @@ claims_play :: proc(delay: int, arm: Arm) -> (p: Play) {
 	}
 	server.world.soldiers[SHOOTER].loadout = {primary, .LAW if arm == .LAW else .Knife}
 	game.soldier_place(server, SHOOTER, .Alpha, remote = true)
-	game.soldier_place(server, TARGET, .Alpha, remote = false) // a teammate: hit, and never killed
+	game.soldier_place(server, TARGET, .Bravo if enemy else .Alpha, remote = false) // else a teammate: hit, and never killed
 	game.soldier_place(server, WATCHER, .Alpha, remote = true)
 
 	words: net.Wire_Queue
@@ -217,6 +247,7 @@ claims_play :: proc(delay: int, arm: Arm) -> (p: Play) {
 		return (dice^ >> 16) % n
 	}
 	strafe: game.Buttons
+	target_life: u8
 	lost: [2]int
 	sequence: u32
 	buf: [net.MTU]u8
@@ -244,7 +275,14 @@ claims_play :: proc(delay: int, arm: Arm) -> (p: Play) {
 		if wall % 4 == 0 do strafe = {.Left} if roll(&dice, 2) == 0 else {.Right}
 		if wall % 4 == 0 && roll(&dice, 6) == 0 do strafe += {.Jump}
 		commands[TARGET] = {sequence = server.world.tick + 1, buttons = strafe, aim = server.world.soldiers[SHOOTER].body.pos}
-		server.world.soldiers[TARGET].vitals.health = game.DEFAULT_HEALTH
+		if !enemy do server.world.soldiers[TARGET].vitals.health = game.DEFAULT_HEALTH
+		// an enemy placed where the shooter can reach it: by its own team's spawn, across the map, it can't
+		if enemy && server.world.soldiers[TARGET].vitals.life != target_life && !server.world.soldiers[TARGET].vitals.dead {
+			target_life = server.world.soldiers[TARGET].vitals.life
+			s := &server.world.soldiers[TARGET]
+			s.body.pos = game.spawn_point(server.world.polymap, .Alpha, &server.world.rng)
+			s.body.old_pos = s.body.pos
+		}
 		game.game_tick(server, &commands)
 		for event in sa.slice(&server.output.events) {
 			#partial switch e in event {
@@ -258,6 +296,7 @@ claims_play :: proc(delay: int, arm: Arm) -> (p: Play) {
 		}
 		for ruling in sa.slice(&server.output.rulings) {
 			if laid, is := ruling.(game.Knife_Land); is && laid.owner == SHOOTER do p.knives_laid += 1
+			if kill, is := ruling.(game.Kill); is && kill.killer == SHOOTER && kill.target == TARGET do append(&p.killed_server, wall)
 		}
 		net.wire_collect(&words, &server.output, server.world.tick - 1, nil)
 		for i in 0 ..< 2 {
@@ -321,7 +360,14 @@ claims_play :: proc(delay: int, arm: Arm) -> (p: Play) {
 					else do p.blasts_watcher += 1
 				case game.Blood:
 					if i == 1 && e.target == TARGET do p.watched += 1
+				case game.Kill_Taken_Back:
+					if i == 0 && e.target == TARGET do p.taken_back += 1
 				}
+			}
+			for ruling in sa.slice(&g.output.rulings) {
+				kill, is := ruling.(game.Kill)
+				if !is || kill.killer != SHOOTER || kill.target != TARGET do continue
+				append(&p.killed_shown if i == 0 else &p.killed_watched, wall)
 			}
 			net.client_stream_collect(c, g, me)
 			if state := net.client_stream_state(c, &g.world.soldiers[me], buf[:]); state != nil {

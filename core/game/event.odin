@@ -36,6 +36,8 @@ Event :: union {
 	Hit_Claimed,
 	Shot_Hit,
 	Blast_Claimed,
+	// a death this client foresaw that the server never confirmed (foresight.odin), for showing
+	Kill_Taken_Back,
 }
 
 MAX_EVENTS :: 256
