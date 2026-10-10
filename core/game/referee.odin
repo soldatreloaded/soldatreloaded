@@ -11,6 +11,7 @@ Authority :: struct {
 	history: History,
 	shots:   Shot_Records, // the clients' shots' flights here, which their claims are held to
 	deaths:  [MAX_PLAYERS]Death_Seen, // each soldier's last death, in the game's time (shot_after_death)
+	trust:   bool, // the clients' claims taken as they say, unseen again: an experiment, for a trusted group (hit_claim.odin)
 }
 
 // A soldier's last death here: the life it ended, and the tick it came in as its killer
@@ -163,6 +164,7 @@ judge_hit :: proc(world: ^World, resources: ^Resources, authority: ^Authority, h
 		part     = hit.part,
 	}
 	rule(world, resources, damage, out)
+	if hit.kills && !target.vitals.dead do target.vitals.health = min(target.vitals.health, 0) // a kill its shooter's screen showed, trusted
 	if target.vitals.dead || target.vitals.health >= 1.0 do return
 
 	// whether the body burns (Sprites.pas Die, "Fire on from bullet")

@@ -354,6 +354,7 @@ hit_tell :: proc(
 	push: utils.Vec2,
 	stops: bool,
 	bloodless: bool, // a teammate's thrown knife: heard, not bled
+	amount: f32, // the wound, as this screen reckoned it
 	out: ^Tick_Output,
 ) {
 	if authority == nil {
@@ -370,6 +371,7 @@ hit_tell :: proc(
 			start    = start,
 			point    = point,
 			stopped  = stops,
+			amount   = amount,
 		})
 		return
 	}
@@ -488,7 +490,7 @@ body_collide :: proc(
 			if !corpse {
 				stops := !kills && speed <= 23 && !(speed > 5 && speed / stats.speed >= 0.9) // as below
 				airtime := resources.weapons[bullet.weapon].timeout - bullet.timeout
-				hit_tell(authority, bullet, airtime, target_id, part, from, velocity, start, point, &joints, push, stops, false, out)
+				hit_tell(authority, bullet, airtime, target_id, part, from, velocity, start, point, &joints, push, stops, false, amount, out)
 			}
 
 			// a punched enemy starts throwing its gun away
@@ -535,7 +537,7 @@ body_collide :: proc(
 				return
 			}
 			airtime := resources.weapons[bullet.weapon].timeout - bullet.timeout
-			hit_tell(authority, bullet, airtime, target_id, part, bullet.pos, bullet.velocity, start, point, &joints, push, true, friendly, out)
+			hit_tell(authority, bullet, airtime, target_id, part, bullet.pos, bullet.velocity, start, point, &joints, push, true, friendly, utils.length(bullet.velocity) * bullet.damage * 0.01, out)
 			knife_land(world, bullet)
 			bullet_end(world, id, out, point)
 			return

@@ -137,6 +137,10 @@ server_init :: proc(sv: ^Server, options: Options) -> bool {
 		server_destroy(sv)
 		return false
 	}
+	if config.server.trust_claims {
+		sv.game.authority.trust = true
+		log.warnf("trust_claims is on: every player's hits and kills are taken as they say, unchecked")
+	}
 	maps_list(sv)
 	first := options.first_map
 	if file, found := map_file_name(sv, first); found do first = file
