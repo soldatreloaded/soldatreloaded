@@ -75,13 +75,18 @@ heard_apply :: proc(world: ^World, resources: ^Resources, authority: ^Authority,
 		case Ruling:
 			if turn != ruling_turn(w) do continue
 			// a placing the snapshot has already made: the snapshot often comes before the
-			// word, and placed again the soldier was put back at its spawn with the round's
-			// first loadout, a weapon picked since taken from it. Recorded, not done again.
-			if respawn, is_respawn := w.(Respawn); is_respawn && placed_already(world, respawn) {
-				sa.push_back(&out.rulings, w)
+			// word. Placed again, all the life's own is begun as the server began it (the
+			// randomness, and what is never on the wire), but the guns are kept: placed with
+			// the round's first loadout, the soldier lost the weapon picked since, to fists.
+			respawn, is_respawn := w.(Respawn)
+			if !is_respawn || !placed_already(world, respawn) {
+				rule(world, resources, w, out)
 				continue
 			}
+			soldier := &world.soldiers[respawn.target]
+			primary, secondary, loadout := soldier.arsenal.primary, soldier.arsenal.secondary, soldier.loadout
 			rule(world, resources, w, out)
+			soldier.arsenal.primary, soldier.arsenal.secondary, soldier.loadout = primary, secondary, loadout
 		}
 	}
 	if turn == .Things do sa.clear(&world.heard)
