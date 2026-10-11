@@ -483,7 +483,14 @@ soldat_import :: proc(menu: ^Menu) {
 		note(mods, result.problem, true)
 		return
 	}
-	note(mods, fmt.tprintf("%s made of %d changed file%s, and on.", name, result.changed, "" if result.changed == 1 else "s"), false)
+	// the install's custom interfaces too, and the mod's, into interfaces/
+	interfaces := res.interfaces_import({im.sources[0].dir, source.dir} if im.pick > 0 else {source.dir}, res.INTERFACES_DIR)
+	made := fmt.tprintf("%s made of %d changed file%s, and on.", name, result.changed, "" if result.changed == 1 else "s")
+	if len(interfaces) > 0 {
+		made = fmt.tprintf("%s %d custom interface%s brought into interfaces/: pick one on the Graphics page.", made, len(interfaces), "" if len(interfaces) == 1 else "s")
+	}
+	note(mods, made, false)
+	menu.interfaces_listed = false
 	im.named = false
 	import_pick(im, im.pick)
 	mods.tab = .Installed
@@ -767,7 +774,7 @@ mod_delete :: proc(menu: ^Menu, name: string) {
 }
 
 // A folder shown in the system's file browser.
-@(private = "file")
+@(private = "package")
 folder_open :: proc(path: string) {
 	full, err := os.get_absolute_path(path, context.temp_allocator)
 	if err != nil do return

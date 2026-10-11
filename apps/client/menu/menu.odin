@@ -88,6 +88,8 @@ Menu :: struct {
 	taunts:       Taunt_Editor,
 	custom_size:  Custom_Size, // the Graphics tab's resolution typed
 	in_game:      bool, // over a game: its settings alone (IN_GAME_PAGES), and Back to game
+	interfaces:   [dynamic]string, // interfaces/, as the Graphics page last listed it
+	interfaces_listed: bool,       // and is to list again as it is next shown
 }
 
 // The pages the menu shows over a game: the settings that take effect while it plays.
@@ -103,6 +105,7 @@ Request :: union {
 	Play_Demo,
 	Refresh,
 	Use_Mod,
+	Use_Interface,
 	Quit,
 	Back,
 }
@@ -135,6 +138,12 @@ Refresh :: struct {}
 // allocator: the client takes it.
 Use_Mod :: struct {
 	mods: []string,
+}
+
+// The custom interface `name`, of interfaces/ ("" the game's own), worn from now on: the
+// HUD's art loaded again with it (menu_mods_changed). The name is the temp allocator's.
+Use_Interface :: struct {
+	name: string,
 }
 
 Quit :: struct {}
@@ -171,6 +180,8 @@ menu_destroy :: proc(menu: ^Menu) {
 	offline_destroy(&menu.offline)
 	demos_destroy(&menu.demos)
 	mods_destroy(&menu.mods)
+	for name in menu.interfaces do delete(name)
+	delete(menu.interfaces)
 	delete(menu.servers.search)
 	delete(menu.taunts.text)
 	delete(menu.custom_size.width)
@@ -190,6 +201,7 @@ menu_mods_changed :: proc(menu: ^Menu, mod: res.Mod) {
 	if menu.previewed do draw.preview_destroy(&menu.preview)
 	menu.previewed = false
 	menu.mods.listed = false // mods/ as it is now
+	menu.interfaces_listed = false
 }
 
 // The keys and the mouse since the last pass; and what that pass asked, once.
@@ -346,6 +358,7 @@ set_text :: proc(s: ^string, text: string) {
 go_page :: proc(menu: ^Menu, page: Page) {
 	if page == .Demos && menu.page != .Demos do menu.demos.listed = false // demos/ as it is now
 	if page == .Mods && menu.page != .Mods do menu.mods.listed = false // mods/ as it is now
+	if page == .Settings && menu.page != .Settings do menu.interfaces_listed = false // interfaces/ as it is now
 	menu.page = page
 	menu.side = rail_index(menu, page)
 	ui.kit_reset_page(&menu.kit)

@@ -36,11 +36,12 @@ Scale_Settings :: struct {
 
 DEFAULT_MOD_SCALE :: 4.5
 
-// One mod's own mod.ini, its strings and maps allocated with `allocator`; the defaults,
+// One mod's own mod.ini, its strings and maps allocated with `allocator`; the defaults
+// (`default_scale` the pixels to a unit where it doesn't say: a custom interface's are 1),
 // and false, if it hasn't one. A value that isn't a number is passed over, logged. Free
 // with mod_config_destroy.
-mod_config_read :: proc(layer: ^Mod_Layer, allocator := context.allocator) -> (config: Mod_Config, has: bool) {
-	config.scale.default = DEFAULT_MOD_SCALE
+mod_config_read :: proc(layer: ^Mod_Layer, allocator := context.allocator, default_scale: f32 = DEFAULT_MOD_SCALE) -> (config: Mod_Config, has: bool) {
+	config.scale.default = default_scale
 	config.scale.paths = make(map[string]f32, allocator)
 	config.anchors = make(map[string]f32, allocator)
 	file := layer_file(layer, 0, MOD_CONFIG_FILE) or_return

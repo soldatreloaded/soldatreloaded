@@ -50,6 +50,7 @@ the unpacked folder in a release:
 ```
 data/        what the game plays by: maps, animations, skeletons, objects, bots
 mods/        what it looks and sounds like: classic/, the game's own, and the player's beside it
+interfaces/  the HUD's layouts: Soldat 1 custom interfaces, folders or .sint, the player's own
 scripts/     the server's Lua scripts, its host's own: none ship (docs/scripting.md)
 *.config.mjson  the configs, made with their defaults where they are missing
 weapons.ini     the server's weapons' numbers, as Soldat's are, made commented out where missing

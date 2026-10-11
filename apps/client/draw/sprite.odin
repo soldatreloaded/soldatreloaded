@@ -69,6 +69,12 @@ sprite_book_load :: proc(book: ^Sprite_Book, dir, name: string, listings: ^utils
 	return sprite_find({book.mod, &book.atlas, listings}, dir, name)
 }
 
+// A custom interface's own picture (res.interface_picture), `scale` pixels to a unit,
+// green keyed out as the original's interface is.
+sprite_book_add :: proc(book: ^Sprite_Book, file: res.Mod_File, scale: f32) -> Sprite {
+	return sprite_sized({book.mod, &book.atlas, nil}, file, scale, res.COLOR_KEY, false)
+}
+
 // The scale of the image at `path`, relative to the mod ("weapons-gfx/ak74.png"), as
 // the mod.ini of the mod it came from has it ([SCALE], res.mod_scale). A mod of the old,
 // small art says so there.
@@ -160,12 +166,18 @@ draw_turned :: proc(image: Atlas_Image, size, at, center, scale: [2]f32, angle: 
 }
 
 @(private = "file")
-sprite_from :: proc(source: Source, file: res.Mod_File, path: string, key: Maybe(utils.Rgba), flat: bool) -> (sprite: Sprite) {
+sprite_from :: proc(source: Source, file: res.Mod_File, path: string, key: Maybe(utils.Rgba), flat: bool) -> Sprite {
+	return sprite_sized(source, file, scale_of(source.mod, file.layer, path), key, flat)
+}
+
+// The image of `file`, `scale` pixels to a unit.
+@(private = "file")
+sprite_sized :: proc(source: Source, file: res.Mod_File, scale: f32, key: Maybe(utils.Rgba), flat: bool) -> (sprite: Sprite) {
 	image, loaded := res.texture_load_file(file, key, context.temp_allocator)
 	if !loaded do return
 	sprite.image = atlas_add(source.atlas, image)
 	sprite.layer = file.layer
-	sprite.size = {f32(image.width), f32(image.height)} / scale_of(source.mod, file.layer, path)
+	sprite.size = {f32(image.width), f32(image.height)} / scale
 	if flat {
 		for &pixel in image.pixels {
 			pixel = {255, 255, 255, pixel.a}

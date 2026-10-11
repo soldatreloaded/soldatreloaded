@@ -34,7 +34,8 @@ MOD_NAME_MAX :: 32
 MOD_FOLDERS := [?]string{"gostek-gfx", "weapons-gfx", "interface-gfx", "sparks-gfx", "objects-gfx", "scenery-gfx", "textures", "sfx", "txt", "fonts"}
 
 Mod :: struct {
-	layers: []Mod_Layer, // the mods on, the top first, then Classic, always last
+	layers:    []Mod_Layer, // the mods on, the top first, then Classic, always last
+	interface: ^Interface,  // the custom interface worn over them, the HUD's: the client's own, which outlives the mods made again; nil for the game's own
 }
 
 // One mod of the stack: a folder, or an .smod open.
@@ -347,7 +348,7 @@ layer_open :: proc(mods_dir, name: string, allocator := context.allocator) -> (l
 	return {name = strings.clone(name), archive = a}, true
 }
 
-@(private = "file")
+@(private)
 layer_close :: proc(layer: ^Mod_Layer, allocator := context.allocator) {
 	context.allocator = allocator
 	if a := layer.archive; a != nil {
