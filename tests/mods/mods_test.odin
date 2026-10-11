@@ -171,7 +171,7 @@ soldat_sources :: proc(t: ^testing.T) {
 	testing.expect_value(t, len(sources), 3)
 	testing.expect(t, sources[0].name == "" && sources[0].changed == 2, "its own folders: its chest and its shotgun")
 	testing.expect(t, sources[1].name == "Loud" && sources[1].changed == 2 && sources[1].in_use, "a mod of its mods/, the one last played")
-	testing.expect(t, sources[2].name == "Plain" && sources[2].changed == 0 && !sources[2].in_use, "a mod of nothing changed")
+	testing.expect(t, sources[2].name == "Plain" && sources[2].changed == 1 && !sources[2].in_use, "a mod of mods/ whole, though its head is Classic's again")
 
 	result := res.mod_import({sources[0].dir, sources[1].dir}, utils.temp_path(dir, "made"), "Loud", classic)
 	testing.expect_value(t, result.problem, "")

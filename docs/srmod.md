@@ -95,7 +95,7 @@ to change and pack again under a version of its own.
 | `icons` | `icons/` | the rest of the HUD's and menus' art: the crosshair, the menu cursor, the arrow over me, the boxes' ground, the flags, the scoreboard's and minimap's marks, the title | `interface-gfx/` but the guns and the HUD's |
 | `sounds` | `sounds/` | the sounds, `.wav`, `.ogg` or `.mp3`, by the game's names; `radio/` | `sfx/` |
 | `textures` | `textures/` | the maps' polygon textures, by the names maps give them; `edges/` | `textures/` |
-| `scenery` | `scenery/` | the maps' props, by the names maps give them | `scenery-gfx/`, which Soldat 1 never let a mod change |
+| `scenery` | `scenery/` | the maps' props, by the names maps give them: **Classic's alone**, as Soldat 1 never let a mod change it; a map's own come first | `scenery-gfx/`, left out of an import |
 | `fonts` | `fonts/` | the HUD's two fonts, and `font.ini`: which, their widths and sizes, as now | `txt/font.ini` and its `.ttf`s (ours) |
 
 Within a part, files keep Soldat 1's names (`klata.png`, `ak74-clip.png`, `health-bar.png`):
@@ -195,9 +195,11 @@ no importer of them. Soldat 1 was modded two ways, and the importer takes both:
   it shipped (`data/soldat-1.7.1.txt`, each file's size and CRC), as the importer does now,
   and what differs is the player's.
 - **In `mods/`**: each loose folder of `mods/<name>/`, as `-mod <name>` wore it, over the
-  install's own as Soldat wore it.
+  install's own as Soldat wore it. A mod there is the player's whole: all of it goes in,
+  weighed against nothing.
 
-And the install's custom interfaces, the ten it shipped with and any added. Then:
+And the install's custom interfaces, and its mods', but for the ten 1.7.1 ships with as
+they came. Then:
 
 - Each image's Soldat 1 scale, as Soldat 1 works it out: its `mod.ini`'s, by its path,
   then its folder, then `DefaultScale`, else 1 (soldat1-mods.md). An image at another
@@ -206,13 +208,14 @@ And the install's custom interfaces, the ten it shipped with and any added. Then
 - `.bmp` to `.png`, its colour key to alpha (green; black for the 15 images keyed so).
 - `[GOSTEK]` split into the soldier's and the weapons' `pivots.json`, only what differs from
   Classic's.
-- Only what differs from Soldat 1.7.1 as it shipped, and from Classic, goes in, as now.
+- Of the install's own folders, only what differs from Soldat 1.7.1 as it shipped, and from
+  Classic, goes in, weighed by size before CRC and by size before pixels, so it is quick.
 - Each custom interface is a `.srmod` of its own, its `hud` (its `setup.sif` as
   `layout.json`, anchors and alignment resolved) and its `icons` (its cursor, arrow and
-  the rest of its 21 pictures), named after it. The ten stock ones too: they shipped with
-  1.7.1, but they aren't Classic's, and a player will want them.
-- Left out: maps, animations, `txt/` but the weapons' names (if the game shows them),
-  anything else no part holds; listed for the player.
+  the rest of its 21 pictures), named after it and titled "<name> interface". One 1.7.1
+  ships with, every file as it came, is left out.
+- Left out: maps, scenery (Classic's alone), animations, `txt/` but the weapons' names (if
+  the game shows them), anything else no part holds; listed for the player.
 
 **`.smod`s of now** (the catalogue's three, and any a player made or installed): the game
 no longer wears them. The catalogue's are converted once, by a tool of the mods
