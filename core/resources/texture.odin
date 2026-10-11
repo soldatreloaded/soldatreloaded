@@ -143,12 +143,39 @@ texture_rescale :: proc(texture: Texture, by: f32) -> Texture {
 		from = sharp
 		if from.width == w && from.height == h do return from
 	}
+	return texture_shrink(from, w, h)
+}
+
+// `from` brought down to `w` by `h`: each pixel the average of the part of `from` it
+// covers, by how much of each pixel it covers, the colours weighted by their alpha. Our
+// own rather than stb's resize, which raylib has inside it already, and the two can't be
+// linked together.
+@(private = "file")
+texture_shrink :: proc(from: Texture, w, h: int) -> Texture {
 	to := Texture{w, h, make([]utils.Rgba, w * h, context.temp_allocator)}
-	stbi.resize_uint8_generic(
-		([^]u8)(raw_data(from.pixels)), c.int(from.width), c.int(from.height), 0,
-		([^]u8)(raw_data(to.pixels)), c.int(w), c.int(h), 0,
-		4, 3, 0, .CLAMP, .BOX, .LINEAR, nil,
-	)
+	sx, sy := f32(from.width) / f32(w), f32(from.height) / f32(h)
+	for ty in 0 ..< h {
+		y0, y1 := f32(ty) * sy, f32(ty + 1) * sy
+		for tx in 0 ..< w {
+			x0, x1 := f32(tx) * sx, f32(tx + 1) * sx
+			r, g, b, a, covered: f32
+			for y in int(y0) ..< min(int(math.ceil(y1)), from.height) {
+				wy := min(y1, f32(y + 1)) - max(y0, f32(y))
+				for x in int(x0) ..< min(int(math.ceil(x1)), from.width) {
+					weight := (min(x1, f32(x + 1)) - max(x0, f32(x))) * wy
+					p := from.pixels[y * from.width + x]
+					alpha := f32(p.a) * weight
+					r += f32(p.r) * alpha
+					g += f32(p.g) * alpha
+					b += f32(p.b) * alpha
+					a += alpha
+					covered += weight
+				}
+			}
+			if a <= 0 || covered <= 0 do continue
+			to.pixels[ty * w + tx] = {u8(math.round(r / a)), u8(math.round(g / a)), u8(math.round(b / a)), u8(math.round(a / covered))}
+		}
+	}
 	return to
 }
 
