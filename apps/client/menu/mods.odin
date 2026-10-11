@@ -634,16 +634,16 @@ worn_from :: proc(menu: ^Menu, part: res.Part) -> string {
 wear :: proc(menu: ^Menu, part: res.Part, name: string) {
 	parts: [res.Part]string
 	for p in res.Part do parts[p] = worn_from(menu, p)
-	parts[part] = strings.clone(name, context.temp_allocator)
-	menu.request = Use_Mod{parts}
+	parts[part] = name
+	use_parts(menu, parts)
 }
 
 // Every part `listing` has worn from it, the others as they are.
 @(private = "file")
 use_all :: proc(menu: ^Menu, listing: ^res.Srmod_Listing) {
 	parts: [res.Part]string
-	for p in res.Part do parts[p] = strings.clone(listing.name, context.temp_allocator) if p in listing.parts else worn_from(menu, p)
-	menu.request = Use_Mod{parts}
+	for p in res.Part do parts[p] = listing.name if p in listing.parts else worn_from(menu, p)
+	use_parts(menu, parts)
 }
 
 // ---------------------------------------------------------------------------------
@@ -703,7 +703,7 @@ mod_delete :: proc(menu: ^Menu, name: string) {
 	}
 	if worn {
 		// let go of first: the client wears it, and a .srmod worn is a file open
-		menu.request = Use_Mod{parts}
+		use_parts(menu, parts)
 		note(mods, fmt.tprintf("%s is no longer worn: press Delete again to delete it.", gone), false)
 		mods.confirm = false
 		return
@@ -753,4 +753,14 @@ line :: proc(k: ^ui.Kit, text: string, color: rl.Color) {
 note :: proc(mods: ^Mods, text: string, bad: bool) {
 	set_text(&mods.note, text)
 	mods.note_bad = bad
+}
+
+// Each part worn from the mod `parts` names for it, asked of the client, which takes the
+// request at the next frame's start: so its names are its own, made with the context's
+// allocator, outliving this frame's temp allocator, and the client frees them.
+@(private = "file")
+use_parts :: proc(menu: ^Menu, parts: [res.Part]string) {
+	kept: [res.Part]string
+	for name, part in parts do kept[part] = strings.clone(name)
+	menu.request = Use_Mod{kept}
 }
