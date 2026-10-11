@@ -181,7 +181,7 @@ imported :: proc(t: ^testing.T) {
 	neo, why, ok := res.srmod_open(utils.temp_path(mods_dir, "Neo.srmod"))
 	defer res.srmod_close(&neo)
 	if !testing.expectf(t, ok, "Neo a mod (%s)", why) do return
-	testing.expect(t, neo.parts == {.Hud, .Icons} && neo.info.title == "Neo", "its hud and its icons")
+	testing.expect(t, neo.parts == {.Hud, .Icons} && neo.info.title == "Neo interface", "its hud and its icons")
 	file, found := res.srmod_file(&neo, .Hud, "layout.json")
 	data, _ := res.mod_read(file, context.temp_allocator)
 	layout := res.hud_layout_default()
@@ -195,5 +195,5 @@ imported :: proc(t: ^testing.T) {
 
 	tourney, twhy, tok := res.srmod_open(utils.temp_path(mods_dir, "Tourney_HUD.srmod"))
 	defer res.srmod_close(&tourney)
-	testing.expect(t, tok && tourney.info.title == "Tourney HUD" && tourney.parts == {.Hud}, twhy)
+	testing.expect(t, tok && tourney.info.title == "Tourney HUD interface" && tourney.parts == {.Hud}, twhy)
 }
