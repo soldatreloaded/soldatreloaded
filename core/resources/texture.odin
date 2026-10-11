@@ -1,6 +1,9 @@
 package resources
 
+import "base:runtime"
+import "core:c"
 import "core:log"
+import "core:math"
 
 import stbi "vendor:stb/image"
 
@@ -119,4 +122,43 @@ scenery_destroy :: proc(textures: []Texture, allocator := context.allocator) {
 		texture_destroy(&texture, allocator)
 	}
 	delete(textures, allocator)
+}
+
+// `texture` `by` times as big (each side rounded, a pixel at least), with the temp
+// allocator. Up, it is first made a whole number of times as big, each pixel kept a
+// sharp square, then brought down to the size smoothed: so old pixel art stays crisp,
+// its edges a half pixel soft at most. Down, it is smoothed. The colours are weighted
+// by their alpha, so what is see-through bleeds into nothing.
+texture_rescale :: proc(texture: Texture, by: f32) -> Texture {
+	w := max(int(math.round(f32(texture.width) * by)), 1)
+	h := max(int(math.round(f32(texture.height) * by)), 1)
+	if w == texture.width && h == texture.height do return texture
+	from := texture
+	if by > 1 {
+		k := int(math.ceil(by))
+		sharp := Texture{texture.width * k, texture.height * k, make([]utils.Rgba, texture.width * k * texture.height * k, context.temp_allocator)}
+		for y in 0 ..< sharp.height {
+			for x in 0 ..< sharp.width do sharp.pixels[y * sharp.width + x] = texture.pixels[(y / k) * texture.width + x / k]
+		}
+		from = sharp
+		if from.width == w && from.height == h do return from
+	}
+	to := Texture{w, h, make([]utils.Rgba, w * h, context.temp_allocator)}
+	stbi.resize_uint8_generic(
+		([^]u8)(raw_data(from.pixels)), c.int(from.width), c.int(from.height), 0,
+		([^]u8)(raw_data(to.pixels)), c.int(w), c.int(h), 0,
+		4, 3, 0, .CLAMP, .BOX, .LINEAR, nil,
+	)
+	return to
+}
+
+// `texture` as a PNG's bytes, its alpha kept: with the temp allocator.
+texture_png :: proc(texture: Texture) -> []byte {
+	out := make([dynamic]byte, context.temp_allocator)
+	stbi.write_png_to_func(proc "c" (ctx: rawptr, data: rawptr, size: c.int) {
+		context = runtime.default_context()
+		context.allocator = context.temp_allocator
+		append((^[dynamic]byte)(ctx), ..([^]byte)(data)[:size])
+	}, &out, c.int(texture.width), c.int(texture.height), 4, raw_data(texture.pixels), c.int(texture.width * 4))
+	return out[:]
 }

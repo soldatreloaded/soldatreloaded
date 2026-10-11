@@ -149,29 +149,51 @@ anchors :: proc(t: ^testing.T) {
 	testing.expect_value(t, two.anchors, res.Interface_Anchors{health = health, jet = jet, ammo = jet, fire = jet, nades = jet})
 }
 
-// A Soldat 1 install's custom interfaces, and its mod's, brought into interfaces/: each
-// folder whole and each .sint, but not one already there, nor the original's Default.
+// A Soldat 1 install's custom interfaces, and its mod's, each made a .srmod: its hud, its
+// setup.sif as layout.json and its HUD's pictures; its icons, the rest of them; each
+// picture brought to 4.5 from its own scale (1, without a mod.ini), see-through where it
+// was green. Named as it was but for what a name can't have; not over a mod by that
+// name, nor the original's Default, nor one without a setup.sif.
 @(test)
 imported :: proc(t: ^testing.T) {
 	dir := scratch(t, "imported")
 	defer os.remove_all(dir)
 	install := utils.temp_path(dir, "Soldat")
 	mod := utils.temp_path(install, "mods", "Tourney")
-	dest := utils.temp_path(dir, "interfaces")
-	sif := res.interface_setup_write(res.INTERFACE_DEFAULT)
+	mods_dir := utils.temp_path(dir, "mods")
+	setup := res.INTERFACE_DEFAULT
+	setup.alpha = 77
+	sif := res.interface_setup_write(setup)
+	green := res.Texture{2, 2, {{0, 255, 0, 255}, {10, 20, 30, 255}, {10, 20, 30, 255}, {10, 20, 30, 255}}}
 	write(utils.temp_path(install, "custom-interfaces", "Neo", "setup.sif"), sif)
-	write(utils.temp_path(install, "custom-interfaces", "Neo", "gfx", "health.bmp"), transmute([]byte)string("bmp"))
+	write(utils.temp_path(install, "custom-interfaces", "Neo", "health.png"), res.texture_png(green))
+	write(utils.temp_path(install, "custom-interfaces", "Neo", "cursor.png"), res.texture_png(green))
 	write(utils.temp_path(install, "custom-interfaces", "Default", "setup.sif"), sif)
-	write(utils.temp_path(install, "custom-interfaces", "Packed.sint"), transmute([]byte)string("zip"))
+	write(utils.temp_path(install, "custom-interfaces", "Empty", "health.png"), res.texture_png(green))
 	write(utils.temp_path(mod, "custom-interfaces", "Tourney HUD", "setup.sif"), sif)
-	write(utils.temp_path(dest, "Neo", "setup.sif"), transmute([]byte)string("mine"))
+	write(utils.temp_path(mods_dir, "Taken", "mod.json"), transmute([]byte)string(`{"format": 1, "name": "Taken", "version": "1.0.0", "parts": []}`))
+	write(utils.temp_path(install, "custom-interfaces", "Taken", "setup.sif"), sif)
 
-	names := res.interfaces_import({install, mod}, dest)
+	names := res.interfaces_import({install, mod}, mods_dir)
 	slice.sort(names)
-	testing.expect(t, slice.equal(names, []string{"Packed", "Tourney HUD"}), "the ones not there yet, not Default")
-	mine, _ := utils.read_file(utils.temp_path(dest, "Neo", "setup.sif"), context.temp_allocator)
-	testing.expect_value(t, string(mine), "mine")
-	testing.expect(t, utils.file_exists(utils.temp_path(dest, "Packed.sint")), "the .sint copied")
-	testing.expect(t, utils.file_exists(utils.temp_path(dest, "Tourney HUD", "setup.sif")), "the mod's folder copied")
-	testing.expect(t, !utils.file_exists(utils.temp_path(dest, "Default", "setup.sif")), "not Default")
+	testing.expect(t, slice.equal(names, []string{"Neo", "Tourney_HUD"}), "Neo and the mod's, not Default, Empty or Taken")
+
+	neo, why, ok := res.srmod_open(utils.temp_path(mods_dir, "Neo.srmod"))
+	defer res.srmod_close(&neo)
+	if !testing.expectf(t, ok, "Neo a mod (%s)", why) do return
+	testing.expect(t, neo.parts == {.Hud, .Icons} && neo.info.title == "Neo", "its hud and its icons")
+	file, found := res.srmod_file(&neo, .Hud, "layout.json")
+	data, _ := res.mod_read(file, context.temp_allocator)
+	layout := res.hud_layout_default()
+	testing.expect(t, found && res.hud_layout_read(data, "layout.json", &layout) && layout.alpha == 77 && layout.weapon.align == .Left, "its layout, as a custom one's")
+	health, has := res.srmod_file(&neo, .Hud, "health.png")
+	pixels, _ := res.mod_read(health, context.temp_allocator)
+	image, decoded := res.texture_decode(pixels, nil, context.temp_allocator)
+	testing.expect(t, has && decoded && image.width == 9 && image.height == 9 && image.pixels[0].a == 0, "its health, at 4.5, its green see-through")
+	_, cursor := res.srmod_file(&neo, .Icons, "cursor.png")
+	testing.expect(t, cursor, "its cursor among its icons")
+
+	tourney, twhy, tok := res.srmod_open(utils.temp_path(mods_dir, "Tourney_HUD.srmod"))
+	defer res.srmod_close(&tourney)
+	testing.expect(t, tok && tourney.info.title == "Tourney HUD" && tourney.parts == {.Hud}, twhy)
 }

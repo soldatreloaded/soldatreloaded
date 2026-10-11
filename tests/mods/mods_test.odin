@@ -86,7 +86,7 @@ imported :: proc(t: ^testing.T) {
 	mods_dir := utils.temp_path(dir, "mods")
 	// a Classic of a chest, a belt and a head, see-through about them, and a shot
 	chest_png, belt_png, head_png := picture(1), picture(2), picture(3)
-	write_classic(mods_dir, {{"soldier/klata.png", chest_png}, {"soldier/biodro.png", belt_png}, {"soldier/morda.png", head_png}, {"sounds/spas12-fire.wav", "classic shotgun"}})
+	write_classic(mods_dir, {{"soldier/klata.png", chest_png}, {"soldier/biodro.png", belt_png}, {"soldier/morda.png", head_png}, {"soldier/pivots.json", `{"Head": [0, 0.5]}`}, {"sounds/spas12-fire.wav", "classic shotgun"}})
 	classic := res.mod_make(mods_dir)
 	defer res.mod_destroy(&classic)
 
@@ -103,16 +103,31 @@ imported :: proc(t: ^testing.T) {
 	testing.expect(t, res.soldat_is_install(soldat), "a Soldat folder")
 	result := res.mod_import({soldat}, mods_dir, "Mine", classic)
 	testing.expect_value(t, result.problem, "")
-	testing.expect_value(t, result.changed, 2)
+	testing.expect_value(t, result.changed, 3) // its head, its shotgun, and its head's pivot
 
-	z, opened := utils.zip_open(utils.temp_path(mods_dir, "Mine.smod"))
-	defer utils.zip_close(&z)
-	testing.expect(t, opened, "an .smod made")
+	z, opened := utils.zip_open(utils.temp_path(mods_dir, "Mine.srmod"))
+	testing.expect(t, opened, "a .srmod made")
 	names := make([dynamic]string, context.temp_allocator)
 	for name in z.entries do append(&names, name)
+	utils.zip_close(&z)
 	slice.sort(names[:])
-	testing.expect(t, slice.equal(names[:], []string{"gostek-gfx/morda.bmp", "mod.ini", "sfx/spas12-fire.wav"}), "what differs, and its mod.ini")
+	testing.expect(t, slice.equal(names[:], []string{"mod.json", "soldier/morda.png", "soldier/pivots.json", "sounds/spas12-fire.wav"}), "what differs, by part")
 
+	// worn: its head a PNG 4.5 times its size (it had no mod.ini's scale, so 1), its green
+	// see-through; its shotgun; its head pinned where its mod.ini said, the half it didn't
+	// say Classic's
+	choice: [res.Part]string
+	choice[.Soldier], choice[.Sounds] = "Mine", "Mine"
+	worn := res.mod_make(mods_dir, choice)
+	defer res.mod_destroy(&worn)
+	head, found := res.mod_image(worn, "gostek-gfx", "morda.png")
+	data, _ := res.mod_read(head, context.temp_allocator)
+	image, decoded := res.texture_decode(data, nil, context.temp_allocator)
+	testing.expect(t, found && decoded && image.width == 27 && image.height == 18, "its head, at 4.5")
+	testing.expect(t, decoded && image.pixels[0].a == 0 && image.pixels[9 * 27 + 13] == {60, 100, 200, 255}, "see-through where it was green, its colour where it wasn't")
+	shot, _ := res.sound_file(worn, "spas12-fire.wav")
+	testing.expect_value(t, read(shot), "my shotgun")
+	testing.expect_value(t, res.worn_pivot(worn.worn, .Soldier, "Head", {}), [2]f32{0.6, 0.5})
 
 	again := res.mod_import({soldat}, mods_dir, "Mine", classic)
 	testing.expect(t, again.problem != "", "not over a mod by that name")
@@ -161,10 +176,10 @@ soldat_sources :: proc(t: ^testing.T) {
 	result := res.mod_import({sources[0].dir, sources[1].dir}, utils.temp_path(dir, "made"), "Loud", classic)
 	testing.expect_value(t, result.problem, "")
 	testing.expect_value(t, result.changed, 3)
-	z, opened := utils.zip_open(utils.temp_path(dir, "made", "Loud.smod"))
+	z, opened := utils.zip_open(utils.temp_path(dir, "made", "Loud.srmod"))
 	defer utils.zip_close(&z)
-	shot, _ := utils.zip_read(&z, z.entries["sfx/spas12-fire.wav"], context.temp_allocator)
-	_, chest := z.entries["gostek-gfx/klata.png"]
+	shot, _ := utils.zip_read(&z, z.entries["sounds/spas12-fire.wav"], context.temp_allocator)
+	_, chest := z.entries["soldier/klata.png"]
 	testing.expect(t, opened && string(shot) == "loud shotgun" && chest, "the mod's own over its own folders', and theirs under it")
 }
 

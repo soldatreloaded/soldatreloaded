@@ -381,9 +381,10 @@ import_look :: proc(menu: ^Menu) {
 import_pick :: proc(im: ^Soldat_Import, i: int) {
 	im.pick = i
 	if im.named do return
-	base := im.sources[i].name
-	// a mod named as the game's own, or as no file can be, is MySoldat
-	if base == "" || res.mod_builtin(base) || res.mod_name_problem(res.MODS_DIR, base) != "" && !res.mod_exists(res.MODS_DIR, base) do base = "MySoldat"
+	// named as the mod it is made from, as a mod's name can be; MySoldat for the install's
+	// own, or one named as nothing can be
+	base := res.mod_name_from(im.sources[i].name)
+	if base == "" do base = "MySoldat"
 	set_text(&im.name, free_name(base))
 }
 
@@ -401,8 +402,13 @@ soldat_import :: proc(menu: ^Menu) {
 		note(mods, result.problem, true)
 		return
 	}
-	// the install's custom interfaces too, and the mod's, into interfaces/
-	note(mods, fmt.tprintf("%s made of %d changed file%s.", name, result.changed, "" if result.changed == 1 else "s"), false)
+	// the install's custom interfaces too, and the mod's, each a mod of its own
+	interfaces := res.interfaces_import({im.sources[0].dir, source.dir} if im.pick > 0 else {source.dir}, res.MODS_DIR)
+	made := fmt.tprintf("%s made of %d changed file%s: wear its parts below.", name, result.changed, "" if result.changed == 1 else "s")
+	if len(interfaces) > 0 {
+		made = fmt.tprintf("%s made, and %d custom interface%s, each a mod of its own: wear them below.", name, len(interfaces), "" if len(interfaces) == 1 else "s")
+	}
+	note(mods, made, false)
 	im.named = false
 	import_pick(im, im.pick)
 	mods.tab = .Installed
