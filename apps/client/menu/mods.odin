@@ -334,7 +334,7 @@ source_row :: proc(menu: ^Menu, source: res.Soldat_Source, i, own: int) {
 	if !r.shown do return
 	name := OWN_NAME if source.kind == .Own else res.mod_name_from(source.name)
 	taken := name == "" || name_taken(menu, name)
-	pressed, bx := row_button(k, r.x + r.w - 8, r.y + (r.h - ui.CTRL_H) / 2, "Installed" if taken else "Install", taken, primary = !taken)
+	pressed, bx := row_button(k, r.x + r.w - 8, r.y + (r.h - ui.CTRL_H) / 2, "Imported" if taken else "Import", taken, primary = !taken)
 	if pressed && !taken do ask_install(menu, i)
 	title, detail: string
 	switch source.kind {
@@ -358,7 +358,7 @@ source_row :: proc(menu: ^Menu, source: res.Soldat_Source, i, own: int) {
 @(private = "file")
 ask_install :: proc(menu: ^Menu, i: int) {
 	menu.mods.import_.install = i
-	note(&menu.mods, "Installing...", false)
+	note(&menu.mods, "Importing...", false)
 }
 
 // The install of the folder given found, and looked through for what mods can be made of.
@@ -401,7 +401,7 @@ soldat_install :: proc(menu: ^Menu, i: int) {
 		note(mods, fmt.tprintf("%s couldn't be made: %s", name, problem), true)
 		return
 	}
-	note(mods, fmt.tprintf("%s installed: wear its parts on Installed Mods.", OWN_TITLE if source.kind == .Own else name), false)
+	note(mods, fmt.tprintf("%s imported: wear its parts on Installed Mods.", OWN_TITLE if source.kind == .Own else name), false)
 	mods_relist(mods)
 }
 
