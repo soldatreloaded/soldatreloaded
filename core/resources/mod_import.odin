@@ -114,6 +114,21 @@ soldat_is_install :: proc(dir: string) -> bool {
 	return false
 }
 
+// Whether `dir` is an original Soldat's install: its anims/, which a mod or a folder of
+// art never has, and beside it a file named for the game: its program, soldat.exe, or a
+// build native to Linux or macOS by whatever name (soldat, soldat_x64...), or the
+// soldat.ini it writes; their names in any case, anims/ a link or not.
+is_soldat :: proc(dir: string) -> bool {
+	entries, err := os.read_all_directory_by_path(dir, context.temp_allocator)
+	if err != nil do return false
+	exe, anims := false, false
+	for entry in entries {
+		if strings.equal_fold(entry.name, "anims") do anims ||= os.is_dir(entry.fullpath)
+		else do exe ||= strings.has_prefix(strings.to_lower(entry.name, context.temp_allocator), "soldat") && !os.is_dir(entry.fullpath)
+	}
+	return exe && anims
+}
+
 // What making a mod found: how many of its files change something of the game's.
 Import_Result :: struct {
 	changed: int,    // its art and sounds that differ from Classic's
@@ -145,21 +160,6 @@ soldat_root :: proc(path: string, allocator := context.allocator) -> (root, mod:
 		dir, _ = strings.replace_all(up, "\\", "/", context.temp_allocator)
 	}
 	return
-}
-
-// Whether `dir` is an original Soldat's install: its program (soldat.exe; or soldat, a
-// build native to Linux or macOS) and its anims/ beside it, which a mod or a folder of
-// art never has; their names in any case. 1.7.1 on Linux is its Windows install played
-// through Wine or Proton, soldat.exe and all.
-is_soldat :: proc(dir: string) -> bool {
-	entries, err := os.read_all_directory_by_path(dir, context.temp_allocator)
-	if err != nil do return false
-	exe, anims := false, false
-	for entry in entries {
-		if entry.type == .Directory do anims ||= strings.equal_fold(entry.name, "anims")
-		else do exe ||= strings.equal_fold(entry.name, "soldat.exe") || strings.equal_fold(entry.name, "soldat")
-	}
-	return exe && anims
 }
 
 // What a mod can be made of in a Soldat install: what the player changed of its own

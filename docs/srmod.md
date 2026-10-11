@@ -193,7 +193,8 @@ no importer of them.
 The install is found where it is usually put: `C:\Soldat`, Program Files, Steam's
 libraries (its registry, `libraryfolders.vdf`, any `steamapps/common` folder named for
 Soldat), and on Linux Wine's, Steam's, Flatpak's and Snap's. A folder is an install when
-it holds `soldat.exe` (or `soldat`) with `anims/` beside it. Failing that, **Browse...**
+it holds `anims/` and beside it a file named for the game (`soldat.exe`, a native
+build's `soldat` or `soldat_x64`, or `soldat.ini`). Failing that, **Browse...**
 brings up the system's folder dialog (Windows' own; zenity, kdialog or osascript
 elsewhere). Once found, the install isn't shown again.
 

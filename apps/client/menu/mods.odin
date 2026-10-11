@@ -367,7 +367,7 @@ import_look :: proc(menu: ^Menu) {
 	im := &menu.mods.import_
 	root, _, found := res.soldat_root(im.folder, context.temp_allocator)
 	if !found {
-		set_text(&im.problem, "No Soldat 1.7.1 there: pick the folder soldat.exe and anims are in.")
+		set_text(&im.problem, "No Soldat 1.7.1 there: pick the folder its anims folder is in.")
 		set_text(&im.root, "")
 		return
 	}
