@@ -559,7 +559,7 @@ is_stock :: proc(stock: ^map[string]Stock_File, path, file, at: string) -> bool 
 // Every file below `root`, by its path from it with forward slashes; `own`, only in its
 // game's folders (gostek-gfx/, sfx/...), an install's maps/, demos/ and mods/ passed
 // over. With the temp allocator.
-@(private = "file")
+@(private)
 files_below :: proc(root: string, own := false) -> []string {
 	files := make([dynamic]string, context.temp_allocator)
 	walk :: proc(files: ^[dynamic]string, root, below: string) {

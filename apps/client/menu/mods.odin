@@ -114,13 +114,27 @@ tab_installed :: proc(menu: ^Menu) {
 	k := &menu.kit
 	if len(mods.listings) == 0 {
 		muted_line(k, "No mods yet: get one from the Mod Marketplace, or make one from Soldat 1.")
+		classic_row(menu)
 		return
 	}
 	muted_line(k, "Click a mod's part to wear it from that mod, and from no other; again, for Classic's.")
+	classic_row(menu)
 	for &listing in mods.listings do installed_row(menu, &listing)
 	if listing, picked := listing_of(mods, mods.selected); picked && !listing.packed {
 		page_making(menu, listing.name)
 	}
+}
+
+// Classic, the game's own: not worn as a mod is, but its HUD may begin one in the editor.
+@(private = "file")
+classic_row :: proc(menu: ^Menu) {
+	k := &menu.kit
+	r := ui.row(k, ui.ROW_H + 8, false)
+	if !r.shown do return
+	edit, ex := row_button(k, r.x + r.w - 8, r.y + (r.h - ui.CTRL_H) / 2, "Edit HUD", false)
+	if edit do hud_editor_open(menu, "")
+	ui.text_fit(k, ui.LABEL, "Classic", r.x + 12, r.y + r.h / 2, 80, ui.MUTED)
+	ui.text_fit(k, ui.TINY, "The game's own, under every mod", r.x + 12 + ui.width_of(k.ui, ui.LABEL, "Classic") + 10, r.y + r.h / 2, ex - r.x - 110, ui.FAINT)
 }
 
 // A mod's row: its name, and what it is; under them a chip for each part it has, lit if
@@ -146,6 +160,11 @@ installed_row :: proc(menu: ^Menu, listing: ^res.Srmod_Listing) {
 	for part in listing.parts do every &&= worn_from(menu, part) == listing.name
 	used, ux := row_button(k, r.x + r.w - 8, r.y + 5, "Use All", !all || every)
 	if used do use_all(menu, listing)
+	if .Hud in listing.parts && listing.problem == "" {
+		edit, ex := row_button(k, ux, r.y + 5, "Edit HUD", false)
+		ux = ex
+		if edit do hud_editor_open(menu, listing.name)
+	}
 
 	tx := r.x + 12
 	ui.text_fit(k, ui.LABEL, listing.title, tx, r.y + 13, ux - tx - 8, ui.TEXT if worn_any else ui.MUTED)
@@ -577,7 +596,7 @@ action_bar :: proc(menu: ^Menu) {
 
 // The mod `part` is worn from, by name; "" for Classic's: the config's, if that mod is
 // in mods/ and has the part.
-@(private = "file")
+@(private)
 worn_from :: proc(menu: ^Menu, part: res.Part) -> string {
 	chosen := res.part_choice_of(&menu.config.graphics.parts, part)
 	if chosen == nil do return "" // the scenery, Classic's alone
@@ -607,7 +626,7 @@ use_all :: proc(menu: ^Menu, listing: ^res.Srmod_Listing) {
 // ---------------------------------------------------------------------------------
 
 // mods/ read again; and the version of each of the catalogue's mods installed.
-@(private = "file")
+@(private)
 mods_relist :: proc(mods: ^Mods) {
 	res.srmod_listings_destroy(mods.listings)
 	mods.listings = res.srmod_listings(res.MODS_DIR)
@@ -716,7 +735,7 @@ note :: proc(mods: ^Mods, text: string, bad: bool) {
 // Each part worn from the mod `parts` names for it, asked of the client, which takes the
 // request at the next frame's start: so its names are its own, made with the context's
 // allocator, outliving this frame's temp allocator, and the client frees them.
-@(private = "file")
+@(private)
 use_parts :: proc(menu: ^Menu, parts: [res.Part]string) {
 	kept: [res.Part]string
 	for name, part in parts do kept[part] = strings.clone(name)

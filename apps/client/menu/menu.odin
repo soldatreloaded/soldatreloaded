@@ -87,6 +87,7 @@ Menu :: struct {
 	mods:         Mods,
 	taunts:       Taunt_Editor,
 	custom_size:  Custom_Size, // the Graphics tab's resolution typed
+	editor:       Hud_Editor, // the HUD editor, over the whole window while it is open
 	in_game:      bool, // over a game: its settings alone (IN_GAME_PAGES), and Back to game
 }
 
@@ -170,6 +171,7 @@ menu_init :: proc(menu: ^Menu, config: ^res.Client_Config, mod: res.Mod, last_ma
 menu_destroy :: proc(menu: ^Menu) {
 	offline_destroy(&menu.offline)
 	demos_destroy(&menu.demos)
+	hud_editor_close(menu)
 	mods_destroy(&menu.mods)
 	delete(menu.servers.search)
 	delete(menu.taunts.text)
@@ -206,6 +208,24 @@ menu_draw :: proc(menu: ^Menu, u: ^ui.Ui) {
 	rlgl.DisableBackfaceCulling() // the shapes are wound either way
 	rl.EndBlendMode()
 
+	if menu.editor.open {
+		hud_editor_draw(menu, u)
+	} else {
+		pages_draw(menu, u)
+	}
+	ui.kit_end(k)
+
+	rlgl.DrawRenderBatchActive()
+	rlgl.EnableBackfaceCulling()
+	graphics := &menu.config.graphics
+	hud.pointer_draw(u, &menu.art, u.mouse, rl.Color(graphics.cursor_color), f32(clamp(graphics.cursor_size, 50, 200)) / 100)
+	rl.EndBlendMode()
+}
+
+// The rail and the page beside it, its header and its footer.
+@(private = "file")
+pages_draw :: proc(menu: ^Menu, u: ^ui.Ui) {
+	k := &menu.kit
 	if menu.in_game {
 		ui.rect(u, 0, 0, u.width, VIEW_H, {0, 0, 0, 90}) // the game, darkened
 	} else {
@@ -243,13 +263,6 @@ menu_draw :: proc(menu: ^Menu, u: ^ui.Ui) {
 	if ui.kit_page_keys(k) do menu.side = rail_index(menu, menu.page) // up from the page's first widget: back out to the rail
 	ui.kit_page_scroll(k, {PANEL_X, BODY_TOP, panel_w, BODY_BOTTOM - BODY_TOP}, menu.bar_x.? or_else x + w + 8)
 	ui.popup_draw(k)
-	ui.kit_end(k)
-
-	rlgl.DrawRenderBatchActive()
-	rlgl.EnableBackfaceCulling()
-	graphics := &menu.config.graphics
-	hud.pointer_draw(u, &menu.art, u.mouse, rl.Color(graphics.cursor_color), f32(clamp(graphics.cursor_size, 50, 200)) / 100)
-	rl.EndBlendMode()
 }
 
 // ---------------------------------------------------------------------------------

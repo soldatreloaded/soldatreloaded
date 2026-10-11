@@ -267,3 +267,20 @@ worn_layout :: proc(worn: ^Worn) -> (layout: Hud_Layout) {
 	if i := worn.chosen[.Hud]; i >= 0 do over(&layout, &worn.mods[i])
 	return
 }
+
+// How the description of a mod the HUD editor made begins: one that begins so is the
+// editor's, saved over as it is edited again.
+HUD_EDITOR_MADE :: "Made in the HUD editor"
+
+// The mod `name` made in `mods_dir`, over one by that name: a .srmod of a hud alone,
+// `layout` its layout.json and `pictures` (srmod_part_files of the hud it was made from)
+// beside it, `description` its own. False if it couldn't be written.
+hud_mod_write :: proc(mods_dir, name, title, description: string, layout: Hud_Layout, pictures: map[string][]byte) -> bool {
+	entries := make(map[string][]byte, context.temp_allocator)
+	for path, data in pictures {
+		if strings.equal_fold(path, HUD_LAYOUT_FILE) do continue
+		entries[strings.concatenate({PART_NAMES[.Hud], "/", path}, context.temp_allocator)] = data
+	}
+	entries[strings.concatenate({PART_NAMES[.Hud], "/", HUD_LAYOUT_FILE}, context.temp_allocator)] = transmute([]byte)hud_layout_text(layout)
+	return srmod_write(mods_dir, name, title, description, entries)
+}

@@ -96,6 +96,7 @@ Art :: struct {
 	guns:           [res.Weapon]draw.Sprite,
 	kill_left_text: f32, // a kill feed line's start with the feed on the left, past the widest icon
 	layout:         res.Hud_Layout, // where the bars and the texts go: the hud worn's layout.json
+	opaque:         [Picture]rl.Rectangle, // where each picture isn't see-through, its share across and down; the whole of it unless art_opaque says (the HUD editor's)
 }
 
 // The HUD's pictures, the hud's and the icons' worn, and its layout.
@@ -110,6 +111,26 @@ art_load :: proc(art: ^Art, mod: res.Mod) {
 	widest: f32 = 0
 	for gun in art.guns do widest = max(widest, gun.size.x)
 	art.kill_left_text = max(KILL_FEED_LEFT_TEXT, 5 + widest * 0.8 + 5)
+}
+
+// Where each picture isn't see-through (Art's `opaque`), from `mod`'s files: the HUD
+// editor outlines that, as a picture may have room about what is drawn of it.
+art_opaque :: proc(art: ^Art, mod: res.Mod) {
+	for file, picture in PICTURE_FILES {
+		art.opaque[picture] = {0, 0, 1, 1}
+		found := res.mod_file(mod, strings.concatenate({"interface-gfx/", file}, context.temp_allocator)) or_continue
+		data := res.mod_read(found, context.temp_allocator) or_continue
+		image := res.texture_decode(data, res.COLOR_KEY, context.temp_allocator) or_continue
+		lo, hi := [2]int{image.width, image.height}, [2]int{-1, -1}
+		for p, i in image.pixels {
+			if p.a < 24 do continue // a faint fringe isn't what is seen
+			x, y := i % image.width, i / image.width
+			lo, hi = {min(lo.x, x), min(lo.y, y)}, {max(hi.x, x), max(hi.y, y)}
+		}
+		if hi.x < 0 do continue
+		w, h := f32(image.width), f32(image.height)
+		art.opaque[picture] = {f32(lo.x) / w, f32(lo.y) / h, f32(hi.x - lo.x + 1) / w, f32(hi.y - lo.y + 1) / h}
+	}
 }
 
 art_destroy :: proc(art: ^Art) {

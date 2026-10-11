@@ -230,3 +230,50 @@ layout_worn :: proc(t: ^testing.T) {
 	l = res.worn_layout(&w)
 	testing.expect(t, l.alpha == 150 && l.team_box.at == {1, 2} && l.ping.at == {10, 10}, "the mod's over Classic's")
 }
+
+// A HUD as the HUD editor saves it: the hud part's files of the mod it began from
+// (srmod_part_files), its folder's or its .srmod's alike, and a mod of a hud alone written
+// with them and a layout (hud_mod_write); saved again over itself, its description kept.
+@(test)
+hud_saved :: proc(t: ^testing.T) {
+	dir := scratch(t, "hud_saved")
+	defer os.remove_all(dir)
+	write(utils.temp_path(dir, "Neo", "mod.json"), info("Neo", `"hud", "sounds"`))
+	write(utils.temp_path(dir, "Neo", "hud", "health.png"), "neo health")
+	write(utils.temp_path(dir, "Neo", "hud", "guns", "1.png"), "neo gun")
+	write(utils.temp_path(dir, "Neo", "hud", "layout.json"), `{"alpha": 90}`)
+	write(utils.temp_path(dir, "Neo", "sounds", "shot.wav"), "not the hud's")
+
+	neo, why, ok := res.srmod_open(utils.temp_path(dir, "Neo"))
+	if !testing.expectf(t, ok, "Neo opened (%s)", why) do return
+	pictures := res.srmod_part_files(&neo, .Hud, context.temp_allocator)
+	res.srmod_close(&neo)
+	testing.expect_value(t, len(pictures), 3)
+	testing.expect(t, string(pictures["health.png"]) == "neo health" && string(pictures["guns/1.png"]) == "neo gun", "its hud's files, in their folders, and no other part's")
+
+	layout := res.hud_layout_default()
+	layout.alpha = 120
+	layout.health.icon.at = {50, 300}
+	testing.expect(t, res.hud_mod_write(dir, "My_HUD", "My HUD", "Made in the HUD editor, from Neo's HUD.", layout, pictures), "written")
+	mine, mwhy, mok := res.srmod_open(utils.temp_path(dir, "My_HUD.srmod"))
+	defer res.srmod_close(&mine)
+	if !testing.expectf(t, mok, "My_HUD opened (%s)", mwhy) do return
+	testing.expect(t, mine.parts == {.Hud} && mine.info.title == "My HUD", "a hud alone")
+	again := res.srmod_part_files(&mine, .Hud, context.temp_allocator)
+	testing.expect(t, string(again["health.png"]) == "neo health" && string(again["guns/1.png"]) == "neo gun", "Neo's pictures in it")
+	read_back := res.hud_layout_default()
+	testing.expect(t, res.hud_layout_read(again["layout.json"], "layout.json", &read_back) && read_back == layout, "its layout, not Neo's")
+	res.srmod_close(&mine)
+
+	layout.alpha = 200
+	testing.expect(t, res.hud_mod_write(dir, "My_HUD", "My HUD", mine_description(dir), layout, again), "saved over itself")
+	over, _, _ := res.srmod_open(utils.temp_path(dir, "My_HUD.srmod"))
+	defer res.srmod_close(&over)
+	testing.expect(t, strings.has_prefix(over.info.description, res.HUD_EDITOR_MADE) && strings.contains(over.info.description, "Neo"), "the editor's, from Neo's still")
+
+	mine_description :: proc(dir: string) -> string {
+		m, _, _ := res.srmod_open(utils.temp_path(dir, "My_HUD.srmod"))
+		defer res.srmod_close(&m) // a .srmod open is a file open, which can't be written over
+		return strings.clone(m.info.description, context.temp_allocator)
+	}
+}

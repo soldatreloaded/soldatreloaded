@@ -151,7 +151,7 @@ team_text_color :: proc(team: res.Team) -> rl.Color {
 }
 
 // Where `anchor` is in the layout: its icon's place, or the corner's.
-@(private = "file")
+@(private)
 anchor_of :: proc(l: ^res.Hud_Layout, anchor: res.Hud_Anchor) -> [2]f32 {
 	switch anchor {
 	case .Corner: return {}
@@ -164,7 +164,7 @@ anchor_of :: proc(l: ^res.Hud_Layout, anchor: res.Hud_Anchor) -> [2]f32 {
 
 // Where `place` is, in the layout beside `anchor`: as far from it as there, the anchor
 // spread across the view.
-@(private = "file")
+@(private)
 anchored :: proc(u: ^ui.Ui, anchor, place: [2]f32) -> [2]f32 {
 	return {anchor.x * wide(u) + place.x - anchor.x, place.y}
 }
@@ -174,7 +174,7 @@ aligned :: proc(u: ^ui.Ui, at: [2]f32) -> [2]f32 {
 	return {align(u, at.x), align(u, at.y)}
 }
 
-@(private = "file")
+@(private)
 f32s :: proc(v: [2]i32) -> [2]f32 {
 	return {f32(v.x), f32(v.y)}
 }

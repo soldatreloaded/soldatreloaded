@@ -210,6 +210,29 @@ srmod_file :: proc(mod: ^Srmod, part: Part, path: string) -> (file: Mod_File, fo
 	return layer_file(&mod.pack, 0, strings.concatenate({PART_NAMES[part], "/", path}, context.temp_allocator))
 }
 
+// Every file of the mod's `part`, read: by its path in the part ("health.png",
+// "guns/1.png"), in lower case for a .srmod's. With `allocator`, the paths and the bytes.
+srmod_part_files :: proc(mod: ^Srmod, part: Part, allocator := context.allocator) -> map[string][]byte {
+	files := make(map[string][]byte, allocator)
+	if part not_in mod.parts do return files
+	prefix := strings.concatenate({PART_NAMES[part], "/"}, context.temp_allocator)
+	paths := make([dynamic]string, context.temp_allocator)
+	if a := mod.pack.archive; a != nil {
+		for path in a.files do if strings.has_prefix(path, prefix) && len(path) > len(prefix) do append(&paths, path[len(prefix):])
+	} else {
+		for path in files_below(utils.temp_path(mod.pack.dir, PART_NAMES[part])) {
+			slashed, _ := strings.replace_all(path, "\\", "/", context.temp_allocator)
+			append(&paths, slashed)
+		}
+	}
+	for path in paths {
+		file := srmod_file(mod, part, path) or_continue
+		data := mod_read(file, allocator) or_continue
+		files[strings.clone(path, allocator)] = data
+	}
+	return files
+}
+
 // Whether `name` is one a mod may have: letters, digits, - and _, at most
 // SRMOD_NAME_MAX; not Classic's.
 srmod_name_ok :: proc(name: string) -> bool {

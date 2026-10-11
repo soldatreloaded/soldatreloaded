@@ -1,7 +1,7 @@
 # .srmod: Soldat Reloaded's mods
 
 Being built: the format, Classic laid out as one, wearing mods by part and bringing them
-in from Soldat 1 are done (steps 1 to 4, below). It replaces the mods of before (folders
+in from Soldat 1, and the HUD editor, are done (steps 1 to 4 and 6, below). It replaces the mods of before (folders
 and `.smod`s laid out as Soldat 1's, stacked). How Soldat 1 does it, which this is
 measured against and imports from, is [soldat1-mods.md](soldat1-mods.md).
 
@@ -159,8 +159,21 @@ the original worked both out from which pictures an interface had and whether it
 custom at all (soldat1-mods.md), which an import resolves once and writes down, and the
 editor shows and changes. A part a layout leaves out is Classic's layout's.
 
-The interface editor (stage 2 of the custom interfaces) edits this file, and can still
-write a `setup.sif` for Soldat 1 from it.
+**The HUD editor** edits this file. The Mods page opens it on any mod's HUD (**Edit HUD**
+on its row, Classic's on its own): the HUD over the whole window as the game draws it,
+with made-up numbers, each part outlined (as much of its picture as isn't see-through).
+A part is picked by a click or from the panel's list, dragged or nudged with the arrows
+(Shift by 10); an icon moved takes along what is anchored to it. The panel shows or
+hides it, sets a bar's style and fill, a text's alignment, what it is kept beside, how
+it is turned, and the whole HUD's opacity; Undo (Ctrl+Z), Reset, Save, Close (Escape,
+twice with changes unsaved). There are no pictures to change in it: those of the HUD it
+began from are kept.
+
+Saved, a HUD is a mod of its own, as a `.srmod` is read-only: `My HUD` (`My_HUD`, then
+`My_HUD_2`...), a `hud` part alone, its `layout.json` and the pictures of the HUD it began
+from, and worn at once. Its description begins "Made in the HUD editor": opened on such a
+mod, the editor saves over it, letting go of it first where it is worn (a `.srmod` worn
+is a file open). Writing a `setup.sif` for Soldat 1 from a layout is left for later.
 
 ## Choosing
 
@@ -270,7 +283,7 @@ PNG only, files a part holds, the size limit (150 MB), the soldier's and guns' s
    one with art copied over its own, its `mods/classic`, its ten interfaces.
 5. **The catalogue**: the three mods converted by the mods repository's script;
    publishing `.srmod`s and `mods.json` at format 2; the game reading it.
-6. **The interface editor**, on `layout.json`.
+6. **The HUD editor**, on `layout.json`: done.
 7. **Pack and share**: the Mods page's **New mod** making a `.srmod` folder, and **Pack**
    making the file.
 
