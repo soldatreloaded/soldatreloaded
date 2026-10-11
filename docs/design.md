@@ -50,7 +50,6 @@ the unpacked folder in a release:
 ```
 data/        what the game plays by: maps, animations, skeletons, objects, bots
 mods/        what it looks and sounds like: classic/, the game's own, and the player's beside it
-interfaces/  the HUD's layouts: Soldat 1 custom interfaces, folders or .sint, the player's own
 scripts/     the server's Lua scripts, its host's own: none ship (docs/scripting.md)
 *.config.mjson  the configs, made with their defaults where they are missing
 weapons.ini     the server's weapons' numbers, as Soldat's are, made commented out where missing
@@ -62,17 +61,18 @@ animations and the maps decide what is solid, so a difference here is a differen
 A server and its clients must agree on it.
 
 **`mods/` is each player's own.** `mods/classic/` is the game's look and sound, which
-ships with it and is kept by the launcher. Beside it, a player's own mods, each an
-`.smod` (a zip, as OpenSoldat's are, and what the Mods page installs) or a folder (for
-making one), which no update touches. A player turns on any of them, in an order (the
-client config's `graphics.mods`, on the Mods page), and each file is looked for in each
-in turn, the top first, and in Classic last, so a mod holds only what it changes: a mod
-can be one sound, worn with another of art. Mods are laid out as OpenSoldat's are, so one
-of theirs works as it is, even packed a folder down: its `mod.ini` says how big its own
-images are in the world and where the soldier's parts are pinned (a mod without one uses
-Classic's), and its `txt/font.ini` what the HUD is written in. A player's Soldat 1.7.1 is
-made a mod of what they changed in it (`data/soldat-1.7.1.txt` lists the files it came
-with, which are left out).
+ships with it and is kept by the launcher. Beside it, a player's own mods, each a
+`.srmod` (a zip, read only) or a folder (a mod being made), which no update touches. A
+mod is made of parts, each a folder of it: the soldier, the weapons, the effects, the
+objects, the HUD, the icons, the sounds, the textures, the scenery, the fonts. A player
+wears each part from a mod of their choosing (the client config's `graphics.parts`, on
+the Mods page), and a file that mod's part hasn't is Classic's, so a mod holds only what
+it changes: one gun's art, or one sound. Every image is 4.5 pixels to a unit; the
+soldier's and the weapons' parts say where their images are pinned (`pivots.json`), and
+the HUD's where its bars and texts go (`layout.json`). [srmod.md](srmod.md) is the
+format, and [soldat1-mods.md](soldat1-mods.md) Soldat 1's, which a player's Soldat
+1.7.1 is made a mod from (`data/soldat-1.7.1.txt` lists the files it came with, which
+are left out).
 
 **A map may carry its own art.** Beside `data/maps/<name>.pms`, a folder of the map's
 name holds the images it draws with that the mods may not have, laid out as a mod is:

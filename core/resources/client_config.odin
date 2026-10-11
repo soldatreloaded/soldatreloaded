@@ -1,6 +1,5 @@
 package resources
 
-import "core:encoding/json"
 import "core:fmt"
 import "core:log"
 import "core:mem/virtual"
@@ -111,8 +110,7 @@ SENSITIVITY_LOWEST :: 0.1
 SENSITIVITY_HIGHEST :: 5.0
 
 Graphics_Settings :: struct {
-	mods:              []string `jsoncomment:"the mods the game looks and sounds like, over Classic (mods/classic/), the top first: each a .smod or a folder of mods/, by its name. A file is the first of them's that has it, else Classic's. Empty for Classic alone. Chosen on the Mods page, which uses them at once."`,
-	interface:         string `jsoncomment:"the HUD's layout and pictures: a Soldat 1 custom interface in interfaces/, a folder or a .sint, by its name; empty for the game's own. Chosen on the Graphics page."`,
+	parts:             Part_Choice `jsoncomment:"the mod each part of the game is worn from (the soldier, the weapons, the effects, the objects, the hud, the icons, the sounds, the textures, the scenery, the fonts), by its name in mods/; empty for Classic's. Chosen on the Mods page, which wears them at once."`,
 	screen_width:      i32 `jsoncomment:"the resolution's width: windowed, the window's; fullscreen, the world is drawn at it and scaled to the screen"`,
 	screen_height:     i32 `jsoncomment:"the resolution's height"`,
 	window_mode:       Window_Mode `jsoncomment:"windowed, or fullscreen: a window without borders over the whole screen"`,
@@ -502,12 +500,11 @@ client_config_load :: proc(path: string, old_path := "") -> ^Client_Config {
 	switch result, dropped, line := config_read(from, config, arena, backup = true); result {
 	case .Read:
 		if lobby_moved(&config.network.lobby) do log.infof("%s: the lobby is %s now", path, LOBBY_URL)
-		carried := mod_carried(from, config)
 		unbound := vsync_unbound(config)
 		if unbound do log.infof("%s: vsync is the graphics menu's alone now, its key let go (F4 takes the screenshot)", path)
 		dropped_keys := settings_unbound(config)
 		if dropped_keys do log.infof("%s: the keys that toggled the frame rate or the player names let go: they are the Settings page's", path)
-		if from != path || carried || unbound || dropped_keys do client_config_save(config, path)
+		if from != path || unbound || dropped_keys do client_config_save(config, path)
 		if dropped > 0 {
 			config.problem = fmt.aprintf("%d settings weren't understood and are at their defaults; the file as it was is %s.bak", dropped, from, allocator = arena)
 		}
@@ -518,28 +515,6 @@ client_config_load :: proc(path: string, old_path := "") -> ^Client_Config {
 		config.problem = fmt.aprintf("%s has a mistake on line %d: on the defaults until it is fixed or deleted", from, line, allocator = arena)
 	}
 	return config
-}
-
-// The one mod of a config from before the mods were stacked (graphics.mod), the only mod
-// on in a config that has none on. True if there was one.
-@(private = "file")
-mod_carried :: proc(path: string, config: ^Client_Config) -> bool {
-	if len(config.graphics.mods) > 0 do return false
-	text := utils.read_file(path, context.temp_allocator) or_return
-	Before :: struct {
-		graphics: struct {
-			mod: string,
-		},
-	}
-	before: Before
-	json.unmarshal(text, &before, .MJSON, context.temp_allocator)
-	name := before.graphics.mod
-	if name == "" || mod_builtin(name) || strings.equal_fold(name, "default") do return false
-	mods := make([]string, 1, virtual.arena_allocator(&config.arena))
-	mods[0] = strings.clone(name, virtual.arena_allocator(&config.arena))
-	config.graphics.mods = mods
-	log.infof("%s: the mod %s is the first of graphics.mods now", path, name)
-	return true
 }
 
 // A lobby address of a config read, moved to LOBBY_URL if it is still the old lobby's

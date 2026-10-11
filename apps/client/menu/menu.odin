@@ -88,8 +88,6 @@ Menu :: struct {
 	taunts:       Taunt_Editor,
 	custom_size:  Custom_Size, // the Graphics tab's resolution typed
 	in_game:      bool, // over a game: its settings alone (IN_GAME_PAGES), and Back to game
-	interfaces:   [dynamic]string, // interfaces/, as the Graphics page last listed it
-	interfaces_listed: bool,       // and is to list again as it is next shown
 }
 
 // The pages the menu shows over a game: the settings that take effect while it plays.
@@ -105,7 +103,6 @@ Request :: union {
 	Play_Demo,
 	Refresh,
 	Use_Mod,
-	Use_Interface,
 	Quit,
 	Back,
 }
@@ -132,18 +129,11 @@ Play_Demo :: struct {
 // The lobby asked for its servers again.
 Refresh :: struct {}
 
-// The mods `mods`, of mods/, the top first, worn from now on over Classic: what the game
-// looks and sounds like loaded again from them, and the Mods page opened again as it was
-// (menu_mods_changed). The list is the request's, allocated with the context's
-// allocator: the client takes it.
+// Each part worn from the mod of mods/ `parts` names for it ("" for Classic's), from now
+// on: what the game looks and sounds like loaded again from them, and the Mods page
+// opened again as it was (menu_mods_changed). The names are the temp allocator's.
 Use_Mod :: struct {
-	mods: []string,
-}
-
-// The custom interface `name`, of interfaces/ ("" the game's own), worn from now on: the
-// HUD's art loaded again with it (menu_mods_changed). The name is the temp allocator's.
-Use_Interface :: struct {
-	name: string,
+	parts: [res.Part]string,
 }
 
 Quit :: struct {}
@@ -180,8 +170,6 @@ menu_destroy :: proc(menu: ^Menu) {
 	offline_destroy(&menu.offline)
 	demos_destroy(&menu.demos)
 	mods_destroy(&menu.mods)
-	for name in menu.interfaces do delete(name)
-	delete(menu.interfaces)
 	delete(menu.servers.search)
 	delete(menu.taunts.text)
 	delete(menu.custom_size.width)
@@ -201,7 +189,6 @@ menu_mods_changed :: proc(menu: ^Menu, mod: res.Mod) {
 	if menu.previewed do draw.preview_destroy(&menu.preview)
 	menu.previewed = false
 	menu.mods.listed = false // mods/ as it is now
-	menu.interfaces_listed = false
 }
 
 // The keys and the mouse since the last pass; and what that pass asked, once.
@@ -305,7 +292,7 @@ PAGE_LINES := [Page]string {
 	.Controls = "The keys. Click a binding, then press the new key; Escape cancels.",
 	.Settings = "What is drawn, the sound, the mouse and the interface.",
 	.Taunts   = "What a key says: a message to everyone or the team, or your own words as a radio call.",
-	.Mods     = "How the game looks and sounds: mods over its own, stacked, the top one first.",
+	.Mods     = "How the game looks and sounds: each part, the soldier, the weapons, the sounds..., from a mod.",
 }
 
 // What the footer says on the pages with nothing of their own to say there.
@@ -358,7 +345,6 @@ set_text :: proc(s: ^string, text: string) {
 go_page :: proc(menu: ^Menu, page: Page) {
 	if page == .Demos && menu.page != .Demos do menu.demos.listed = false // demos/ as it is now
 	if page == .Mods && menu.page != .Mods do menu.mods.listed = false // mods/ as it is now
-	if page == .Settings && menu.page != .Settings do menu.interfaces_listed = false // interfaces/ as it is now
 	menu.page = page
 	menu.side = rail_index(menu, page)
 	ui.kit_reset_page(&menu.kit)

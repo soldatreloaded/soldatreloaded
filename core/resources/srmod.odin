@@ -53,6 +53,45 @@ PART_NAMES := [Part]string {
 	.Fonts    = "fonts",
 }
 
+// The mod each part is worn from, by its name, "" for Classic's: the client config's
+// graphics.parts.
+Part_Choice :: struct {
+	soldier:  string,
+	weapons:  string,
+	effects:  string,
+	objects:  string,
+	hud:      string,
+	icons:    string,
+	sounds:   string,
+	textures: string,
+	scenery:  string,
+	fonts:    string,
+}
+
+// The choice's mod for `part`.
+part_choice_of :: proc(choice: ^Part_Choice, part: Part) -> ^string {
+	switch part {
+	case .Soldier:  return &choice.soldier
+	case .Weapons:  return &choice.weapons
+	case .Effects:  return &choice.effects
+	case .Objects:  return &choice.objects
+	case .Hud:      return &choice.hud
+	case .Icons:    return &choice.icons
+	case .Sounds:   return &choice.sounds
+	case .Textures: return &choice.textures
+	case .Scenery:  return &choice.scenery
+	case .Fonts:    return &choice.fonts
+	}
+	return nil
+}
+
+// The choice, part by part.
+part_choices :: proc(choice: Part_Choice) -> (by_part: [Part]string) {
+	choice := choice
+	for part in Part do by_part[part] = part_choice_of(&choice, part)^
+	return
+}
+
 // The part named `name` (as PART_NAMES has it, in any case).
 part_named :: proc(name: string) -> (part: Part, ok: bool) {
 	for n, p in PART_NAMES {
@@ -194,6 +233,49 @@ srmods_list :: proc(dir: string) -> []string {
 	}
 	slice.sort(names[:])
 	return names[:]
+}
+
+// A mod as the Mods page lists it.
+Srmod_Listing :: struct {
+	name:        string,
+	title:       string,
+	version:     string,
+	author:      string,
+	description: string,
+	parts:       Parts,
+	packed:      bool,   // a .srmod; else a folder, being made
+	problem:     string, // why it can't be worn, if it can't: it is listed to be deleted
+}
+
+// The mods in `dir` (srmods_list), each opened to say what it is. Free with
+// srmod_listings_destroy.
+srmod_listings :: proc(dir: string, allocator := context.allocator) -> []Srmod_Listing {
+	listings := make([dynamic]Srmod_Listing, allocator)
+	for name in srmods_list(dir) {
+		path := srmod_path(dir, name)
+		mod, problem, ok := srmod_open(path, context.temp_allocator)
+		listing := Srmod_Listing{name = strings.clone(name, allocator), packed = !os.is_dir(path)}
+		if ok {
+			listing.title = strings.clone(mod.info.title, allocator)
+			listing.version = strings.clone(mod.info.version, allocator)
+			listing.author = strings.clone(mod.info.author, allocator)
+			listing.description = strings.clone(mod.info.description, allocator)
+			listing.parts = mod.parts
+			srmod_close(&mod, context.temp_allocator)
+		} else {
+			listing.title = strings.clone(name, allocator)
+			listing.problem = strings.clone(problem, allocator)
+		}
+		append(&listings, listing)
+	}
+	return listings[:]
+}
+
+srmod_listings_destroy :: proc(listings: []Srmod_Listing, allocator := context.allocator) {
+	for l in listings {
+		for s in ([]string{l.name, l.title, l.version, l.author, l.description, l.problem}) do delete(s, allocator)
+	}
+	delete(listings, allocator)
 }
 
 // Where the mod `name` in `dir` is: its folder, else its .srmod; "" if neither.

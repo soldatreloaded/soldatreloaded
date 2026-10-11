@@ -15,56 +15,49 @@ import "../ui"
 // and the grenades, each a bar beside its icon; the rounds left and the weapon's name;
 // my place, my kills and the limit. The team box with the scores and the flags away
 // from home. The original's RenderInterface and RenderPlayerInterfaceTexts, laid out as
-// the interface worn says (res.Interface_Setup, art.layout): the game's own, or a Soldat
-// 1 custom interface's setup.sif, in the 640 by 480 layout's units. Each icon is placed
-// across the view as it widens; each bar, text and the grenades kept as far from its
-// anchor (art.anchors) as the layout has them. A bar shows its share as its picture cut
-// across or down, or as a number; turned as the layout says, about its top-left. The
-// vest's bar, the cluster grenades and the ping's dot have no place in this game: an
-// interface's are kept, and drawn by none.
+// the hud worn's layout.json says (res.Hud_Layout, art.layout), in the 640 by 480
+// layout's units. Each icon is placed across the view as it widens; each bar, text and
+// the grenades kept as far from its anchor (an icon, or the layout's corner) as the
+// layout has them. A bar shows its share as its picture cut across or down, filling
+// forward or backward, or as a number; turned as the layout says, about its top-left.
+// The vest's bar, the cluster grenades and the ping's dot have no place in this game: a
+// layout's are kept, and drawn by none.
 
 // The bars and their icons.
 draw_bars :: proc(u: ^ui.Ui, art: ^Art, mine: ^Mine) {
 	p := &art.pictures
-	s := &art.layout
-	a := &art.anchors
+	l := &art.layout
 	tint := WHITE
-	tint.a = s.alpha
-	// the game's own fills its bars from their left; a custom one, but for the reload's
-	// and the fire's, from their right (the original's IntAlign)
-	from_left := !art.custom
+	tint.a = l.alpha
 
-	if .Health in s.shown {
-		icon(u, p[.Health], s.health_icon, tint)
-		bar(u, p[.Health_Bar], a.health, s.health_bar, mine.health / sim.DEFAULT_HEALTH, from_left, tint)
+	if l.health.shown {
+		icon(u, p[.Health], l.health.icon, tint)
+		bar(u, p[.Health_Bar], anchor_of(l, l.health.bar.anchor), l.health.bar, mine.health / sim.DEFAULT_HEALTH, l.health.bar.fill, tint)
 	}
-	if .Ammo in s.shown {
-		icon(u, p[.Ammo], s.ammo_icon, tint)
+	if l.ammo.shown {
+		icon(u, p[.Ammo], l.ammo.icon, tint)
 		if share, shown := mine.ammo_bar.?; shown {
-			reloading := mine.ammo == 0
-			bar(u, p[.Reload_Bar], a.ammo, s.ammo_bar, share, true if reloading else from_left, tint)
+			fill := l.ammo.reload_fill if mine.ammo == 0 else l.ammo.bar.fill // emptied, the reload's
+			bar(u, p[.Reload_Bar], anchor_of(l, l.ammo.bar.anchor), l.ammo.bar, share, fill, tint)
 		}
 	}
-	if .Fire in s.shown {
-		// the frame where the layout's fire bar is, and the bar where its fire icon is (sic)
-		at := aligned(u, anchored(u, a.fire, f32s(s.fire_bar.at)))
-		picture(u, p[.Fire_Bar_Frame], at, tint, angle = math.to_radians(f32(s.fire_bar.rotate)))
-		fire := s.fire_bar
-		fire.at, fire.rotate = s.fire_icon.at, s.fire_icon.rotate
-		bar(u, p[.Fire_Bar], a.fire, fire, mine.fire_bar, false, tint)
+	if l.fire.shown {
+		anchor := anchor_of(l, l.fire.bar.anchor)
+		picture(u, p[.Fire_Bar_Frame], aligned(u, anchored(u, anchor, f32s(l.fire.frame.at))), tint, angle = math.to_radians(f32(l.fire.frame.rotate)))
+		bar(u, p[.Fire_Bar], anchor, l.fire.bar, mine.fire_bar, l.fire.bar.fill, tint)
 	}
-	if jets, has_jets := mine.jets.?; has_jets && .Jet in s.shown {
-		icon(u, p[.Jet], s.jet_icon, tint)
-		bar(u, p[.Jet_Bar], a.jet, s.jet_bar, jets, from_left, tint)
+	if jets, has_jets := mine.jets.?; has_jets && l.jet.shown {
+		icon(u, p[.Jet], l.jet.icon, tint)
+		bar(u, p[.Jet_Bar], anchor_of(l, l.jet.bar.anchor), l.jet.bar, jets, l.jet.bar.fill, tint)
 	}
 
 	// the grenades on the belt, one each, in a row or up a column
-	if .Nades in s.shown && s.nades.style != .Text {
+	if l.nades.shown && l.nades.style != .Number {
 		nade := p[.Nade]
-		base := anchored(u, a.nades, f32s(s.nades.at))
+		base := anchored(u, anchor_of(l, l.nades.anchor), f32s(l.nades.at))
 		for j in 1 ..= mine.grenades {
 			step := f32(j)
-			at := base + {nade.size.x * step, 0} if s.nades.style == .Horizontal else base + {0, nade.size.y * (6 - step)}
+			at := base + {nade.size.x * step, 0} if l.nades.style == .Across else base + {0, nade.size.y * (6 - step)}
 			picture(u, nade, aligned(u, at), tint)
 		}
 	}
@@ -74,49 +67,35 @@ draw_bars :: proc(u: ^ui.Ui, art: ^Art, mine: ^Mine) {
 // and always the place, the kills against the leader's, and the limit of whoever I am
 // watching (me, unless I follow a player).
 draw_bar_texts :: proc(u: ^ui.Ui, art: ^Art, data: ^Hud_Data) {
-	s := &art.layout
-	a := &art.anchors
+	l := &art.layout
 	mine := &data.mine
 	if !mine.dead {
-		white := with_alpha(WHITE, int(s.alpha))
-		if .Health in s.shown && s.health_bar.style == .Text {
-			percent(u, a.health, s.health_bar.at, mine.health / sim.DEFAULT_HEALTH, white)
+		white := with_alpha(WHITE, int(l.alpha))
+		if l.health.shown && l.health.bar.style == .Number {
+			percent(u, anchor_of(l, l.health.bar.anchor), l.health.bar.at, mine.health / sim.DEFAULT_HEALTH, white)
 		}
-		if share, shown := mine.ammo_bar.?; shown && .Ammo in s.shown && s.ammo_bar.style == .Text && mine.ammo == 0 {
-			percent(u, a.ammo, s.ammo_bar.at, share, white) // the reload's share done
+		if share, shown := mine.ammo_bar.?; shown && l.ammo.shown && l.ammo.bar.style == .Number && mine.ammo == 0 {
+			percent(u, anchor_of(l, l.ammo.bar.anchor), l.ammo.bar.at, share, white) // the reload's share done
 		}
-		if jets, has_jets := mine.jets.?; has_jets && .Jet in s.shown && s.jet_bar.style == .Text {
-			percent(u, a.jet, s.jet_bar.at, jets, white)
+		if jets, has_jets := mine.jets.?; has_jets && l.jet.shown && l.jet.bar.style == .Number {
+			percent(u, anchor_of(l, l.jet.bar.anchor), l.jet.bar.at, jets, white)
 		}
-		if .Nades in s.shown && s.nades.style == .Text {
-			write(u, fmt.tprintf("%d", mine.grenades), anchored(u, a.nades, f32s(s.nades.at)), MENU_FONT, white)
+		if l.nades.shown && l.nades.style == .Number {
+			write(u, fmt.tprintf("%d", mine.grenades), anchored(u, anchor_of(l, l.nades.anchor), f32s(l.nades.at)), MENU_FONT, white)
 		}
-		// the game's own puts the rounds and the name to the left of their places; a
-		// custom one, to the right (the original's IntAlign)
-		right := !art.custom
-		if .Bullets in s.shown {
-			at := anchored(u, a.ammo, f32s(s.bullets))
-			rounds := fmt.tprintf("%d", mine.ammo)
-			if right do at.x -= text_width(u, rounds, MENU_FONT)
-			write(u, rounds, at, MENU_FONT, with_alpha(ROUNDS_COLOR, int(s.alpha)))
-		}
-		if .Weapon in s.shown && named(mine.weapon) {
-			at := anchored(u, a.ammo, f32s(s.weapon))
-			name := data.weapon_names[mine.weapon]
-			if right do at.x -= text_width(u, name, WEAPONS_FONT)
-			write(u, name, at, WEAPONS_FONT, with_alpha(WEAPON_COLOR, int(s.alpha)))
-		}
+		if l.bullets.shown do text(u, l, l.bullets, fmt.tprintf("%d", mine.ammo), MENU_FONT, ROUNDS_COLOR)
+		if l.weapon.shown && named(mine.weapon) do text(u, l, l.weapon, data.weapon_names[mine.weapon], WEAPONS_FONT, WEAPON_COLOR)
 	}
 
-	if .Status not_in s.shown do return
+	if !l.status.shown do return
 	ranked := rank_players(data)
 	ranks := sa.slice(&ranked)
 	place := 0
 	for id, i in ranks {
 		if id == data.viewed do place = i + 1
 	}
-	at := [2]f32{f32(s.status.x) * wide(u), f32(s.status.y)}
-	if place > 0 do write(u, fmt.tprintf("%d/%d", place, len(ranks)), at, SMALL_FONT, with_alpha(PLACE_COLOR, int(s.alpha)))
+	at := [2]f32{f32(l.status.at.x) * wide(u), f32(l.status.at.y)}
+	if place > 0 do write(u, fmt.tprintf("%d/%d", place, len(ranks)), at, SMALL_FONT, with_alpha(PLACE_COLOR, int(l.alpha)))
 	kills := data.players[data.viewed].kills
 	standing: string
 	if place == 1 && len(ranks) > 1 {
@@ -126,30 +105,30 @@ draw_bar_texts :: proc(u: ^ui.Ui, art: ^Art, data: ^Hud_Data) {
 		behind := kills - data.players[ranks[0]].kills if len(ranks) > 0 else 0
 		standing = fmt.tprintf("%d (%d)", kills, behind)
 	}
-	write(u, standing, at + {0, 10}, SMALL_FONT, with_alpha(KILLS_COLOR, int(s.alpha)))
-	write(u, fmt.tprintf("%d", data.limit), at + {0, 20}, SMALL_FONT, with_alpha(LIMIT_COLOR, int(s.alpha)))
+	write(u, standing, at + {0, 10}, SMALL_FONT, with_alpha(KILLS_COLOR, int(l.alpha)))
+	write(u, fmt.tprintf("%d", data.limit), at + {0, 20}, SMALL_FONT, with_alpha(LIMIT_COLOR, int(l.alpha)))
 }
 
 // A box with each team's flag shown where it is away from its base.
 draw_team_box :: proc(u: ^ui.Ui, art: ^Art, data: ^Hud_Data) {
-	s := &art.layout
-	if .Team not_in s.shown do return
-	place := f32s(s.team_box)
-	box(u, art, {place.x * wide(u), place.y, 57, 88}, u8(int(s.alpha) * 56 / 100))
+	l := &art.layout
+	if !l.team_box.shown do return
+	place := f32s(l.team_box.at)
+	box(u, art, {place.x * wide(u), place.y, 57, 88}, u8(int(l.alpha) * 56 / 100))
 	at := [2]f32{align(u, (place.x + 4) * wide(u)), align(u, place.y + 5)}
-	if !data.flags_home[.Alpha] do picture(u, art.pictures[.No_Flag], at, {255, 0, 0, s.alpha})
-	if !data.flags_home[.Bravo] do picture(u, art.pictures[.No_Flag], {align(u, at.x + 31), at.y}, {0, 0, 255, s.alpha})
+	if !data.flags_home[.Alpha] do picture(u, art.pictures[.No_Flag], at, {255, 0, 0, l.alpha})
+	if !data.flags_home[.Bravo] do picture(u, art.pictures[.No_Flag], {align(u, at.x + 31), at.y}, {0, 0, 255, l.alpha})
 }
 
 // And in it, the teams' captures, the leader's first.
 draw_team_scores :: proc(u: ^ui.Ui, art: ^Art, data: ^Hud_Data) {
-	s := &art.layout
-	if .Team not_in s.shown do return
+	l := &art.layout
+	if !l.team_box.shown do return
 	order := [2]res.Team{.Alpha, .Bravo}
 	if data.captures[.Bravo] > data.captures[.Alpha] do order = {.Bravo, .Alpha}
 	for team, i in order {
-		at := [2]f32{f32(s.team_box.x) * wide(u) + 2, f32(s.team_box.y) + 25 + 40 * f32(i)}
-		write(u, fmt.tprintf("%d", data.captures[team]), at, MENU_FONT, with_alpha(team_text_color(team), int(s.alpha)))
+		at := [2]f32{f32(l.team_box.at.x) * wide(u) + 2, f32(l.team_box.at.y) + 25 + 40 * f32(i)}
+		write(u, fmt.tprintf("%d", data.captures[team]), at, MENU_FONT, with_alpha(team_text_color(team), int(l.alpha)))
 	}
 }
 
@@ -171,6 +150,18 @@ team_text_color :: proc(team: res.Team) -> rl.Color {
 	return {0xC3, 0xC3, 0xC3, 0xF1}
 }
 
+// Where `anchor` is in the layout: its icon's place, or the corner's.
+@(private = "file")
+anchor_of :: proc(l: ^res.Hud_Layout, anchor: res.Hud_Anchor) -> [2]f32 {
+	switch anchor {
+	case .Corner: return {}
+	case .Health: return f32s(l.health.icon.at)
+	case .Ammo:   return f32s(l.ammo.icon.at)
+	case .Jet:    return f32s(l.jet.icon.at)
+	}
+	return {}
+}
+
 // Where `place` is, in the layout beside `anchor`: as far from it as there, the anchor
 // spread across the view.
 @(private = "file")
@@ -190,30 +181,39 @@ f32s :: proc(v: [2]i32) -> [2]f32 {
 
 // An icon at its place across the view, turned as the layout says.
 @(private = "file")
-icon :: proc(u: ^ui.Ui, image: draw.Sprite, place: res.Interface_Icon, tint: rl.Color) {
+icon :: proc(u: ^ui.Ui, image: draw.Sprite, place: res.Hud_Icon, tint: rl.Color) {
 	at := f32s(place.at)
 	picture(u, image, aligned(u, anchored(u, at, at)), tint, angle = math.to_radians(f32(place.rotate)))
 }
 
-// The original's RenderBar: the bar's image cut to the `share` of it, beside `anchor`,
-// turned about its top-left. Across, growing from its left, or from its right shrinking
-// toward its left; down, growing up from its bottom, or its top shown shrinking toward
-// its bottom, as the original draws them. Nothing for a bar shown as a number.
+// A text at its place beside its anchor, starting there or ending there.
 @(private = "file")
-bar :: proc(u: ^ui.Ui, image: draw.Sprite, anchor: [2]f32, layout: res.Interface_Bar, share: f32, from_left: bool, tint: rl.Color) {
-	if layout.style == .Text do return
+text :: proc(u: ^ui.Ui, l: ^res.Hud_Layout, place: res.Hud_Text, words: string, font: Lettering, color: rl.Color) {
+	at := anchored(u, anchor_of(l, place.anchor), f32s(place.at))
+	if place.align == .Right do at.x -= text_width(u, words, font)
+	write(u, words, at, font, with_alpha(color, int(l.alpha)))
+}
+
+// The original's RenderBar: the bar's image cut to the `share` of it, beside `anchor`,
+// turned about its top-left. Across, forward growing from its left, backward from its
+// right shrinking toward its left; down, forward growing up from its bottom, backward its
+// top shown shrinking toward its bottom, as the original draws them. Nothing for a bar
+// shown as a number.
+@(private = "file")
+bar :: proc(u: ^ui.Ui, image: draw.Sprite, anchor: [2]f32, layout: res.Hud_Bar, share: f32, fill: res.Hud_Fill, tint: rl.Color) {
+	if layout.style == .Number do return
 	p := clamp(share, 0, 1)
 	place := f32s(layout.at)
 	at := [2]f32{align(u, anchor.x * wide(u)) + place.x - anchor.x, align(u, anchor.y) + place.y - anchor.y}
 	part: rl.Rectangle
 	switch {
-	case layout.style == .Vertical && from_left:
+	case layout.style == .Down && fill == .Forward:
 		part = {0, 1 - p, 1, p}
 		at.y += image.size.y * (1 - p)
-	case layout.style == .Vertical:
+	case layout.style == .Down:
 		part = {0, 0, 1, p}
 		at.y += image.size.y * (1 - p)
-	case from_left:
+	case fill == .Forward:
 		part = {0, 0, p, 1}
 	case:
 		part = {1 - p, 0, p, 1}

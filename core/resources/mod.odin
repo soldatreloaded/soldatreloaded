@@ -36,7 +36,6 @@ MOD_FOLDERS := [?]string{"gostek-gfx", "weapons-gfx", "interface-gfx", "sparks-g
 Mod :: struct {
 	worn:         ^Worn,      // each part's mod, Classic under them; nil where Classic couldn't be read
 	classic_only: bool,       // mod_classic's: Classic alone
-	interface:    ^Interface, // the custom interface worn over them, the HUD's: the client's own, which outlives the mods made again; nil for the game's own
 }
 
 // One mod as its files: a folder, or a zip open.
@@ -531,8 +530,9 @@ mod_exists :: proc(mods_dir, name: string) -> bool {
 	for entry in entries {
 		other := entry.name
 		if entry.type != .Directory {
-			if !strings.equal_fold(filepath.ext(other), MOD_EXTENSION) do continue
-			other = other[:len(other) - len(MOD_EXTENSION)]
+			ext := filepath.ext(other)
+			if !strings.equal_fold(ext, MOD_EXTENSION) && !strings.equal_fold(ext, SRMOD_EXTENSION) do continue
+			other = other[:len(other) - len(ext)]
 		}
 		if strings.equal_fold(other, name) do return true
 	}
@@ -584,8 +584,9 @@ mod_delete :: proc(mods_dir, name: string) -> bool {
 			return false
 		}
 	}
-	packed := strings.concatenate({dir, MOD_EXTENSION}, context.temp_allocator)
-	if os.is_file(packed) {
+	for extension in ([]string{MOD_EXTENSION, SRMOD_EXTENSION}) {
+		packed := strings.concatenate({dir, extension}, context.temp_allocator)
+		if !os.is_file(packed) do continue
 		if err := os.remove(packed); err != nil {
 			log.errorf("cannot delete %s: %v", packed, err)
 			return false

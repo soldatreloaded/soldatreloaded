@@ -207,26 +207,6 @@ old_time_settings :: proc(t: ^testing.T) {
 	testing.expect(t, again.interface.local_time, "and the local time")
 }
 
-// A config of before the mods were stacked, its one mod in graphics.mod, has it as the
-// only mod on, and is written so; Classic, or none, is no mod on.
-@(test)
-old_mod_setting :: proc(t: ^testing.T) {
-	dir := scratch(t, "mod")
-	defer os.remove_all(dir)
-	path := utils.temp_path(dir, "client.config.mjson")
-	write(path, "player: {name: \"Kept\"}\ngraphics: {mod: \"NoNameMod\", vsync: true}\n")
-	config := res.client_config_load(path)
-	defer res.client_config_destroy(config)
-	testing.expect(t, !config.broken && config.player.name == "Kept" && config.graphics.vsync, "it reads, its other settings kept")
-	testing.expect(t, len(config.graphics.mods) == 1 && config.graphics.mods[0] == "NoNameMod", "its mod the one on")
-	text := read(path)
-	testing.expect(t, strings.contains(text, "mods: [\n") && strings.contains(text, "\"NoNameMod\"") && !strings.contains(text, " mod: "), "and written as one of graphics.mods")
-
-	write(path, "graphics: {mod: \"classic\"}\n")
-	classic := res.client_config_load(path)
-	defer res.client_config_destroy(classic)
-	testing.expect_value(t, len(classic.graphics.mods), 0)
-}
 
 // A config of another version, with values this one doesn't take (a haircut it hasn't, a
 // setting now of another kind) and a setting it hasn't: those settings keep their
@@ -393,4 +373,19 @@ sound_levels :: proc(t: ^testing.T) {
 	defer res.client_config_destroy(again)
 	testing.expect(t, again.sound.levels == set.sound.levels, "and read back the same")
 	testing.expect(t, strings.contains(read(path), "spawns: 100"), "every one written")
+}
+
+// A config of before the mods were worn by part, its stacked mods in graphics.mods (and
+// before that its one in graphics.mod), reads as it is, every part Classic's: those mods
+// were .smods, which the game no longer wears.
+@(test)
+old_mod_settings :: proc(t: ^testing.T) {
+	dir := scratch(t, "mod")
+	defer os.remove_all(dir)
+	path := utils.temp_path(dir, "client.config.mjson")
+	write(path, "player: {name: \"Kept\"}\ngraphics: {mod: \"NoNameMod\", mods: [\"Competitive\"], vsync: true}\n")
+	config := res.client_config_load(path)
+	defer res.client_config_destroy(config)
+	testing.expect(t, !config.broken && config.problem == "" && config.player.name == "Kept" && config.graphics.vsync, "it reads, its other settings kept")
+	testing.expect_value(t, config.graphics.parts, res.Part_Choice{})
 }

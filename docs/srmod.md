@@ -1,8 +1,9 @@
 # .srmod: Soldat Reloaded's mods
 
-A design, not yet built. It replaces the mods of now (folders and `.smod`s laid out as
-Soldat 1's, stacked) and the custom interfaces of `interfaces/`. How Soldat 1 does it,
-which this is measured against and imports from, is [soldat1-mods.md](soldat1-mods.md).
+Being built: the format, Classic laid out as one, and wearing mods by part are done
+(steps 1 to 3, below). It replaces the mods of before (folders and `.smod`s laid out as
+Soldat 1's, stacked). How Soldat 1 does it, which this is measured against and imports
+from, is [soldat1-mods.md](soldat1-mods.md).
 
 ## Why
 
@@ -255,9 +256,8 @@ PNG only, files a part holds, the size limit (150 MB), the soldier's and guns' s
 7. **Pack and share**: the Mods page's **New mod** making a `.srmod` folder, and **Pack**
    making the file.
 
-The custom interfaces of now (`interfaces/`, `graphics.interface`) become `hud` parts in
-step 3; their reading of `setup.sif` and the HUD's drawing stay, the importer's and the
-game's.
+Soldat 1's custom interfaces are `hud` parts: their `setup.sif` is read by the importer,
+which writes it as `layout.json`, and the HUD draws the layout as Soldat 1 draws theirs.
 
 ## Open
 

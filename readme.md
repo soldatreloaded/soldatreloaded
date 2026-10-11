@@ -124,21 +124,17 @@ and how the programs sit on it.
 
 ## Modding
 
-`assets/mods/classic/` is how the game looks and sounds, and ships with it. A
-player's own mod is a folder in `mods/`, holding only what it changes from Classic, from
-one sound to every image, laid out as an OpenSoldat mod is; the Mods page makes one (an
-empty folder, and says what to put in it), uses one at once, and deletes one. Its
-`mod.ini` sets how big its images are in the world and where the soldier's parts are
-pinned, and its `txt/font.ini` the HUD's fonts. Players' mods are shared at
+`assets/mods/classic/` is how the game looks and sounds, and ships with it. A mod is one
+file, a `.srmod`, or while it is being made a folder in `mods/` laid out the same: its
+`mod.json`, and its parts, each a folder of it (`soldier/`, `weapons/`, `hud/`,
+`sounds/`, ...), laid out as Classic's are and holding only what they change. On the Mods
+page each part is worn from the mod chosen for it, and what that mod hasn't of it is
+Classic's: the soldier from one mod, the sounds from another. Every image is 4.5 pixels to
+a unit, so a mod's art is the size it should be; its parts' `pivots.json` say where the
+soldier's images are pinned, and `hud/layout.json` where the HUD's bars and texts go.
+[docs/srmod.md](docs/srmod.md) is the format. Players' mods are shared at
 [soldatreloaded-mods](https://github.com/soldatreloaded/soldatreloaded-mods), which says
-how to add one; the Mods page lists them, and installs or updates one in a click.
-
-The HUD's layout is a Soldat 1 custom interface's, or the game's own: drop one (its
-folder, or its `.sint`) into `interfaces/` and pick it on the Graphics page, or make a mod
-from a Soldat 1 install and its `custom-interfaces/` come along. Its `setup.sif` places,
-shows and turns each part, its bars as bars or numbers, as Soldat 1 draws it; its
-pictures replace the HUD's, the rest coming from the mods. Classic's own icons carry
-their bar's frame, so an interface that moves a bar should bring its own icon.
+how to add one.
 
 A server is scripted in Lua: [docs/scripting.md](docs/scripting.md) is the API, and a
 script is a `.lua` in the server's `scripts/`. None ship with it; examples, and the
@@ -152,7 +148,7 @@ community's, are at
 - [porting.md](docs/porting.md): porting the simulation from C, and checking it.
 - [scripting.md](docs/scripting.md): the server's Lua API.
 - [soldat1-mods.md](docs/soldat1-mods.md): how Soldat 1 finds, layers and sizes its mods' art, and its custom interfaces.
-- [srmod.md](docs/srmod.md): the design of our own mods, .srmod: parts chosen one by one, one scale (not yet built).
+- [srmod.md](docs/srmod.md): our own mods, .srmod: each part worn from a mod of its own, one scale.
 - [git.md](docs/git.md): commit messages, branches and releases.
 
 ## Licence

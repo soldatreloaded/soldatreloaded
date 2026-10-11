@@ -187,7 +187,7 @@ newest release's manifest for its platform, the files on disk, and the install's
 brought out of that release's zip; a file the install's manifest lists that the newest
 doesn't was dropped, and is deleted. So an update brings what changed and repairs what
 is damaged. What no manifest lists is the player's and never touched: the configs, a
-player's own mods beside `mods/classic/`, their interfaces in `interfaces/`, and demos.
+player's own mods beside `mods/classic/`, and demos.
 
 The launcher follows GitHub's latest release, the newest that is published and not a
 pre-release, by its fixed addresses: it asks GitHub's API nothing.
