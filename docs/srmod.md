@@ -186,20 +186,33 @@ file the game draws or plays. It can't be removed or chosen against itself.
 
 ## Bringing mods in
 
-**From Soldat 1** (the Mods page's **From your Soldat 1**, as now), making `.srmod`s, which
+**From Soldat 1** (the Mods page's **From your Soldat 1** tab), making `.srmod`s, which
 are then mods like any other. Soldat 1.7.1 never used `.smod`s (OpenSoldat's), so there is
-no importer of them. Soldat 1 was modded two ways, and the importer takes both:
+no importer of them.
 
-- **Over the game's own files**: art and sounds copied over the install's `gostek-gfx/`,
-  `sfx/` and the rest. Each file of the install's own folders is weighed against 1.7.1 as
-  it shipped (`data/soldat-1.7.1.txt`, each file's size and CRC), as the importer does now,
-  and what differs is the player's.
-- **In `mods/`**: each loose folder of `mods/<name>/`, as `-mod <name>` wore it, over the
-  install's own as Soldat wore it. A mod there is the player's whole: all of it goes in,
-  weighed against nothing.
+The install is found where it is usually put: `C:\Soldat`, Program Files, Steam's
+libraries (its registry, `libraryfolders.vdf`, any `steamapps/common` folder named for
+Soldat), and on Linux Wine's, Steam's, Flatpak's and Snap's. A folder is an install when
+it holds `soldat.exe` (or `soldat`) with `anims/` beside it. Failing that, **Browse...**
+brings up the system's folder dialog (Windows' own; zenity, kdialog or osascript
+elsewhere), or the folder is typed.
 
-And the install's custom interfaces, and its mods', but for the ten 1.7.1 ships with as
-they came. Then:
+Then the tab offers each thing in the install a mod can be made of, an **Install** each
+(**Installed** once a mod by its name is):
+
+- **Your changes**: art and sounds copied over the install's own `gostek-gfx/`, `sfx/` and
+  the rest, if any. Each file is weighed against 1.7.1 as it shipped
+  (`data/soldat-1.7.1.txt`, each file's size and CRC) and against Classic; what differs is
+  the player's. Named by the player.
+- **Mods**: each folder of `mods/<name>/` but those 1.7.1 ships with. A mod there is the
+  player's whole: all of it goes in, weighed against nothing. Under it go the player's
+  changes, as Soldat wore a mod over its own folders.
+- **Custom interfaces**: each of the install's, and its mods', but the ten 1.7.1 ships
+  with as they came, `Default`, and any without a `setup.sif`. Under it go the player's
+  changes to the HUD's art and icons.
+
+There is no choice about the changes underneath: a mod made from Soldat 1 looks as it did
+there. Then:
 
 - Each image's Soldat 1 scale, as Soldat 1 works it out: its `mod.ini`'s, by its path,
   then its folder, then `DefaultScale`, else 1 (soldat1-mods.md). An image at another
