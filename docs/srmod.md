@@ -195,7 +195,7 @@ libraries (its registry, `libraryfolders.vdf`, any `steamapps/common` folder nam
 Soldat), and on Linux Wine's, Steam's, Flatpak's and Snap's. A folder is an install when
 it holds `soldat.exe` (or `soldat`) with `anims/` beside it. Failing that, **Browse...**
 brings up the system's folder dialog (Windows' own; zenity, kdialog or osascript
-elsewhere), or the folder is typed.
+elsewhere). Once found, the install isn't shown again.
 
 Then the tab offers each thing in the install a mod can be made of, an **Install** each
 (**Installed** once a mod by its name is):
@@ -203,7 +203,7 @@ Then the tab offers each thing in the install a mod can be made of, an **Install
 - **Your changes**: art and sounds copied over the install's own `gostek-gfx/`, `sfx/` and
   the rest, if any. Each file is weighed against 1.7.1 as it shipped
   (`data/soldat-1.7.1.txt`, each file's size and CRC) and against Classic; what differs is
-  the player's. Named by the player.
+  the player's. Made **My S1 Mod**; each mod and interface below is named for its folder.
 - **Mods**: each folder of `mods/<name>/` but those 1.7.1 ships with. A mod there is the
   player's whole: all of it goes in, weighed against nothing. Under it go the player's
   changes, as Soldat wore a mod over its own folders.

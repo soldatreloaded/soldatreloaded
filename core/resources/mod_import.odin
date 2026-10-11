@@ -236,7 +236,7 @@ soldat_sources_destroy :: proc(sources: []Soldat_Source, allocator := context.al
 	delete(sources, allocator)
 }
 
-// The mod `name` made in `mods_dir`, a .srmod, from the folders `dirs` of an original
+// The mod `name` (titled `title`, else its name) made in `mods_dir`, a .srmod, from the folders `dirs` of an original
 // Soldat install, each over the last as Soldat wears a mod over its own folders (the
 // install's own first, then a mod of its mods/): each file of their art and sounds that
 // is one of Classic's, neither 1.7.1's own as it came nor the same as Classic's, laid out
@@ -245,7 +245,7 @@ soldat_sources_destroy :: proc(sources: []Soldat_Source, allocator := context.al
 // soldier's and the weapons' pivots, from their mod.inis' [GOSTEK], where they differ
 // from Classic's. A folder that is the install itself is looked through for its own
 // folders alone, not its mods/ or maps/.
-mod_import :: proc(dirs: []string, mods_dir, name: string, classic: Mod) -> (result: Import_Result) {
+mod_import :: proc(dirs: []string, mods_dir, name: string, classic: Mod, title := "") -> (result: Import_Result) {
 	if problem := mod_name_problem(mods_dir, name); problem != "" do return {problem = problem}
 	if !srmod_name_ok(name) do return {problem = "A mod's name is letters, digits, - and _, 32 at most."}
 	if len(dirs) == 0 do return {problem = "Pick what to make the mod from."}
@@ -297,7 +297,7 @@ mod_import :: proc(dirs: []string, mods_dir, name: string, classic: Mod) -> (res
 	if result.changed == 0 {
 		return {problem = "Nothing there differs from the game as it came. Put your art and sounds in its folders first."}
 	}
-	if !srmod_write(mods_dir, name, name, fmt.tprintf("Made from %s, in Soldat 1.7.1.", strings.join(dirs, " and ", context.temp_allocator)), entries) {
+	if !srmod_write(mods_dir, name, title if title != "" else name, fmt.tprintf("Made from %s, in Soldat 1.7.1.", strings.join(dirs, " and ", context.temp_allocator)), entries) {
 		return {problem = "The mod couldn't be written into mods/: is the disk full?"}
 	}
 	log.infof("made the mod %s from %v: %d files that differ from the game's", name, dirs, result.changed)
