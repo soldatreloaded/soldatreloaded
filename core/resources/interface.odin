@@ -478,7 +478,7 @@ interface_import :: proc(from, title, mods_dir, name: string) -> bool {
 		part := Part.Hud if slice.contains(HUD_PICTURES[:], stem) else .Icons
 		entries[strings.concatenate({PART_NAMES[part], "/", stem, ".png"}, context.temp_allocator)] = texture_png(texture)
 	}
-	return srmod_write(mods_dir, name, title, fmt.tprintf("Soldat 1's custom interface %s, its HUD's layout and pictures.", title), entries)
+	return srmod_write(mods_dir, name, fmt.tprintf("%s interface", title), fmt.tprintf("Soldat 1's custom interface %s, its HUD's layout and pictures.", title), entries)
 }
 
 // A mod's name made of `title`: what a name can't have (srmod_name_ok) made `_`, at most
