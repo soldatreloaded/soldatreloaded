@@ -48,15 +48,14 @@ Mods :: struct {
 	import_:    Soldat_Import, // Create Mod From S1's
 }
 
-// Create Mod From S1: the Soldat install, what in it to make a mod from, and its name.
+// From your Soldat 1: the Soldat install, and what in it to make mods from.
 Soldat_Import :: struct {
-	folder:   string, // as typed, picked, or found
+	folder:   string, // as picked, or found
 	root:     string, // the install found from it; "" until one is
 	problem:  string, // why none was
 	looked:   bool,   // the install looked for where it is usually put, as the tab first opened
 	scan:     enum {None, Due, Now}, // the install to be looked through: said this pass, done the next
 	sources:  []res.Soldat_Source,
-	name:     string, // the mod of the install's own changes'
 	install:  int,    // the source being installed: said this pass, done the next; -1 for none
 	pick:     Folder_Pick, // the system's folder dialog, while it is up
 }
@@ -75,7 +74,7 @@ mods_destroy :: proc(mods: ^Mods) {
 	delete(mods.selected)
 	delete(mods.note)
 	im := &mods.import_
-	for s in ([]string{im.folder, im.root, im.problem, im.name}) do delete(s)
+	for s in ([]string{im.folder, im.root, im.problem}) do delete(s)
 	res.soldat_sources_destroy(im.sources)
 	mods^ = {}
 }
@@ -242,12 +241,12 @@ page_making :: proc(menu: ^Menu, name: string) {
 // Mod Marketplace, and Create Mod From S1
 
 // Mods made from the player's Soldat 1.7.1. Its install, found where it is usually put
-// (res.soldat_installs), else picked in the system's folder dialog, or typed: any folder
-// of it, or in it, finds it (res.soldat_root). Then each thing in it a mod can be made
-// of, an Install each (res.soldat_sources): what the player changed of its own files;
-// each mod of its mods/, those changes under it, as Soldat wore a mod over its own
-// folders; each custom interface, the changes to its HUD's art under it. Those 1.7.1
-// ships with, untouched, aren't offered.
+// (res.soldat_installs), else picked in the system's folder dialog: any folder of it, or
+// in it, finds it (res.soldat_root). Once it is, the install is not shown again: each
+// thing in it a mod can be made of is, an Install each (res.soldat_sources), named for
+// it: what the player changed of its own files, My S1 Mod; each mod of its mods/, those
+// changes under it, as Soldat wore a mod over its own folders; each custom interface, the
+// changes to its HUD's art under it. Those 1.7.1 ships with, untouched, aren't offered.
 @(private = "file")
 page_import :: proc(menu: ^Menu) {
 	k := &menu.kit
@@ -269,25 +268,6 @@ page_import :: proc(menu: ^Menu) {
 	}
 	muted_line(k, "Make mods of what you changed or added in your Soldat 1.7.1.")
 
-	ui.section(k, "YOUR SOLDAT")
-	{
-		r := ui.row(k, ui.ROW_H + 4, false)
-		if r.shown {
-			picking := im.pick.thread != nil
-			bw := ui.button_w(k, "Browse...")
-			if ui.button_at(k, r.x + r.w - 8 - bw, ui.ctrl_y(r), bw, ui.CTRL_H, "Picking..." if picking else "Browse...", true, picking) {
-				folder_pick_start(&im.pick, "Pick your Soldat 1.7.1 folder", rl.GetWindowHandle())
-			}
-			found := fmt.tprintf("Found at %s", shown_path(im.root)) if im.root != "" else "No Soldat 1.7.1 found where it is usually installed: browse to its folder."
-			ui.text_fit(k, ui.LABEL, found, r.x + 12, r.y + r.h / 2, r.w - bw - 32, ui.TEXT if im.root != "" else ui.MUTED)
-		}
-		if typed, changed := ui.field_row(k, "Or type its folder", &im.folder, im.folder, 260, "C:\\Soldat"); changed {
-			set_text(&im.folder, typed)
-		}
-		if ui.edit_entered(k, &im.folder) && strings.trim_space(im.folder) != "" do im.scan = .Due
-		if im.problem != "" do line(k, im.problem, ui.WARN)
-	}
-
 	// looked through, and installed, a frame after it is asked for, so that it says so
 	// while it does
 	switch im.scan {
@@ -300,44 +280,37 @@ page_import :: proc(menu: ^Menu) {
 		im.scan = .None
 		import_look(menu)
 	}
-	if im.root == "" do return
+	if im.root == "" {
+		r := ui.row(k, ui.ROW_H + 4, false)
+		if r.shown {
+			picking := im.pick.thread != nil
+			bw := ui.button_w(k, "Browse...")
+			if ui.button_at(k, r.x + r.w - 8 - bw, ui.ctrl_y(r), bw, ui.CTRL_H, "Picking..." if picking else "Browse...", true, picking) {
+				folder_pick_start(&im.pick, "Pick your Soldat 1.7.1 folder", rl.GetWindowHandle())
+			}
+			said := im.problem if im.problem != "" else "No Soldat 1.7.1 found where it is usually installed: browse to its folder."
+			ui.text_fit(k, ui.LABEL, said, r.x + 12, r.y + r.h / 2, r.w - bw - 32, ui.WARN if im.problem != "" else ui.MUTED)
+		}
+		return
+	}
 	if im.install >= 0 && im.install < len(im.sources) {
 		i := im.install
 		im.install = -1
 		soldat_install(menu, i)
 	}
 
-	own := im.sources[0] if len(im.sources) > 0 && im.sources[0].kind == .Own else res.Soldat_Source{}
-	offered := own.changed > 0
-	if own.changed > 0 {
-		ui.section(k, "YOUR CHANGES")
-		r := ui.row(k, MOD_ROW, false)
-		if r.shown {
-			ui.text_fit(k, ui.LABEL, fmt.tprintf("%d file%s you changed in Soldat's own folders", own.changed, "" if own.changed == 1 else "s"), r.x + 12, r.y + 13, r.w - 24, ui.TEXT)
-			ui.text_fit(k, ui.TINY, "Made a mod of its own; each mod and interface below has them under it too.", r.x + 12, r.y + 31, r.w - 24, ui.FAINT)
-		}
-		if typed, changed := ui.field_row(k, "Name", &im.name, im.name, res.MOD_NAME_MAX, "The mod's name"); changed {
-			set_text(&im.name, typed)
-		}
-		install := ui.edit_entered(k, &im.name)
-		b := ui.row(k, ui.ROW_H + 4, false)
-		if b.shown {
-			taken := name_taken(menu, strings.trim_space(im.name))
-			pressed, _ := row_button(k, ui.ctrl_x(b) + ui.ctrl_w(b), ui.ctrl_y(b), "Installed" if taken else "Install", taken || strings.trim_space(im.name) == "", primary = true)
-			install ||= pressed && !taken
-		}
-		if install && strings.trim_space(im.name) != "" do ask_install(menu, 0)
-	}
-	for kind in ([]res.Soldat_Source_Kind{.Mod, .Interface}) {
+	offered := false
+	for kind in res.Soldat_Source_Kind {
 		titled := false
 		for source, i in im.sources {
-			if source.kind != kind do continue
+			if source.kind != kind || source.changed == 0 do continue
 			if !titled {
-				ui.section(k, "MODS" if kind == .Mod else "CUSTOM INTERFACES")
+				sections := [res.Soldat_Source_Kind]string{.Own = "YOUR CHANGES", .Mod = "MODS", .Interface = "CUSTOM INTERFACES"}
+				ui.section(k, sections[kind])
 				titled = true
 			}
 			offered = true
-			source_row(menu, source, i, own.changed)
+			source_row(menu, source, i, im.sources[0].changed if im.sources[0].kind == .Own else 0)
 		}
 	}
 	if !offered {
@@ -346,29 +319,38 @@ page_import :: proc(menu: ^Menu) {
 	}
 }
 
-// A mod of mods/, or a custom interface: its name, what it holds, and Install, or
-// Installed once a mod by its name is.
+// The mod of the install's own changes: its name, and its title as the Mods page shows it.
+@(private = "file")
+OWN_NAME :: "My_S1_Mod"
+@(private = "file")
+OWN_TITLE :: "My S1 Mod"
+
+// What the player changed of the install, a mod of mods/, or a custom interface: its
+// name, what it holds, and Install, or Installed once a mod by its name is.
 @(private = "file")
 source_row :: proc(menu: ^Menu, source: res.Soldat_Source, i, own: int) {
 	k := &menu.kit
 	r := ui.row(k, MOD_ROW, false)
 	if !r.shown do return
-	name := res.mod_name_from(source.name)
+	name := OWN_NAME if source.kind == .Own else res.mod_name_from(source.name)
 	taken := name == "" || name_taken(menu, name)
 	pressed, bx := row_button(k, r.x + r.w - 8, r.y + (r.h - ui.CTRL_H) / 2, "Installed" if taken else "Install", taken, primary = !taken)
 	if pressed && !taken do ask_install(menu, i)
-	title := fmt.tprintf("mods/%s", source.name) if source.kind == .Mod else source.name
-	ui.text_fit(k, ui.LABEL, title, r.x + 12, r.y + 13, bx - r.x - 24, ui.TEXT)
-	detail: string
+	title, detail: string
 	switch source.kind {
+	case .Own:
+		title = OWN_TITLE
+		detail = fmt.tprintf("%d file%s you changed in Soldat's own folders", own, "" if own == 1 else "s")
 	case .Mod:
+		title = source.name
 		detail = fmt.tprintf("%d file%s", source.changed, "" if source.changed == 1 else "s")
 		if own > 0 do detail = fmt.tprintf("%s, and your %d changed under %s", detail, own, "it" if own == 1 else "them")
 		if source.in_use do detail = fmt.tprintf("%s  -  the mod Soldat was last played with", detail)
 	case .Interface:
+		title = source.name
 		detail = "Its HUD's layout and pictures, and your changes to the HUD's art under them" if own > 0 else "Its HUD's layout and pictures"
-	case .Own:
 	}
+	ui.text_fit(k, ui.LABEL, title, r.x + 12, r.y + 13, bx - r.x - 24, ui.TEXT)
 	ui.text_fit(k, ui.TINY, detail, r.x + 12, r.y + 31, bx - r.x - 24, ui.FAINT)
 }
 
@@ -391,11 +373,9 @@ import_look :: proc(menu: ^Menu) {
 	}
 	set_text(&im.problem, "")
 	set_text(&im.root, root)
-	set_text(&im.folder, shown_path(root))
 	res.soldat_sources_destroy(im.sources)
 	im.sources = res.soldat_sources(root, res.mod_classic(menu.mod))
 	im.install = -1
-	if strings.trim_space(im.name) == "" do set_text(&im.name, free_name("MySoldat"))
 }
 
 // The source `i` made a mod: the install's own changes, a mod of its mods/ with them
@@ -409,8 +389,8 @@ soldat_install :: proc(menu: ^Menu, i: int) {
 	name, problem: string
 	switch source.kind {
 	case .Own:
-		name = strings.clone(strings.trim_space(im.name), context.temp_allocator)
-		problem = res.mod_import({im.root}, res.MODS_DIR, name, classic).problem
+		name = OWN_NAME
+		problem = res.mod_import({im.root}, res.MODS_DIR, name, classic, OWN_TITLE).problem
 	case .Mod:
 		name = res.mod_name_from(source.name)
 		problem = res.mod_import({im.root, source.dir}, res.MODS_DIR, name, classic).problem
@@ -421,17 +401,8 @@ soldat_install :: proc(menu: ^Menu, i: int) {
 		note(mods, fmt.tprintf("%s couldn't be made: %s", name, problem), true)
 		return
 	}
-	note(mods, fmt.tprintf("%s installed: wear its parts on Installed Mods.", name), false)
+	note(mods, fmt.tprintf("%s installed: wear its parts on Installed Mods.", OWN_TITLE if source.kind == .Own else name), false)
 	mods_relist(mods)
-	if source.kind == .Own do set_text(&im.name, free_name("MySoldat"))
-}
-
-// `base`, or "<base>2", "<base>3"..., the first no mod has yet.
-@(private = "file")
-free_name :: proc(base: string) -> string {
-	name := base
-	for n := 2; res.mod_exists(res.MODS_DIR, name); n += 1 do name = fmt.tprintf("%s%d", base, n)
-	return name
 }
 
 // The catalogue's section: each mod it has, and what may be done with it; or why there
