@@ -1,5 +1,6 @@
 // The files of an original Soldat 1.7.1 install, as it came: each one's size, CRC-32 and
-// path from the install, in lower case; the mods it comes with (mods/classic/) among them.
+// path from the install, in lower case; the mods it comes with (mods/classic/) and its
+// custom interfaces (custom-interfaces/, from 1.7.1.1) among them.
 // A mod made from a player's install (mod_import) leaves these out: they are the game as
 // it came, not the player's own art.
 21303 cae45766 gostek-gfx/badge.png
@@ -1316,3 +1317,189 @@
 19100 ab99f34d weapons-gfx/steyraug-fire.png
 17927 18bc3225 weapons-gfx/steyraug-shell.png
 5269 30122a40 weapons-gfx/steyraug.png
+10086 3ef9d50e custom-interfaces/military/ammo.bmp
+1014 201bf018 custom-interfaces/tech/vest-bar.bmp
+1014 c9ac9186 custom-interfaces/tech/jet-bar.bmp
+1038 bdccd0ec custom-interfaces/tech/health-bar.bmp
+106806 889a9090 custom-interfaces/predator/title-r.bmp
+106806 fb8a8413 custom-interfaces/predator/title-l.bmp
+1076 9dbc39eb custom-interfaces/lacey-v2/fire-bar.bmp
+1076 a204cf92 custom-interfaces/lacey-v2/vest-bar.bmp
+1134 6ef1e42e custom-interfaces/predator/vest-bar.bmp
+1134 968076de custom-interfaces/predator/health-bar.bmp
+1144 5fbc5f5b custom-interfaces/soldat style/fire-bar-r.bmp
+12152 b851bbb4 custom-interfaces/lacey-v2/back.bmp
+1222 a618d350 custom-interfaces/micro1/star.bmp
+12342 3754d8d1 custom-interfaces/cabbage/back.bmp
+12342 3754d8d1 custom-interfaces/storm/back.bmp
+12342 3754d8d1 custom-interfaces/text/back.bmp
+12342 5208b88d custom-interfaces/military/back.bmp
+12342 9265ba61 custom-interfaces/tech/back.bmp
+12342 9dc6e9d2 custom-interfaces/predator/back.bmp
+12342 a86675f2 custom-interfaces/classic/back.bmp
+12344 27a8abf9 custom-interfaces/soldat style/back.bmp
+134 725859da custom-interfaces/micro1/smalldot.bmp
+13626 5f18a710 custom-interfaces/classic/health.bmp
+1398 8c6fc51e custom-interfaces/tech/fire-bar.bmp
+1430 1a1fef0e custom-interfaces/military/fire-bar.bmp
+14562 1ad4fd03 custom-interfaces/classic/jet.bmp
+15030 43527fd0 custom-interfaces/cabbage/jet.bmp
+15894 3d647695 custom-interfaces/storm/reload-bar.bmp
+168 3f4d113f custom-interfaces/lacey-v2/jet.bmp
+17320 b4587c69 custom-interfaces/soldat style/health.bmp
+174 6508d01b custom-interfaces/predator/cluster-nade.bmp
+174 9bd73292 custom-interfaces/predator/nade.bmp
+17590 91ef18f5 custom-interfaces/cabbage/ammo.bmp
+17726 bd4b0b69 custom-interfaces/text/jet.bmp
+1832 7b9da8bb custom-interfaces/soldat style/health-bar.bmp
+1832 7b9da8bb custom-interfaces/soldat style/jet-bar.bmp
+1832 7b9da8bb custom-interfaces/soldat style/reload-bar.bmp
+1832 7b9da8bb custom-interfaces/soldat style/vest-bar.bmp
+19014 1e99b830 custom-interfaces/classic/ammo.bmp
+19312 62b81f82 custom-interfaces/soldat style/ammo.bmp
+1954 33429c3f custom-interfaces/classic/dot.bmp
+1954 33429c3f custom-interfaces/lacey-v2/dot.bmp
+1954 33429c3f custom-interfaces/military/dot.bmp
+1954 33429c3f custom-interfaces/predator/dot.bmp
+1954 33429c3f custom-interfaces/storm/dot.bmp
+1954 33429c3f custom-interfaces/tech/dot.bmp
+1954 33429c3f custom-interfaces/text/dot.bmp
+1954 5c823aa4 custom-interfaces/micro1/dot.bmp
+1954 a0322a9c custom-interfaces/cabbage/dot.bmp
+1956 2385d8d3 custom-interfaces/soldat style/dot.bmp
+2034 5a77bd75 custom-interfaces/predator/reload-bar.bmp
+22032 b9bd3bd8 custom-interfaces/lacey-v2/health.bmp
+222 ab7801eb custom-interfaces/micro1/deaddot.bmp
+2271 acd871d8 custom-interfaces/micro1/menucursor.bmp
+2300 10e6d7fe custom-interfaces/lacey-v2/jet-bar.bmp
+2300 345a3d65 custom-interfaces/lacey-v2/reload-bar.bmp
+2300 db45efa4 custom-interfaces/lacey-v2/health-bar.bmp
+24 05d0a703 custom-interfaces/micro1/mod.ini
+240 31e8e734 custom-interfaces/storm/setup.sif
+240 33a6c507 custom-interfaces/text/setup.sif
+240 418a4fb3 custom-interfaces/soldat style/setup.sif
+240 6694ea70 custom-interfaces/military/setup.sif
+240 6bae8259 custom-interfaces/tech/setup.sif
+240 776c7012 custom-interfaces/classic/setup.sif
+240 a65dc237 custom-interfaces/predator/setup.sif
+240 c5d422a2 custom-interfaces/micro1/setup.sif
+240 c9dce584 custom-interfaces/cabbage/setup.sif
+240 fce19081 custom-interfaces/lacey-v2/setup.sif
+25110 f716699b custom-interfaces/cabbage/health.bmp
+2650 63a7348f custom-interfaces/storm/jet-bar.bmp
+2650 903c9c0d custom-interfaces/storm/health-bar.bmp
+2650 c180f4eb custom-interfaces/storm/vest-bar.bmp
+272 2dc5eed0 custom-interfaces/lacey-v2/nade.bmp
+272 8b830eea custom-interfaces/lacey-v2/cluster-nade.bmp
+28098 2ff0b4ea custom-interfaces/storm/health.bmp
+2830 366b4d35 custom-interfaces/micro1/fire-bar.bmp
+28442 6069a590 custom-interfaces/text/health.bmp
+2848 38902856 custom-interfaces/micro1/vest-bar.bmp
+2862 acfdf7ea custom-interfaces/micro1/fire-bar-r.bmp
+2863 b8c9843a custom-interfaces/micro1/nade.bmp
+2864 ed1e918d custom-interfaces/micro1/cluster-nade.bmp
+2875 6735abc1 custom-interfaces/micro1/reload-bar.bmp
+2885 d9b3b0ca custom-interfaces/micro1/health-bar.bmp
+2886 ea741628 custom-interfaces/micro1/jet-bar.bmp
+2951 79b84f80 custom-interfaces/micro1/noflag.bmp
+29518 340fce88 custom-interfaces/predator/jet.bmp
+3050 2607e0bb custom-interfaces/micro1/jet.bmp
+3073 be46310b custom-interfaces/micro1/health.bmp
+3126 29df41d8 custom-interfaces/military/health.bmp
+3126 9df18932 custom-interfaces/military/jet.bmp
+3136 7ca6e237 custom-interfaces/micro1/cursor.bmp
+3141 02c98510 custom-interfaces/micro1/ammo.bmp
+3186 14c7c9f0 custom-interfaces/military/jet-bar.bmp
+3186 19543657 custom-interfaces/text/health-bar.bmp
+3186 196ab0a2 custom-interfaces/classic/reload-bar.bmp
+3186 1ff7e679 custom-interfaces/cabbage/vest-bar.bmp
+3186 2db6004a custom-interfaces/classic/vest-bar.bmp
+3186 5eb6e1eb custom-interfaces/military/health-bar.bmp
+3186 602d1f9e custom-interfaces/classic/health-bar.bmp
+3186 91113bde custom-interfaces/text/reload-bar.bmp
+3186 9b171c78 custom-interfaces/cabbage/jet-bar.bmp
+3186 a2a6b5fb custom-interfaces/text/vest-bar.bmp
+3186 aa0b216f custom-interfaces/classic/jet-bar.bmp
+3186 be1a7af5 custom-interfaces/text/jet-bar.bmp
+3186 bf7fbc8f custom-interfaces/cabbage/reload-bar.bmp
+3186 ee93e788 custom-interfaces/military/vest-bar.bmp
+3186 f31f54d0 custom-interfaces/cabbage/health-bar.bmp
+3530 cf29fca2 custom-interfaces/storm/fire-bar.bmp
+36902 f832ec6c custom-interfaces/text/ammo.bmp
+374 0ac5d9dd custom-interfaces/storm/arrow.bmp
+374 0ac5d9dd custom-interfaces/text/arrow.bmp
+374 0f88f133 custom-interfaces/cabbage/nade.bmp
+374 10e1c975 custom-interfaces/micro1/arrow.bmp
+374 25c2734a custom-interfaces/classic/nade.bmp
+374 9b4e262d custom-interfaces/military/nade.bmp
+374 9b4e262d custom-interfaces/soldat style/nade.bmp
+374 9b4e262d custom-interfaces/storm/nade.bmp
+374 9b4e262d custom-interfaces/tech/nade.bmp
+374 9b4e262d custom-interfaces/text/nade.bmp
+374 ab3a728b custom-interfaces/cabbage/cluster-nade.bmp
+374 abe71be4 custom-interfaces/military/arrow.bmp
+374 abe71be4 custom-interfaces/predator/arrow.bmp
+374 bb70fb2a custom-interfaces/classic/cluster-nade.bmp
+374 cd11d66d custom-interfaces/classic/arrow.bmp
+374 d018e9fa custom-interfaces/cabbage/arrow.bmp
+374 dc79e0d6 custom-interfaces/military/cluster-nade.bmp
+374 dc79e0d6 custom-interfaces/soldat style/cluster-nade.bmp
+374 dc79e0d6 custom-interfaces/storm/cluster-nade.bmp
+374 dc79e0d6 custom-interfaces/tech/cluster-nade.bmp
+374 dc79e0d6 custom-interfaces/text/cluster-nade.bmp
+374 e4318ee7 custom-interfaces/tech/arrow.bmp
+376 62531d1b custom-interfaces/lacey-v2/arrow.bmp
+376 dca637c9 custom-interfaces/soldat style/arrow.bmp
+37958 8241a5ff custom-interfaces/tech/health.bmp
+45519 c29fb59f custom-interfaces/micro1/back.bmp
+5070 8764c7de custom-interfaces/military/reload-bar.bmp
+568 6932c349 custom-interfaces/lacey-v2/ammo.bmp
+58 c9a95c99 custom-interfaces/predator/ammo.bmp
+58 ee011960 custom-interfaces/predator/health.bmp
+58 ee011960 custom-interfaces/storm/ammo.bmp
+58 ee011960 custom-interfaces/tech/ammo.bmp
+58 f84464fa custom-interfaces/storm/fire-bar-r.bmp
+58 f84464fa custom-interfaces/tech/jet.bmp
+58 fea5f141 custom-interfaces/tech/fire-bar-r.bmp
+594 c05c50fc custom-interfaces/predator/fire-bar.bmp
+594 dfc6d10b custom-interfaces/predator/fire-bar-r.bmp
+598 afdcbfe8 custom-interfaces/tech/reload-bar.bmp
+694 e8e15b10 custom-interfaces/predator/jet-bar.bmp
+72 efa4d3ed custom-interfaces/lacey-v2/fire-bar-r.bmp
+742 3ba1bec5 custom-interfaces/cabbage/fire-bar.bmp
+742 493ea2bf custom-interfaces/classic/fire-bar-r.bmp
+742 493ea2bf custom-interfaces/text/fire-bar-r.bmp
+742 518d6cca custom-interfaces/military/fire-bar-r.bmp
+742 cf0a976f custom-interfaces/cabbage/fire-bar-r.bmp
+742 e012cfb1 custom-interfaces/classic/fire-bar.bmp
+742 e012cfb1 custom-interfaces/text/fire-bar.bmp
+776 8cb7717a custom-interfaces/lacey-v2/cursor.bmp
+80406 dd32ff22 custom-interfaces/storm/jet.bmp
+822 094f9a1b custom-interfaces/classic/noflag.bmp
+822 0973314e custom-interfaces/cabbage/cursor.bmp
+822 0973314e custom-interfaces/storm/cursor.bmp
+822 0973314e custom-interfaces/text/cursor.bmp
+822 28850f1d custom-interfaces/cabbage/menucursor.bmp
+822 28850f1d custom-interfaces/classic/menucursor.bmp
+822 28850f1d custom-interfaces/storm/menucursor.bmp
+822 28850f1d custom-interfaces/tech/menucursor.bmp
+822 28850f1d custom-interfaces/text/menucursor.bmp
+822 55397387 custom-interfaces/classic/cursor.bmp
+822 64540d03 custom-interfaces/tech/cursor.bmp
+822 6f89b6e6 custom-interfaces/predator/cursor.bmp
+822 8886bcf7 custom-interfaces/military/menucursor.bmp
+822 8886bcf7 custom-interfaces/predator/menucursor.bmp
+822 9c00f190 custom-interfaces/military/cursor.bmp
+822 bea5b13d custom-interfaces/cabbage/noflag.bmp
+822 bea5b13d custom-interfaces/military/noflag.bmp
+822 bea5b13d custom-interfaces/predator/noflag.bmp
+822 ecb6a960 custom-interfaces/storm/noflag.bmp
+822 ecb6a960 custom-interfaces/tech/noflag.bmp
+822 ecb6a960 custom-interfaces/text/noflag.bmp
+824 119521ac custom-interfaces/lacey-v2/noflag.bmp
+824 61598407 custom-interfaces/soldat style/noflag.bmp
+824 7d95bf6a custom-interfaces/lacey-v2/menucursor.bmp
+824 ca398e49 custom-interfaces/soldat style/menucursor.bmp
+824 f19708f7 custom-interfaces/soldat style/cursor.bmp
+848 9f6e88e0 custom-interfaces/soldat style/fire-bar.bmp
+9684 1478ebc1 custom-interfaces/soldat style/jet.bmp

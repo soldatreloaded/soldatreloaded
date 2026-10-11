@@ -289,7 +289,7 @@ menu_open :: proc(client: ^Client) -> Screen {
 mod_use :: proc(client: ^Client, parts: [res.Part]string) {
 	choice := &client.config.graphics.parts
 	for name, part in parts {
-		res.part_choice_of(choice, part)^ = strings.clone(name, virtual.arena_allocator(&client.config.arena))
+		if chosen := res.part_choice_of(choice, part); chosen != nil do chosen^ = strings.clone(name, virtual.arena_allocator(&client.config.arena))
 		delete(name) // the request's, which the client takes
 	}
 	config_save(client.config)

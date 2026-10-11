@@ -1,14 +1,19 @@
 package resources
 
+import "base:runtime"
+import "core:c"
 import "core:encoding/json"
 import "core:fmt"
 import "core:hash"
+import "core:mem/virtual"
 import "core:log"
 import "core:os"
 import "core:path/filepath"
 import "core:slice"
 import "core:strconv"
 import "core:strings"
+
+import stbi "vendor:stb/image"
 
 import "../utils"
 
@@ -31,23 +36,27 @@ import "../utils"
 // working directory): "<size> <crc32, hex> <path in lower case>" a line.
 SOLDAT_STOCK :: "data/soldat-1.7.1.txt"
 
-// Where Soldat 1.7.1 may be, besides wherever the player says: its installer's and
-// Steam's places, and a few a player is likely to have put it.
+// Where Soldat 1.7.1 may be, besides wherever the player says: where its installer puts
+// it (C:\Soldat), Steam's (it is there as 1.7.1.1: any folder of a library's
+// steamapps/common named for it, Steam found where Windows has it written, where it is
+// usually put, and in the libraries it lists), Wine's and a few places a player is
+// likely to have put it.
 soldat_installs :: proc(allocator := context.allocator) -> []string {
 	context.allocator = context.temp_allocator
 	candidates := make([dynamic]string)
+	steams := make([dynamic]string)
 	when ODIN_OS == .Windows {
 		home := os.get_env("USERPROFILE", context.temp_allocator)
-		for drive in ([?]string{"C:", "D:", "E:"}) {
+		for drive in ([?]string{"C:", "D:", "E:", "F:", "G:"}) {
 			append(&candidates, utils.temp_path(drive, "Soldat"), utils.temp_path(drive, "Games", "Soldat"))
+			append(&steams, utils.temp_path(drive, "Steam"), utils.temp_path(drive, "SteamLibrary"), utils.temp_path(drive, "Games", "Steam"), utils.temp_path(drive, "Games", "SteamLibrary"))
 		}
 		for program_files in ([?]string{os.get_env("ProgramFiles(x86)", context.temp_allocator), os.get_env("ProgramFiles", context.temp_allocator)}) {
 			if program_files == "" do continue
 			append(&candidates, utils.temp_path(program_files, "Soldat"))
-			steam := utils.temp_path(program_files, "Steam")
-			append(&candidates, utils.temp_path(steam, "steamapps", "common", "Soldat"))
-			for library in steam_libraries(steam) do append(&candidates, utils.temp_path(library, "steamapps", "common", "Soldat"))
+			append(&steams, utils.temp_path(program_files, "Steam"))
 		}
+		for steam in steam_registry() do append(&steams, steam)
 		if home != "" {
 			for under in ([?]string{"", "Desktop", "Documents", "Downloads", "Games"}) {
 				append(&candidates, utils.temp_path(home, under, "Soldat") if under != "" else utils.temp_path(home, "Soldat"))
@@ -56,12 +65,28 @@ soldat_installs :: proc(allocator := context.allocator) -> []string {
 	} else {
 		home := os.get_env("HOME", context.temp_allocator)
 		if home != "" {
-			append(&candidates, utils.temp_path(home, ".wine", "drive_c", "Soldat"), utils.temp_path(home, "Soldat"), utils.temp_path(home, "Games", "Soldat"))
-			for steam in ([?]string{utils.temp_path(home, ".local", "share", "Steam"), utils.temp_path(home, ".steam", "steam")}) {
-				append(&candidates, utils.temp_path(steam, "steamapps", "common", "Soldat"))
-				for library in steam_libraries(steam) do append(&candidates, utils.temp_path(library, "steamapps", "common", "Soldat"))
+			append(&candidates, utils.temp_path(home, "Soldat"), utils.temp_path(home, "Games", "Soldat"))
+			// Wine's own prefix, where an installer run by it puts it
+			for under in ([?]string{"Soldat", "Program Files (x86)/Soldat", "Program Files/Soldat", "Games/Soldat"}) {
+				append(&candidates, utils.temp_path(home, ".wine", "drive_c", under))
+			}
+			// Steam's, run natively, as a Flatpak or as a Snap; on macOS its own
+			for steam in ([?]string{
+				".local/share/Steam",
+				".steam/steam",
+				".steam/root",
+				".var/app/com.valvesoftware.Steam/.local/share/Steam",
+				".var/app/com.valvesoftware.Steam/data/Steam",
+				"snap/steam/common/.local/share/Steam",
+				"Library/Application Support/Steam",
+			}) {
+				append(&steams, utils.temp_path(home, steam))
 			}
 		}
+	}
+	for steam in steams {
+		steam_soldats(&candidates, steam)
+		for library in steam_libraries(steam) do steam_soldats(&candidates, library)
 	}
 	found := make([dynamic]string, allocator)
 	for dir in candidates {
@@ -195,7 +220,7 @@ mod_import :: proc(dirs: []string, mods_dir, name: string, classic: Mod) -> (res
 		for f in files do merged[strings.to_lower(f.name, context.temp_allocator)] = f
 		// its mod.ini's pivots, unless it is 1.7.1's own as it came: those are no player's
 		root := dir if own else folder_root(dir)
-		if !utils.file_exists(utils.temp_path(root, MOD_CONFIG_FILE)) || is_stock(&stock, root, MOD_CONFIG_FILE, install_path(root)) do continue
+		if !utils.file_exists(utils.temp_path(root, MOD_CONFIG_FILE)) || is_stock(&stock, utils.temp_path(root, MOD_CONFIG_FILE), MOD_CONFIG_FILE, install_path(root)) do continue
 		config := soldat_config(root)
 		for key, value in config.anchors do anchors[key] = value
 	}
@@ -258,22 +283,42 @@ Packed :: struct {
 	scale: f32,
 }
 
-// What of the folder `dir` goes in a mod (mod_import): each file of the game's folders
-// that differs, with the scale its mod.ini gives it. `own`, it is an install's own: only
-// its game's folders are looked through. With the temp allocator.
+// What of the folder `dir` goes in a mod (mod_import), each with the scale its mod.ini
+// gives it: a mod of mods/, every file of the game's folders; `own`, an install's own, each
+// that is neither 1.7.1's as it came nor Classic's, its game's folders alone looked
+// through. With the temp allocator.
 @(private = "file")
 scan :: proc(dir: string, classic: Mod, stock: ^map[string]Stock_File, own: bool) -> (files: []Packed, ok: bool) {
 	root := dir if own else folder_root(dir)
 	at := install_path(root) // where its files are in the install, as the stock list has them
 	config := soldat_config(root)
 	packed := make([dynamic]Packed, context.temp_allocator)
+	// Classic's folders, read once for every file; kept in an arena of their own, as the
+	// temp allocator's is let go of file by file
+	arena: virtual.Arena
+	_ = virtual.arena_init_growing(&arena)
+	defer virtual.arena_destroy(&arena)
+	listings := new(utils.Dir_Listings, virtual.arena_allocator(&arena))
+	listings^ = make(utils.Dir_Listings, virtual.arena_allocator(&arena))
 	for file in files_below(root, own) {
 		top := file[:max(strings.index_byte(file, '/'), 0)]
 		if top == "" || !is_root_name(top, true) do continue
-		if is_stock(stock, root, file, at) || !differs(classic, root, file) do continue
-		append(&packed, Packed{file, utils.temp_path(root, file), soldat_scale(&config, file)})
+		path := utils.temp_path(root, file)
+		// a mod of mods/ is the player's whole: all of it goes in. The install's own
+		// folders are 1.7.1's, but for what the player put over them
+		if !own || keep(stock, classic, path, file, at, listings) do append(&packed, Packed{file, path, soldat_scale(&config, file)})
 	}
 	return packed[:], true
+
+	// Whether the file goes in: not 1.7.1's own, and not Classic's. What it reads and
+	// decodes is let go of as it is weighed, so a mod of many files takes no more.
+	keep :: proc(stock: ^map[string]Stock_File, classic: Mod, path, file, at: string, listings: ^utils.Dir_Listings) -> bool {
+		mark := runtime.default_temp_allocator_temp_begin()
+		defer runtime.default_temp_allocator_temp_end(mark)
+		if is_stock(stock, path, file, at) do return false
+		data := utils.read_file(path, context.temp_allocator) or_return
+		return differs(classic, data, file, listings)
+	}
 }
 
 // A Soldat 1 folder's mod.ini, as Soldat 1 reads it: its scales 1 where it doesn't say,
@@ -311,12 +356,14 @@ pivot_part :: proc(id: string) -> Part {
 // image keyed as the game keys it, its see-through made alpha, a PNG, and as big as it
 // should be at SRMOD_SCALE: an image whose size is its own from the scale Soldat 1 drew
 // it at; an edge's texture from 1, as Soldat 1 drew those; the rest, whose size the map
-// sets, as it is. A sound as it is. False for anything no part holds.
+// sets, as it is. A sound as it is. False for anything no part a mod may have holds (the
+// scenery is Classic's alone).
 @(private = "file")
 import_file :: proc(f: Packed) -> (dest: string, data: []byte, ok: bool) {
 	slash := strings.last_index_byte(f.name, '/')
 	dir, file := f.name[:max(slash, 0)], f.name[slash + 1:]
 	part, in_part := mod_part_of(dir, file) or_return
+	if part not_in MOD_PARTS do return // the scenery: Classic's alone
 	base := utils.temp_path(PART_NAMES[part], in_part) if in_part != "" else PART_NAMES[part]
 	bytes := utils.read_file(f.path, context.temp_allocator) or_return
 	extension := strings.to_lower(filepath.ext(file), context.temp_allocator)
@@ -404,12 +451,16 @@ install_path :: proc(dir: string) -> string {
 	return strings.to_lower(strings.concatenate({below, "/"}, context.temp_allocator), context.temp_allocator)
 }
 
-// How many of the files are art or sounds: not the fonts, nor mod.ini.
+// How many of the files are art or sounds a mod may have: not the fonts, the scenery or
+// mod.ini.
 @(private = "file")
 changed_of :: proc(files: []Packed) -> (n: int) {
 	for f in files {
+		slash := strings.last_index_byte(f.name, '/')
 		top := strings.to_lower(f.name[:max(strings.index_byte(f.name, '/'), 0)], context.temp_allocator)
-		if top != "" && top != "txt" && top != "fonts" do n += 1
+		if top == "" || top == "txt" || top == "fonts" do continue
+		part, _, ok := mod_part_of(f.name[:max(slash, 0)], f.name[slash + 1:])
+		if ok && part in MOD_PARTS do n += 1 // not the scenery, Classic's alone
 	}
 	return
 }
@@ -427,28 +478,34 @@ last_mod :: proc(root: string) -> string {
 	return ""
 }
 
-// Whether the file `file` (below `root`) is one of Classic's, and isn't the same: an
+// Whether the file `file` (its bytes `mine`) is one of Classic's, and isn't the same: an
 // image whose pixels differ, else bytes that do. A file Classic hasn't isn't one: the
-// game never asks for it.
+// game never asks for it. Images of other sizes differ without being decoded.
 @(private = "file")
-differs :: proc(classic: Mod, root, file: string) -> bool {
+differs :: proc(classic: Mod, mine: []byte, file: string, listings: ^utils.Dir_Listings = nil) -> bool {
 	slash := strings.last_index_byte(file, '/')
 	dir, name := file[:max(slash, 0)], file[slash + 1:]
 	extension := strings.to_lower(filepath.ext(name), context.temp_allocator)
 	theirs: Mod_File
 	found: bool
+	image := extension == ".png" || extension == ".bmp" || extension == ".jpg" || extension == ".gif" || extension == ".tga"
 	switch {
-	case extension == ".png" || extension == ".bmp" || extension == ".jpg" || extension == ".gif" || extension == ".tga":
-		theirs, found = mod_image(classic, dir, name)
+	case image:
+		theirs, found = mod_image(classic, dir, name, listings)
 	case strings.has_prefix(strings.to_lower(file, context.temp_allocator), "sfx/") && (extension == ".wav" || extension == ".ogg" || extension == ".mp3"):
 		theirs, found = sound_file(classic, file[len("sfx/"):])
 	case:
 		theirs, found = mod_file(classic, file)
 	}
 	if !found do return false
-	mine := utils.read_file(utils.temp_path(root, file), context.temp_allocator) or_return
 	classics := mod_read(theirs, context.temp_allocator) or_return
 	if slice.equal(mine, classics) do return false
+	if image {
+		wa, ha, ca, wb, hb, cb: c.int
+		if stbi.info_from_memory(raw_data(mine), c.int(len(mine)), &wa, &ha, &ca) != 0 && stbi.info_from_memory(raw_data(classics), c.int(len(classics)), &wb, &hb, &cb) != 0 {
+			if wa != wb || ha != hb do return true
+		}
+	}
 	a, decoded_a := texture_decode(mine, COLOR_KEY, context.temp_allocator)
 	b, decoded_b := texture_decode(classics, COLOR_KEY, context.temp_allocator)
 	if !decoded_a || !decoded_b do return true
@@ -478,27 +535,33 @@ Stock_File :: struct {
 @(private = "file")
 stock_load :: proc() -> map[string]Stock_File {
 	stock := make(map[string]Stock_File, 2048, context.temp_allocator)
+	if !utils.file_exists(SOLDAT_STOCK) do return stock // not beside the game: none
 	text, read := utils.read_file(SOLDAT_STOCK, context.temp_allocator)
 	if !read do return stock
 	rest := string(text)
 	for line in strings.split_lines_iterator(&rest) {
 		if strings.has_prefix(line, "//") do continue
-		fields := strings.fields(line, context.temp_allocator)
-		if len(fields) != 3 do continue
-		size, size_ok := strconv.parse_int(fields[0])
-		crc, crc_ok := strconv.parse_u64_of_base(fields[1], 16)
-		if size_ok && crc_ok do stock[fields[2]] = {size, u32(crc)}
+		// its size, its CRC, and the rest its path, which may have spaces ("soldat style")
+		size_text, _, after := strings.partition(strings.trim_space(line), " ")
+		crc_text, _, path := strings.partition(after, " ")
+		if path == "" do continue
+		size, size_ok := strconv.parse_int(size_text)
+		crc, crc_ok := strconv.parse_u64_of_base(crc_text, 16)
+		if size_ok && crc_ok do stock[path] = {size, u32(crc)}
 	}
 	return stock
 }
 
-// Whether `file` (below `root`, which is `at` in its install: "", or "mods/classic/") is
-// Soldat 1.7.1's own, as it came.
+// Whether the file at `path`, `file` in its folder, which is `at` in its install ("", or
+// "mods/classic/"), is Soldat 1.7.1's own, as it came: its size, then (only if that
+// matches) its CRC.
 @(private = "file")
-is_stock :: proc(stock: ^map[string]Stock_File, root, file, at: string) -> bool {
+is_stock :: proc(stock: ^map[string]Stock_File, path, file, at: string) -> bool {
 	known := stock[strings.to_lower(strings.concatenate({at, file}, context.temp_allocator), context.temp_allocator)] or_return
-	data := utils.read_file(utils.temp_path(root, file), context.temp_allocator) or_return
-	return len(data) == known.size && hash.crc32(data) == known.crc
+	info, err := os.stat(path, context.temp_allocator)
+	if err != nil || int(info.size) != known.size do return false
+	data := utils.read_file(path, context.temp_allocator) or_return
+	return hash.crc32(data) == known.crc
 }
 
 // Every file below `root`, by its path from it with forward slashes; `own`, only in its
@@ -555,4 +618,30 @@ steam_libraries :: proc(steam: string) -> []string {
 		append(&libraries, path)
 	}
 	return libraries[:]
+}
+
+// Whether every file of the folder `dir` is Soldat 1.7.1's own as it came, by where the
+// folder is in its install: one of the custom interfaces it ships with, untouched.
+@(private)
+folder_is_stock :: proc(dir: string) -> bool {
+	stock := stock_load()
+	at := install_path(dir)
+	files := files_below(dir)
+	if len(files) == 0 do return false
+	for file in files do if !is_stock(&stock, utils.temp_path(dir, file), file, at) do return false
+	return true
+}
+
+// Each folder of the Steam library `library`'s steamapps/common named for Soldat, in any
+// case ("Soldat"), added to `candidates`.
+@(private = "file")
+steam_soldats :: proc(candidates: ^[dynamic]string, library: string) {
+	common := utils.temp_path(library, "steamapps", "common")
+	entries, err := os.read_all_directory_by_path(common, context.temp_allocator)
+	if err != nil do return
+	for entry in entries {
+		if entry.type == .Directory && strings.contains(strings.to_lower(entry.name, context.temp_allocator), "soldat") {
+			append(candidates, utils.temp_path(common, entry.name))
+		}
+	}
 }

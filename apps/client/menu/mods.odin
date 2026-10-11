@@ -596,7 +596,9 @@ action_bar :: proc(menu: ^Menu) {
 // in mods/ and has the part.
 @(private = "file")
 worn_from :: proc(menu: ^Menu, part: res.Part) -> string {
-	name := res.part_choice_of(&menu.config.graphics.parts, part)^
+	chosen := res.part_choice_of(&menu.config.graphics.parts, part)
+	if chosen == nil do return "" // the scenery, Classic's alone
+	name := chosen^
 	listing, present := listing_of(&menu.mods, name)
 	if !present || part not_in listing.parts || listing.problem != "" do return ""
 	return listing.name

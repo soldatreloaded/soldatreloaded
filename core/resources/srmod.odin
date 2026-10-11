@@ -33,10 +33,14 @@ Part :: enum {
 	Icons,    // the rest of the HUD's and the menus' art
 	Sounds,
 	Textures, // the maps' polygon textures, and their edges'
-	Scenery,  // the maps' props
+	Scenery,  // the maps' props: Classic's alone, as Soldat 1's, no mod's (MOD_PARTS)
 	Fonts,    // the HUD's fonts, and fonts.json
 }
 Parts :: bit_set[Part]
+
+// The parts a mod may have: all but the scenery, which is Classic's alone, as the maps'
+// art Soldat 1 never let a mod change.
+MOD_PARTS :: Parts{.Soldier, .Weapons, .Effects, .Objects, .Hud, .Icons, .Sounds, .Textures, .Fonts}
 
 // Each part's folder, and its name in mod.json and the config.
 @(rodata)
@@ -64,11 +68,10 @@ Part_Choice :: struct {
 	icons:    string,
 	sounds:   string,
 	textures: string,
-	scenery:  string,
 	fonts:    string,
 }
 
-// The choice's mod for `part`.
+// The choice's mod for `part`; nil for one no mod may have (MOD_PARTS).
 part_choice_of :: proc(choice: ^Part_Choice, part: Part) -> ^string {
 	switch part {
 	case .Soldier:  return &choice.soldier
@@ -79,7 +82,7 @@ part_choice_of :: proc(choice: ^Part_Choice, part: Part) -> ^string {
 	case .Icons:    return &choice.icons
 	case .Sounds:   return &choice.sounds
 	case .Textures: return &choice.textures
-	case .Scenery:  return &choice.scenery
+	case .Scenery:  return nil // Classic's alone
 	case .Fonts:    return &choice.fonts
 	}
 	return nil
@@ -88,7 +91,7 @@ part_choice_of :: proc(choice: ^Part_Choice, part: Part) -> ^string {
 // The choice, part by part.
 part_choices :: proc(choice: Part_Choice) -> (by_part: [Part]string) {
 	choice := choice
-	for part in Part do by_part[part] = part_choice_of(&choice, part)^
+	for part in MOD_PARTS do by_part[part] = part_choice_of(&choice, part)^
 	return
 }
 
@@ -167,6 +170,14 @@ srmod_open :: proc(path: string, allocator := context.allocator, classic := fals
 	}
 	for part in Part {
 		if pack_has_folder(&mod.pack, PART_NAMES[part]) do mod.parts += {part}
+	}
+	// what no mod may have but Classic, said, and not worn
+	if !classic {
+		for part in mod.parts - MOD_PARTS {
+			append(&problems, strings.clone(fmt.tprintf("its %s/ isn't worn: the %s is Classic's alone", PART_NAMES[part], PART_NAMES[part])))
+		}
+		listed &= MOD_PARTS
+		mod.parts &= MOD_PARTS
 	}
 	for part in listed - mod.parts do append(&problems, strings.clone(fmt.tprintf("mod.json lists %s, but it has no %s/", PART_NAMES[part], PART_NAMES[part])))
 	for part in mod.parts - listed do append(&problems, strings.clone(fmt.tprintf("it has %s/, which mod.json doesn't list", PART_NAMES[part])))
@@ -313,7 +324,7 @@ worn_make :: proc(classic_dir, mods_dir: string, choice: [Part]string, allocator
 		return
 	}
 	for name, part in choice {
-		if name == "" || strings.equal_fold(name, MOD_CLASSIC) do continue
+		if name == "" || strings.equal_fold(name, MOD_CLASSIC) || part not_in MOD_PARTS do continue
 		index := -1
 		for &mod, i in worn.mods {
 			if strings.equal_fold(mod.info.name, name) do index = i

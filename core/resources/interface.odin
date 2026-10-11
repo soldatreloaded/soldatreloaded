@@ -436,7 +436,8 @@ interface_layer :: proc(dir, name: string) -> (layer: Mod_Layer, found: bool) {
 // 1 works them out, written down; and the HUD's pictures of its own) and its icons (the
 // rest of its pictures), each picture brought from its scale to SRMOD_SCALE, see-through
 // where it was green. Named as it was, but for what a mod's name can't have (made `_`);
-// one by a name a mod has already, and the original's own Default, left as they are.
+// one by a name a mod has already, one 1.7.1 ships with as it came, and the original's
+// own Default, left as they are.
 // The names made, with the temp allocator.
 interfaces_import :: proc(dirs: []string, mods_dir: string) -> []string {
 	made := make([dynamic]string, context.temp_allocator)
@@ -451,6 +452,7 @@ interfaces_import :: proc(dirs: []string, mods_dir: string) -> []string {
 				title = title[:len(title) - len(INTERFACE_EXTENSION)]
 			}
 			if title == "" || strings.has_prefix(title, ".") || strings.equal_fold(title, "default") do continue
+			if entry.type == .Directory && folder_is_stock(entry.fullpath) do continue // one 1.7.1 ships with, untouched: nobody's
 			name := mod_name_from(title)
 			if name == "" || mod_exists(mods_dir, name) || slice.contains(made[:], name) do continue
 			if interface_import(from, title, mods_dir, name) do append(&made, name)
