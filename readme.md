@@ -152,6 +152,7 @@ community's, are at
 - [porting.md](docs/porting.md): porting the simulation from C, and checking it.
 - [scripting.md](docs/scripting.md): the server's Lua API.
 - [soldat1-mods.md](docs/soldat1-mods.md): how Soldat 1 finds, layers and sizes its mods' art, and its custom interfaces.
+- [srmod.md](docs/srmod.md): the design of our own mods, .srmod: parts chosen one by one, one scale (not yet built).
 - [git.md](docs/git.md): commit messages, branches and releases.
 
 ## Licence
