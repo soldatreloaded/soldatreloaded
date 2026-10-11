@@ -81,23 +81,6 @@ mod_config_destroy :: proc(config: ^Mod_Config, allocator := context.allocator) 
 	config^ = {}
 }
 
-// The scale of the image at `path` (relative to the mod, "weapons-gfx/ak74.png") of the
-// mod `layer` of the stack: as its mod.ini has it by its path, else by its folder's, else
-// its default; Classic's mod.ini, for a mod without one. `set`: the mod's own mod.ini
-// names the image or its folder. A scale that isn't above 0 is passed over.
-mod_scale :: proc(mod: Mod, layer: int, path: string) -> (scale: f32, set: bool) {
-	if layer < 0 || layer >= len(mod.layers) do return DEFAULT_MOD_SCALE, false
-	l := &mod.layers[layer]
-	config := l.config
-	key := strings.to_lower(path, context.temp_allocator)
-	for &c in transmute([]u8)key do if c == '\\' do c = '/'
-	if value, found := config.scale.paths[key]; found && value > 0 do return value, l.own_config
-	if slash := strings.last_index_byte(key, '/'); slash >= 0 {
-		if value, found := config.scale.paths[key[:slash]]; found && value > 0 do return value, l.own_config
-	}
-	return config.scale.default if config.scale.default > 0 else DEFAULT_MOD_SCALE, false
-}
-
 // Where the part or weapon of the original's id `id` is pinned, by [GOSTEK]; `default`
 // where it doesn't say, or says only one of the two.
 mod_anchor :: proc(config: ^Mod_Config, id: string, default: [2]f32) -> (center: [2]f32) {

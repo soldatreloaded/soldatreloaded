@@ -282,17 +282,18 @@ sound_load :: proc(file: Mod_File, allocator := context.allocator, decode: Sound
 	return sound, true
 }
 
-// Where the sound the original names `name` ("radio/efcup.wav") is: in the sfx/ of each
-// mod, the top first, Classic's last; whatever its case, as a .wav, else an .mp3 or an
-// .ogg. False if none is anywhere.
+// Where the sound the original names `name` ("radio/efcup.wav") is: in the sounds of the
+// mod they are worn from, else Classic's; whatever its case, as a .wav, else an .mp3 or
+// an .ogg. False if neither has it.
 sound_file :: proc(mod: Mod, name: string) -> (file: Mod_File, found: bool) {
 	slash := strings.last_index_byte(name, '/')
 	stem := filepath.stem(name[slash + 1:])
-	dir := utils.temp_path("sfx", name[:slash]) if slash >= 0 else "sfx"
-	for &layer, i in mod.layers {
+	dir := utils.temp_path(PART_NAMES[.Sounds], name[:slash]) if slash >= 0 else PART_NAMES[.Sounds]
+	for pack in mod_packs(mod, .Sounds) {
+		if .Sounds not_in pack.parts do continue
 		for extension in SOUND_EXTENSIONS {
 			wanted := strings.concatenate({stem, extension}, context.temp_allocator)
-			if file, found = layer_find(&layer, i, dir, wanted, extension); found && strings.equal_fold(filepath.ext(file.path), extension) do return
+			if file, found = layer_find(&pack.pack, int(Part.Sounds), dir, wanted, extension); found && strings.equal_fold(filepath.ext(file.path), extension) do return
 		}
 	}
 	return {}, false

@@ -12,10 +12,8 @@ import "../../../core/utils"
 // A sprite: one of the mod's images with its size in the world, drawn as a turned,
 // scaled quad. The soldiers, the bullets, the things and the sparks are all sprites,
 // their images packed into one atlas as they load (atlas.odin), so they draw in one go.
-// How big an image is in the world is the mod's to say, in mod.ini's [SCALE] (the
-// original's ScaleData): its pixels over its scale, by the mod.ini of the mod it came
-// from, so a mod's art is as big as that mod meant it to be among others'. From the C client's render/sprite.c
-// and render/scale_data.c.
+// An image is its pixels over res.SRMOD_SCALE in the world, every mod's alike. From the
+// C client's render/sprite.c.
 
 WHITE :: utils.Rgba{255, 255, 255, 255}
 
@@ -23,7 +21,7 @@ Sprite :: struct {
 	image: Atlas_Image, // none where the mod hasn't the image: it draws nothing
 	mask:  Atlas_Image, // its silhouette in white, for a sprite drawn in a flat colour
 	size:  [2]f32,      // in world units
-	layer: int,         // the mod of the stack it came from, whose mod.ini sizes and pins it
+	layer: int,         // the part it came from (res.Part), whose pivots pin it; -1 for none
 }
 
 // Where sprites are loaded from: the mods; and the atlas they are packed into. With
@@ -73,14 +71,6 @@ sprite_book_load :: proc(book: ^Sprite_Book, dir, name: string, listings: ^utils
 // green keyed out as the original's interface is.
 sprite_book_add :: proc(book: ^Sprite_Book, file: res.Mod_File, scale: f32) -> Sprite {
 	return sprite_sized({book.mod, &book.atlas, nil}, file, scale, res.COLOR_KEY, false)
-}
-
-// The scale of the image at `path`, relative to the mod ("weapons-gfx/ak74.png"), as
-// the mod.ini of the mod it came from has it ([SCALE], res.mod_scale). A mod of the old,
-// small art says so there.
-scale_of :: proc(mod: res.Mod, layer: int, path: string) -> f32 {
-	scale, _ := res.mod_scale(mod, layer, path)
-	return scale
 }
 
 // The image at `path` in the mod ("gostek-gfx/klata.png"), found as the original
@@ -167,7 +157,7 @@ draw_turned :: proc(image: Atlas_Image, size, at, center, scale: [2]f32, angle: 
 
 @(private = "file")
 sprite_from :: proc(source: Source, file: res.Mod_File, path: string, key: Maybe(utils.Rgba), flat: bool) -> Sprite {
-	return sprite_sized(source, file, scale_of(source.mod, file.layer, path), key, flat)
+	return sprite_sized(source, file, res.SRMOD_SCALE, key, flat)
 }
 
 // The image of `file`, `scale` pixels to a unit.

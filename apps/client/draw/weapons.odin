@@ -67,12 +67,12 @@ weapons_load :: proc(source: Source, art: ^Gostek_Art) {
 	}
 }
 
-// Where a sprite is pinned, by the original's id for it: as the mod.ini of the mod it came
-// from says ([GOSTEK]), else `default`.
+// Where a sprite is pinned, by the original's id for it: as the pivots of the part it came
+// from say, the mod's over Classic's, else `default`.
 @(private = "package")
 anchor_of :: proc(source: Source, sprite: Sprite, id: string, default: [2]f32) -> [2]f32 {
-	if sprite.layer < 0 || sprite.layer >= len(source.mod.layers) do return default
-	return res.mod_anchor(source.mod.layers[sprite.layer].config, id, default)
+	if sprite.layer < 0 || sprite.layer > int(max(res.Part)) || source.mod.worn == nil do return default
+	return res.worn_pivot(source.mod.worn, res.Part(sprite.layer), id, default)
 }
 
 @(private = "package")

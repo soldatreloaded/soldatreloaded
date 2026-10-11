@@ -48,46 +48,6 @@ read :: proc(file: res.Mod_File) -> string {
 	return string(data)
 }
 
-// Classic, an .smod of art and a mod.ini, and a folder of sounds whose files are a
-// folder down: each file is the top mod's that has it, else Classic's; each mod's images
-// are sized by its own mod.ini, and the folder's, having none, by Classic's.
-@(test)
-stacked :: proc(t: ^testing.T) {
-	dir := scratch(t, "stacked")
-	defer os.remove_all(dir)
-	write(utils.temp_path(dir, "classic", "gostek-gfx", "klata.png"), "classic chest")
-	write(utils.temp_path(dir, "classic", "gostek-gfx", "morda.png"), "classic head")
-	write(utils.temp_path(dir, "classic", "sfx", "shotgun.wav"), "classic shot")
-	write(utils.temp_path(dir, "classic", "mod.ini"), "[SCALE]\nDefaultScale=4.5\n")
-	write_zip(utils.temp_path(dir, "Art.smod"), {{"Art/Gostek-Gfx/KLATA.png", "art chest"}, {"Art/mod.ini", "[SCALE]\nDefaultScale=2\n"}, {"Art/readme.txt", "hi"}})
-	write(utils.temp_path(dir, "Sounds", "Sounds v2", "sfx", "Shotgun.ogg"), "loud shot")
-	write(utils.temp_path(dir, "Sounds", "Sounds v2", "gostek-gfx", "klata.png"), "sounds' chest")
-	write(utils.temp_path(dir, "Empty", "readme.txt"), "nothing the game uses")
-
-	mods := []string{"Art", "Sounds", "Missing"}
-	mod := res.mod_make(dir, mods)
-	defer res.mod_destroy(&mod)
-	testing.expect_value(t, len(mod.layers), 3) // the missing one passed over, Classic last
-
-	chest, found := res.mod_image(mod, "gostek-gfx", "klata.png")
-	testing.expect(t, found && read(chest) == "art chest" && chest.layer == 0, "the top mod's, in any case, a folder down in its zip")
-	head, _ := res.mod_image(mod, "gostek-gfx", "morda.png")
-	testing.expect(t, read(head) == "classic head" && head.layer == 2, "Classic's where no mod has it")
-	shot, heard := res.sound_file(mod, "shotgun.wav")
-	testing.expect(t, heard && read(shot) == "loud shot" && shot.layer == 1, "a mod's .ogg over Classic's .wav, a folder down in the mod's folder")
-	testing.expect(t, res.mod_has_image(mod, "gostek-gfx", "klata.png") && !res.mod_has_image(mod, "gostek-gfx", "morda.png"), "a mod over Classic has it, or not")
-
-	testing.expect_value(t, mod.layers[0].config.scale.default, f32(2))
-	testing.expect(t, mod.layers[1].config == mod.layers[2].config, "a mod without a mod.ini sized by Classic's")
-	testing.expect_value(t, mod.layers[2].config.scale.default, f32(4.5))
-
-	// the order is the player's: the folder on top, its chest is worn
-	swapped := res.mod_make(dir, []string{"Sounds", "Art"})
-	defer res.mod_destroy(&swapped)
-	chest, _ = res.mod_image(swapped, "gostek-gfx", "klata.png")
-	testing.expect(t, read(chest) == "sounds' chest" && chest.layer == 0, "the top one's, whichever it is")
-}
-
 // mods/ listed: Classic left out, each .smod and folder by name, with what it changes,
 // and where its files were found if not at its root.
 @(test)
@@ -126,11 +86,8 @@ imported :: proc(t: ^testing.T) {
 	mods_dir := utils.temp_path(dir, "mods")
 	// a Classic of a chest, a belt and a head, see-through about them, and a shot
 	chest_png, belt_png, head_png := picture(1), picture(2), picture(3)
-	write(utils.temp_path(mods_dir, "classic", "gostek-gfx", "klata.png"), chest_png)
-	write(utils.temp_path(mods_dir, "classic", "gostek-gfx", "biodro.png"), belt_png)
-	write(utils.temp_path(mods_dir, "classic", "gostek-gfx", "morda.png"), head_png)
-	write(utils.temp_path(mods_dir, "classic", "sfx", "spas12-fire.wav"), "classic shotgun")
-	classic := res.mod_make(mods_dir, nil)
+	write_classic(mods_dir, {{"soldier/klata.png", chest_png}, {"soldier/biodro.png", belt_png}, {"soldier/morda.png", head_png}, {"sounds/spas12-fire.wav", "classic shotgun"}})
+	classic := res.mod_make(mods_dir)
 	defer res.mod_destroy(&classic)
 
 	write(utils.temp_path(soldat, "soldat.exe"), "")
@@ -156,12 +113,6 @@ imported :: proc(t: ^testing.T) {
 	slice.sort(names[:])
 	testing.expect(t, slice.equal(names[:], []string{"gostek-gfx/morda.bmp", "mod.ini", "sfx/spas12-fire.wav"}), "what differs, and its mod.ini")
 
-	worn := res.mod_make(mods_dir, []string{"Mine"})
-	defer res.mod_destroy(&worn)
-	shot, _ := res.sound_file(worn, "spas12-fire.wav")
-	testing.expect(t, read(shot) == "my shotgun", "worn as any mod is")
-	head, _ := res.mod_image(worn, "gostek-gfx", "morda.png")
-	testing.expect(t, head.layer == 0 && worn.layers[0].config.anchors["head_centerx"] == 0.6, "its head, a .bmp where a .png is asked for, pinned by its own mod.ini")
 
 	again := res.mod_import({soldat}, mods_dir, "Mine", classic)
 	testing.expect(t, again.problem != "", "not over a mod by that name")
@@ -179,11 +130,8 @@ soldat_sources :: proc(t: ^testing.T) {
 	defer os.remove_all(dir)
 	soldat := utils.temp_path(dir, "Games", "Soldat")
 	mods_dir := utils.temp_path(dir, "mods")
-	write(utils.temp_path(mods_dir, "classic", "gostek-gfx", "klata.png"), picture(1, 27, 18))
-	write(utils.temp_path(mods_dir, "classic", "gostek-gfx", "morda.png"), picture(2, 27, 18))
-	write(utils.temp_path(mods_dir, "classic", "sfx", "spas12-fire.wav"), "classic shotgun")
-	write(utils.temp_path(mods_dir, "classic", "sfx", "ak74-fire.wav"), "classic ak")
-	classic := res.mod_make(mods_dir, nil)
+	write_classic(mods_dir, {{"soldier/klata.png", picture(1, 27, 18)}, {"soldier/morda.png", picture(2, 27, 18)}, {"sounds/spas12-fire.wav", "classic shotgun"}, {"sounds/ak74-fire.wav", "classic ak"}})
+	classic := res.mod_make(mods_dir)
 	defer res.mod_destroy(&classic)
 
 	write(utils.temp_path(soldat, "soldat.exe"), "")
@@ -213,11 +161,11 @@ soldat_sources :: proc(t: ^testing.T) {
 	result := res.mod_import({sources[0].dir, sources[1].dir}, utils.temp_path(dir, "made"), "Loud", classic)
 	testing.expect_value(t, result.problem, "")
 	testing.expect_value(t, result.changed, 3)
-	worn := res.mod_make(utils.temp_path(dir, "made"), {"Loud"})
-	defer res.mod_destroy(&worn)
-	shot, _ := res.sound_file(worn, "spas12-fire.wav")
-	chest, _ := res.mod_image(worn, "gostek-gfx", "klata.png")
-	testing.expect(t, read(shot) == "loud shotgun" && chest.layer == 0, "the mod's own over its own folders', and theirs under it")
+	z, opened := utils.zip_open(utils.temp_path(dir, "made", "Loud.smod"))
+	defer utils.zip_close(&z)
+	shot, _ := utils.zip_read(&z, z.entries["sfx/spas12-fire.wav"], context.temp_allocator)
+	_, chest := z.entries["gostek-gfx/klata.png"]
+	testing.expect(t, opened && string(shot) == "loud shotgun" && chest, "the mod's own over its own folders', and theirs under it")
 }
 
 // A .png of `w` by `h`: a block of colour `shade` in the middle, see-through about it.
@@ -235,29 +183,56 @@ picture :: proc(shade: u8, w := 6, h := 4) -> string {
 	return string(out[:])
 }
 
-// A mod's art is drawn at the scale its mod.ini gives it, whatever its size: an old
-// mod's small art, from before Soldat 1.6 drew it finer, at its DefaultScale, as nothing
-// is guessed from its size; a mod.ini that sizes its folder, as it says.
-@(test)
-scale_as_the_mod_ini_says :: proc(t: ^testing.T) {
-	dir := scratch(t, "scale_as_said")
-	defer os.remove_all(dir)
-	parts := []string{"klata.png", "morda.png", "noga.png", "udo.png"}
-	for name, i in parts {
-		write(utils.temp_path(dir, "classic", "gostek-gfx", name), picture(u8(i), 27, 18))
-		write(utils.temp_path(dir, "Old", "gostek-gfx", name), picture(u8(i), 6, 4))
-		write(utils.temp_path(dir, "Said", "gostek-gfx", name), picture(u8(i), 6, 4))
-	}
-	write(utils.temp_path(dir, "classic", "mod.ini"), "[SCALE]\nDefaultScale=4.5\n")
-	write(utils.temp_path(dir, "Old", "mod.ini"), "[SCALE]\nDefaultScale=4.5\n")
-	write(utils.temp_path(dir, "Said", "mod.ini"), "[SCALE]\nDefaultScale=4.5\ngostek-gfx=1\n")
 
-	mod := res.mod_make(dir, []string{"Old", "Said"})
+// Classic laid out as a .srmod folder: its mod.json, of every part, and `files` by their
+// paths in it.
+write_classic :: proc(mods_dir: string, files: [][2]string) {
+	write(utils.temp_path(mods_dir, "classic", "mod.json"), `{"format": 1, "name": "classic", "version": "1.0.0", "parts": ["soldier", "weapons", "effects", "objects", "hud", "icons", "sounds", "textures", "scenery", "fonts"]}`)
+	for f in files do write(utils.temp_path(mods_dir, "classic", f[0]), f[1])
+}
+
+// The game asks for a file by Soldat 1's path, and finds it in the part that holds it:
+// the chosen mod's, else Classic's; and Classic's alone, asked of Classic.
+@(test)
+by_part :: proc(t: ^testing.T) {
+	dir := scratch(t, "by_part")
+	defer os.remove_all(dir)
+	write_classic(dir, {
+		{"soldier/klata.png", "classic chest"},
+		{"soldier/morda.png", "classic head"},
+		{"weapons/icons/1.png", "classic icon"},
+		{"hud/health.png", "classic health"},
+		{"icons/cursor.png", "classic cursor"},
+		{"objects/textures/flag.png", "classic cloth"},
+		{"fonts/font.ini", "[FONTS]"},
+		{"sounds/shotgun.wav", "classic shot"},
+	})
+	write(utils.temp_path(dir, "Art", "mod.json"), `{"format": 1, "name": "Art", "version": "1.0.0", "parts": ["soldier", "sounds"]}`)
+	write(utils.temp_path(dir, "Art", "soldier", "KLATA.png"), "art chest")
+	write(utils.temp_path(dir, "Art", "sounds", "Shotgun.ogg"), "loud shot")
+
+	choice: [res.Part]string
+	choice[.Soldier] = "Art"
+	choice[.Sounds] = "Art"
+	mod := res.mod_make(dir, choice)
 	defer res.mod_destroy(&mod)
-	scale, set := res.mod_scale(mod, 0, "gostek-gfx/klata.png")
-	testing.expect(t, !set && scale == 4.5, "an old mod's small art is drawn at its DefaultScale")
-	scale, set = res.mod_scale(mod, 1, "gostek-gfx/klata.png")
-	testing.expect(t, set && scale == 1, "and a mod.ini that sizes its folder, as it says")
+	if !testing.expect(t, mod.worn != nil, "Classic and Art worn") do return
+
+	got :: proc(file: res.Mod_File, found: bool) -> string {return read(file) if found else ""}
+	chest, found := res.mod_image(mod, "gostek-gfx", "klata.png")
+	testing.expect(t, found && read(chest) == "art chest" && chest.layer == int(res.Part.Soldier), "the chosen mod's, in any case, of the soldier")
+	testing.expect_value(t, got(res.mod_image(mod, "gostek-gfx", "morda.png")), "classic head")
+	testing.expect_value(t, got(res.sound_file(mod, "shotgun.wav")), "loud shot")
+	testing.expect_value(t, got(res.mod_image(mod, "interface-gfx/guns", "1.png")), "classic icon")
+	testing.expect_value(t, got(res.mod_image(mod, "interface-gfx", "health.png")), "classic health")
+	testing.expect_value(t, got(res.mod_image(mod, "interface-gfx", "cursor.png")), "classic cursor")
+	testing.expect_value(t, got(res.mod_image(mod, "textures/objects", "flag.bmp")), "classic cloth")
+	testing.expect_value(t, got(res.mod_file(mod, "txt/font.ini")), "[FONTS]")
+	testing.expect(t, res.mod_has_image(mod, "gostek-gfx", "klata.png") && !res.mod_has_image(mod, "gostek-gfx", "morda.png"), "a chosen mod has it, or not")
+
+	classic := res.mod_classic(mod)
+	testing.expect_value(t, got(res.mod_image(classic, "gostek-gfx", "klata.png")), "classic chest")
+	testing.expect(t, !res.mod_has_image(classic, "gostek-gfx", "klata.png"), "Classic is no mod over itself")
 }
 
 // A .png's picture as the original keeps one: a 24-bit .bmp, pure green where it is

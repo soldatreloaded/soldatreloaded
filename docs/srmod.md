@@ -89,13 +89,13 @@ to change and pack again under a version of its own.
 | `soldier` | `soldier/` | the soldier's parts, each with its mirrored `…2.png`; `team2/`, `ranny/` (wounds), the hair and headgear; our own styles, `female/`, `waifu/`, `rat/`, `furry/`, and haircuts; `pivots.json` | `gostek-gfx/`, `[GOSTEK]` (the body's) |
 | `weapons` | `weapons/` | the guns held and dropped, their clips, shells, bullets and flashes; `icons/`, each gun's icon in the kill feed and the weapons menu; `pivots.json` | `weapons-gfx/`, `interface-gfx/guns/`, `[GOSTEK]` (the guns') |
 | `effects` | `effects/` | blood, smoke, sparks, explosions, flames | `sparks-gfx/` |
-| `objects` | `objects/` | things on the map; the flags' cloth and the kits | `objects-gfx/`, `textures/objects/` |
+| `objects` | `objects/` | things on the map; `textures/`, the flags' cloth and the kits | `objects-gfx/`, `textures/objects/` |
 | `hud` | `hud/` | `layout.json`, and the pictures it places: the health, ammo and jet icons, their bars, the fire bar and its frame, the grenade, the vest bar | `custom-interfaces/<name>/` |
 | `icons` | `icons/` | the rest of the HUD's and menus' art: the crosshair, the menu cursor, the arrow over me, the boxes' ground, the flags, the scoreboard's and minimap's marks, the title | `interface-gfx/` but the guns and the HUD's |
 | `sounds` | `sounds/` | the sounds, `.wav`, `.ogg` or `.mp3`, by the game's names; `radio/` | `sfx/` |
 | `textures` | `textures/` | the maps' polygon textures, by the names maps give them; `edges/` | `textures/` |
 | `scenery` | `scenery/` | the maps' props, by the names maps give them | `scenery-gfx/`, which Soldat 1 never let a mod change |
-| `fonts` | `fonts/` | the HUD's two fonts, and `fonts.json`: which, their widths and sizes | `txt/font.ini` and its `.ttf`s (ours) |
+| `fonts` | `fonts/` | the HUD's two fonts, and `font.ini`: which, their widths and sizes, as now | `txt/font.ini` and its `.ttf`s (ours) |
 
 Within a part, files keep Soldat 1's names (`klata.png`, `ak74-clip.png`, `health-bar.png`):
 every mod made so far, every tutorial and Classic itself use them, and an import is then a
@@ -111,15 +111,18 @@ weapons', so a mod's guns and its icons of them come together.
 
 ## Images
 
-- **PNG**, with alpha. No colour key: what is see-through is transparent. (An import turns
-  Soldat 1's green, and its black for its smoke, into alpha once.)
+- **PNG**, with alpha. Opaque pure green is see-through too, as in Soldat 1 (and black
+  for the 15 smoke and spark images keyed so), so its art works as it is: the game keys it
+  out as it loads. (An import turns it into alpha once, so a mod made is plain PNGs.)
 - **4.5 pixels to a unit**, for every image whose size is its own: the soldier, the guns,
   the effects, the objects, the HUD and the icons; the world and the HUD both being laid out
   in units, a unit one pixel of the original 640 by 480. Classic is already so; nothing of
-  it changes but its crosshair (now 10) and its title (now 1), resized once.
+  it changed but its crosshair (it was 10), resized once.
 - **Any resolution** for the art whose size the map sets: scenery (each prop's size is in
   the map), polygon textures and the flags' cloth (their coordinates are). The edges'
-  textures, which the game draws at their pixel height, are made 4.5 too, and drawn so.
+  textures are 4.5 too: their width stands for 90 units of an edge, their height is its
+  thickness. Classic's, which Soldat 1 drew a pixel to a unit, were made 4.5 times as big;
+  one an odd number of pixels thick is a tenth of a unit thicker for it.
 - **Limits**, as now: a soldier's part at most 16 by 16 units, a gun's body 64 by 64;
   bigger is shrunk to fit, and the Mods page says so.
 - **Mirrored images** (`klata2.png`) are the same size as their originals.
@@ -172,7 +175,7 @@ mod has. A mod on for no part is installed and does nothing.
 
 A file is looked for in the chosen mod's part, then in Classic's: by its path within the
 part, in any case. A missing pivot is Classic's; a missing key of `layout.json` or
-`fonts.json` is Classic's.
+`font.ini` is Classic's.
 
 ## Classic
 
@@ -240,7 +243,7 @@ PNG only, files a part holds, the size limit (150 MB), the soldier's and guns' s
 
 1. **The format**: `mod.json`, the parts, reading a `.srmod` or its folder, finding a file
    by part with Classic under it; `layout.json` read and written; pivots. Tests for each.
-2. **Classic** relaid as a `.srmod` folder; its crosshair, title and edges resized to 4.5;
+2. **Classic** relaid as a `.srmod` folder; its crosshair and edges resized to 4.5;
    the game drawing from it as before, checked pixel for pixel (the HUD, the soldier, a map).
 3. **Choosing**: `graphics.parts`; the Mods page by part. The game wears `.srmod`s.
 4. **The importer from Soldat 1**, interfaces included: art over the install's own files,
