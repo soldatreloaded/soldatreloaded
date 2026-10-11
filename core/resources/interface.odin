@@ -120,6 +120,11 @@ INTERFACE_DEFAULT := Interface_Setup {
 // The places across the view that the parts are kept beside as it widens: each bar,
 // text and the grenades as far from its anchor as the layout has them, the anchor spread
 // across the view with it (the original's relinfo).
+// What each part is kept beside: an icon, or the layout's corner.
+Interface_Anchoring :: struct {
+	health, jet, ammo, fire, nades: Hud_Anchor,
+}
+
 Interface_Anchors :: struct {
 	health, jet, ammo, fire, nades: [2]f32,
 }
@@ -130,12 +135,14 @@ Interface :: struct {
 	custom:  bool,   // one of interfaces/, worn: else the game's own
 	layer:   Mod_Layer, // its folder or its .sint, the pictures at its root
 	setup:   Interface_Setup,
-	anchors: Interface_Anchors,
+	anchoring: Interface_Anchoring, // what each part is anchored to
+	anchors: Interface_Anchors, // and where that is
 }
 
 // The game's own interface: its own layout, its pictures the mods'.
 interface_default :: proc() -> (iface: Interface) {
 	iface.setup = INTERFACE_DEFAULT
+	iface.anchoring = anchoring_of(&iface)
 	iface.anchors = anchors_of(&iface)
 	return
 }
@@ -162,6 +169,7 @@ interface_open :: proc(dir, name: string, allocator := context.allocator) -> (if
 	config, _ := mod_config_read(&iface.layer, default_scale = 1)
 	iface.layer.config = new_clone(config)
 	iface.layer.own_config = true
+	iface.anchoring = anchoring_of(&iface)
 	iface.anchors = anchors_of(&iface)
 	return
 
@@ -344,30 +352,52 @@ sif_bar :: proc(b: Interface_Bar) -> Sif_Bar {
 
 // ---------------------------------------------------------------------------------
 
-// Where the parts are anchored, as the original's LoadInterfaceData has them: the game's
+// What each part is anchored to, as the original's LoadInterfaceData has it: the game's
 // own, each bar by its icon and the fire bar and the grenades by the ammo's. A custom
-// one's anchors go by the icons it has pictures of, the original's way: each by its own
-// icon if it has its picture, and the fire bar and the grenades by the last of the
-// health's, the jet's and the ammo's that it has; by none, the layout's corner, if it has
-// none of them.
+// one's go by the icons it has pictures of, the original's way: each by its own icon if
+// it has its picture, and the fire bar and the grenades by the last of the health's, the
+// jet's and the ammo's that it has; by none, the layout's corner, if it has none of them.
 @(private = "file")
-anchors_of :: proc(iface: ^Interface) -> (anchors: Interface_Anchors) {
-	s := &iface.setup
-	health, jet, ammo := f32s(s.health_icon.at), f32s(s.jet_icon.at), f32s(s.ammo_icon.at)
-	if !iface.custom do return {health = health, jet = jet, ammo = ammo, fire = ammo, nades = ammo}
+anchoring_of :: proc(iface: ^Interface) -> (anchoring: Interface_Anchoring) {
+	if !iface.custom do return {health = .Health, jet = .Jet, ammo = .Ammo, fire = .Ammo, nades = .Ammo}
 	has :: proc(iface: ^Interface, name: string) -> bool {
 		_, found := layer_find(&iface.layer, INTERFACE_LAYER, "", name, ".png")
 		return found
 	}
-	all: [2]f32
-	if has(iface, "health.bmp") do all = health
-	if has(iface, "jet.bmp") do all = jet
-	if has(iface, "ammo.bmp") do all = ammo
-	anchors = {health = all, jet = all, ammo = all, fire = all, nades = all}
-	if has(iface, "health.bmp") do anchors.health = health
-	if has(iface, "jet.bmp") do anchors.jet = jet
-	if has(iface, "ammo.bmp") do anchors.ammo = ammo
+	all := Hud_Anchor.Corner
+	if has(iface, "health.bmp") do all = .Health
+	if has(iface, "jet.bmp") do all = .Jet
+	if has(iface, "ammo.bmp") do all = .Ammo
+	anchoring = {health = all, jet = all, ammo = all, fire = all, nades = all}
+	if has(iface, "health.bmp") do anchoring.health = .Health
+	if has(iface, "jet.bmp") do anchoring.jet = .Jet
+	if has(iface, "ammo.bmp") do anchoring.ammo = .Ammo
 	return
+}
+
+// Where each part's anchor is, in the layout.
+@(private = "file")
+anchors_of :: proc(iface: ^Interface) -> Interface_Anchors {
+	a := &iface.anchoring
+	s := &iface.setup
+	return {
+		health = anchor_at(s, a.health),
+		jet    = anchor_at(s, a.jet),
+		ammo   = anchor_at(s, a.ammo),
+		fire   = anchor_at(s, a.fire),
+		nades  = anchor_at(s, a.nades),
+	}
+}
+
+// Where `anchor` is in the layout of `setup`: its icon's place, or the corner's.
+anchor_at :: proc(setup: ^Interface_Setup, anchor: Hud_Anchor) -> [2]f32 {
+	switch anchor {
+	case .Corner: return {}
+	case .Health: return f32s(setup.health_icon.at)
+	case .Ammo:   return f32s(setup.ammo_icon.at)
+	case .Jet:    return f32s(setup.jet_icon.at)
+	}
+	return {}
 }
 
 @(private = "file")
@@ -380,7 +410,7 @@ f32s :: proc(v: [2]i32) -> [2]f32 {
 @(private = "file")
 interface_layer :: proc(dir, name: string) -> (layer: Mod_Layer, found: bool) {
 	folder := utils.temp_path(dir, name)
-	if os.is_dir(folder) do return {name = strings.clone(name), dir = strings.clone(setup_folder(folder))}, true
+	if os.is_dir(folder) do return {name = strings.clone(name), dir = strings.clone(marker_folder(folder, INTERFACE_SETUP_FILE))}, true
 	path := strings.concatenate({folder, INTERFACE_EXTENSION}, context.temp_allocator)
 	if !os.is_file(path) {
 		// any case of the extension
@@ -391,56 +421,8 @@ interface_layer :: proc(dir, name: string) -> (layer: Mod_Layer, found: bool) {
 		}
 		if !os.is_file(path) do return
 	}
-	a := new(Mod_Archive)
-	ok: bool
-	if a.zip, ok = utils.zip_open(path); !ok {
-		log.errorf("%s isn't a zip the game can read", path)
-		free(a)
-		return
-	}
-	a.path = strings.clone(path)
-	// its root: the shallowest folder with its setup.sif, else the zip's own
-	depth := max(int)
-	for zip_name in a.zip.entries {
-		lower := strings.to_lower(zip_name, context.temp_allocator)
-		if !strings.has_suffix(lower, INTERFACE_SETUP_FILE) do continue
-		root := zip_name[:len(zip_name) - len(INTERFACE_SETUP_FILE)]
-		if root != "" && !strings.has_suffix(root, "/") do continue
-		if d := strings.count(root, "/"); d < depth {
-			depth = d
-			delete(a.root)
-			a.root = strings.clone(root)
-		}
-	}
-	a.files = make(map[string]string, len(a.zip.entries))
-	for zip_name in a.zip.entries {
-		if !strings.has_prefix(zip_name, a.root) do continue
-		a.files[strings.to_lower(zip_name[len(a.root):])] = zip_name
-	}
+	a := archive_open_at(path, INTERFACE_SETUP_FILE) or_return
 	return {name = strings.clone(name), archive = a}, true
-}
-
-// Where in `folder` its setup.sif is: the folder, or the first folder down, two at most,
-// that has one. The folder itself if none has.
-@(private = "file")
-setup_folder :: proc(folder: string) -> string {
-	level := []string{folder}
-	for _ in 0 ..= 2 {
-		next := make([dynamic]string, context.temp_allocator)
-		for dir in level {
-			entries, err := os.read_all_directory_by_path(dir, context.temp_allocator)
-			if err != nil do continue
-			slice.sort_by(entries, proc(a, b: os.File_Info) -> bool {return a.name < b.name})
-			for entry in entries {
-				if entry.type != .Directory && strings.equal_fold(entry.name, INTERFACE_SETUP_FILE) do return dir
-			}
-			for entry in entries {
-				if entry.type == .Directory do append(&next, utils.temp_path(dir, entry.name))
-			}
-		}
-		level = next[:]
-	}
-	return folder
 }
 
 // ---------------------------------------------------------------------------------

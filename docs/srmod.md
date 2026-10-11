@@ -75,6 +75,13 @@ A mod being made is the same, unpacked: a folder in `mods/`, `mods/<name>/mod.js
 parts beside it. The game reads a folder as it reads a `.srmod`; the Mods page packs one
 into the other to share it.
 
+Which a mod is says whose it is to change, and nothing in `mod.json` does (a flag there
+would travel with the file, and a mod handed on would say it was its new owner's). **A
+folder** is a mod being made: the Mods page edits its `mod.json` (its title, version,
+description and the rest) and packs it. **A `.srmod`** is packed, installed from the
+catalogue or handed over: worn as it is, read only; **Unpack to edit** makes it a folder,
+to change and pack again under a version of its own.
+
 ## The parts
 
 | Part | Folder | What is in it | From Soldat 1's |

@@ -46,25 +46,30 @@ config_read :: proc(path: string, config: ^$T, allocator: mem.Allocator, backup 
 	if !utils.file_exists(path) do return .Missing, 0, 0
 	text, read := utils.read_file(path, context.temp_allocator)
 	if !read do return .Broken, 0, 0
+	result, dropped, line = config_read_text(text, path, config, allocator)
+	if result == .Read && dropped > 0 && backup {
+		kept := fmt.tprintf("%s.bak", path)
+		if utils.write_file(kept, text) do log.warnf("%s: as it was, in %s", path, kept)
+	}
+	return
+}
 
+// A config's text over `config`, as config_read reads its file: `name` says where it came
+// from, in what is logged. Missing is never the result.
+config_read_text :: proc(text: []byte, name: string, config: ^$T, allocator: mem.Allocator) -> (result: Config_Read, dropped, line: int) {
 	parsed, err, at := parse_json(text, .MJSON)
 	if err != nil {
-		log.errorf("%s:%d:%d: not MJSON (%v); the defaults are used, and the file is left as it is", path, at.line, at.column, err)
+		log.errorf("%s:%d:%d: not MJSON (%v); the defaults are used, and the file is left as it is", name, at.line, at.column, err)
 		return .Broken, 0, at.line
 	}
 	object, is_object := parsed.(json.Object)
 	if !is_object {
-		log.errorf("%s: not a config, its settings in braces; the defaults are used, and the file is left as it is", path)
+		log.errorf("%s: not a config, its settings in braces; the defaults are used, and the file is left as it is", name)
 		return .Broken, 0, 1
 	}
-	whole := Whole{config, ^T, size_of(T), align_of(T), path, allocator}
+	whole := Whole{config, ^T, size_of(T), align_of(T), name, allocator}
 	keys := make([dynamic]string, context.temp_allocator)
-	dropped = settings_take(&whole, &keys, object, 0, T)
-	if dropped > 0 && backup {
-		kept := fmt.tprintf("%s.bak", path)
-		if utils.write_file(kept, text) do log.warnf("%s: as it was, in %s", path, kept)
-	}
-	return .Read, dropped, 0
+	return .Read, settings_take(&whole, &keys, object, 0, T), 0
 }
 
 // The config being read, as its settings are taken one at a time: each is read into a
@@ -142,7 +147,7 @@ read_json :: proc(text: []byte, value: ^$T, allocator := context.allocator) -> b
 }
 
 // `text` as `spec`, in the temp allocator; or where it stops being it.
-@(private = "file")
+@(private)
 parse_json :: proc(text: []byte, spec: json.Specification) -> (value: json.Value, err: json.Error, at: json.Pos) {
 	// All of it in the temp allocator, the context's too: on an error the parser frees
 	// what it has made with the context's allocator rather than its own.
@@ -228,7 +233,7 @@ config_marshalers_init :: proc "contextless" () {
 
 	register(utils.Rgba, marshal_color, unmarshal_color)
 	register(Maybe(utils.Rgba), marshal_maybe_color, unmarshal_maybe_color)
-	for id in ([?]typeid{Gostek, Hair_Style, Head_Style, Chain_Style, Weapon, Typing_Style, Kill_Log_Position, Time_Left_Position}) {
+	for id in ([?]typeid{Gostek, Hair_Style, Head_Style, Chain_Style, Weapon, Typing_Style, Kill_Log_Position, Time_Left_Position, Hud_Anchor, Hud_Bar_Style, Hud_Fill, Hud_Align}) {
 		register(id, marshal_enum, unmarshal_enum)
 	}
 	register(Window_Mode, marshal_enum, unmarshal_window_mode)
