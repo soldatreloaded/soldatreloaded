@@ -91,6 +91,7 @@ imported :: proc(t: ^testing.T) {
 	defer res.mod_destroy(&classic)
 
 	write(utils.temp_path(soldat, "soldat.exe"), "")
+	write(utils.temp_path(soldat, "anims", "stoi.poa"), "")
 	write(utils.temp_path(soldat, "mod.ini"), "[GOSTEK]\nHead_CenterX=0.6\n")
 	// Classic's chest as it is, and its belt as the original's .bmp: the same pictures
 	write(utils.temp_path(soldat, "gostek-gfx", "klata.png"), chest_png)
@@ -150,6 +151,7 @@ soldat_sources :: proc(t: ^testing.T) {
 	defer res.mod_destroy(&classic)
 
 	write(utils.temp_path(soldat, "soldat.exe"), "")
+	write(utils.temp_path(soldat, "anims", "stoi.poa"), "")
 	write(utils.temp_path(soldat, "soldat.ini"), "[GAME]\nLast_Mod=Loud\n")
 	write(utils.temp_path(soldat, "gostek-gfx", "klata.png"), picture(3, 27, 18)) // its own chest, put over the game's
 	write(utils.temp_path(soldat, "sfx", "spas12-fire.wav"), "own shotgun")

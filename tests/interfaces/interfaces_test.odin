@@ -149,11 +149,13 @@ anchors :: proc(t: ^testing.T) {
 	testing.expect_value(t, two.anchors, res.Interface_Anchors{health = health, jet = jet, ammo = jet, fire = jet, nades = jet})
 }
 
-// A Soldat 1 install's custom interfaces, and its mod's, each made a .srmod: its hud, its
-// setup.sif as layout.json and its HUD's pictures; its icons, the rest of them; each
-// picture brought to 4.5 from its own scale (1, without a mod.ini), see-through where it
-// was green. Named as it was but for what a name can't have; not over a mod by that
-// name, nor the original's Default, nor one without a setup.sif.
+// A Soldat 1 install's custom interfaces, and its mods', each offered (soldat_sources) and
+// made a .srmod (interface_install): its hud, its setup.sif as layout.json and its HUD's
+// pictures; its icons, the rest of them; each picture brought to 4.5 from its own scale (1,
+// without a mod.ini), see-through where it was green; and under them the HUD's art the
+// player changed in the install's own folders. Named as it was but for what a name can't
+// have; not over a mod by that name; the original's Default, and one without a setup.sif,
+// not offered.
 @(test)
 imported :: proc(t: ^testing.T) {
 	dir := scratch(t, "imported")
@@ -165,18 +167,42 @@ imported :: proc(t: ^testing.T) {
 	setup.alpha = 77
 	sif := res.interface_setup_write(setup)
 	green := res.Texture{2, 2, {{0, 255, 0, 255}, {10, 20, 30, 255}, {10, 20, 30, 255}, {10, 20, 30, 255}}}
+	blue := res.Texture{1, 1, {{10, 20, 200, 255}}}
+	red := res.Texture{1, 1, {{200, 20, 30, 255}}}
+	write(utils.temp_path(mods_dir, "classic", "mod.json"), transmute([]byte)string(`{"format": 1, "name": "classic", "version": "1.0.0", "parts": ["hud", "icons"]}`))
+	write(utils.temp_path(mods_dir, "classic", "hud", "ammo.png"), res.texture_png(blue))
+	write(utils.temp_path(mods_dir, "classic", "hud", "health.png"), res.texture_png(blue))
+	classic := res.mod_make(mods_dir)
+	defer res.mod_destroy(&classic)
+
+	write(utils.temp_path(install, "soldat.exe"), {})
+	write(utils.temp_path(install, "anims", "stoi.poa"), {})
+	write(utils.temp_path(install, "interface-gfx", "ammo.png"), res.texture_png(red)) // the player's own, under each interface
+	write(utils.temp_path(install, "interface-gfx", "health.png"), res.texture_png(red)) // under Neo's own, which is worn
 	write(utils.temp_path(install, "custom-interfaces", "Neo", "setup.sif"), sif)
 	write(utils.temp_path(install, "custom-interfaces", "Neo", "health.png"), res.texture_png(green))
 	write(utils.temp_path(install, "custom-interfaces", "Neo", "cursor.png"), res.texture_png(green))
 	write(utils.temp_path(install, "custom-interfaces", "Default", "setup.sif"), sif)
 	write(utils.temp_path(install, "custom-interfaces", "Empty", "health.png"), res.texture_png(green))
-	write(utils.temp_path(mod, "custom-interfaces", "Tourney HUD", "setup.sif"), sif)
-	write(utils.temp_path(mods_dir, "Taken", "mod.json"), transmute([]byte)string(`{"format": 1, "name": "Taken", "version": "1.0.0", "parts": []}`))
 	write(utils.temp_path(install, "custom-interfaces", "Taken", "setup.sif"), sif)
+	write(utils.temp_path(mod, "custom-interfaces", "Tourney HUD", "setup.sif"), sif) // a mod that is an interface alone
+	write(utils.temp_path(mods_dir, "Taken", "mod.json"), transmute([]byte)string(`{"format": 1, "name": "Taken", "version": "1.0.0", "parts": []}`))
 
-	names := res.interfaces_import({install, mod}, mods_dir)
-	slice.sort(names)
-	testing.expect(t, slice.equal(names, []string{"Neo", "Tourney_HUD"}), "Neo and the mod's, not Default, Empty or Taken")
+	sources := res.soldat_sources(install, classic)
+	defer res.soldat_sources_destroy(sources)
+	names := make([dynamic]string, context.temp_allocator)
+	for s in sources do if s.kind == .Interface do append(&names, s.name)
+	testing.expect(t, slice.equal(names[:], []string{"Neo", "Taken", "Tourney HUD"}), "Neo, Taken and the mod's, not Default or Empty")
+	testing.expect(t, len(sources) > 0 && sources[0].kind == .Own && sources[0].changed == 2, "the install's own changes: its ammo and its health")
+
+	installed := make([dynamic]string, context.temp_allocator)
+	for s in sources {
+		if s.kind != .Interface do continue
+		name, problem := res.interface_install(install, s.dir, s.name, mods_dir, classic)
+		if problem == "" do append(&installed, name)
+		else do testing.expect(t, s.name == "Taken", problem)
+	}
+	testing.expect(t, slice.equal(installed[:], []string{"Neo", "Tourney_HUD"}), "Neo and the mod's, not over Taken")
 
 	neo, why, ok := res.srmod_open(utils.temp_path(mods_dir, "Neo.srmod"))
 	defer res.srmod_close(&neo)
@@ -189,11 +215,15 @@ imported :: proc(t: ^testing.T) {
 	health, has := res.srmod_file(&neo, .Hud, "health.png")
 	pixels, _ := res.mod_read(health, context.temp_allocator)
 	image, decoded := res.texture_decode(pixels, nil, context.temp_allocator)
-	testing.expect(t, has && decoded && image.width == 9 && image.height == 9 && image.pixels[0].a == 0, "its health, at 4.5, its green see-through")
+	testing.expect(t, has && decoded && image.width == 9 && image.height == 9 && image.pixels[0].a == 0, "its health, not the player's, at 4.5, its green see-through")
+	_, ammo := res.srmod_file(&neo, .Hud, "ammo.png")
+	testing.expect(t, ammo, "the player's ammo under it")
 	_, cursor := res.srmod_file(&neo, .Icons, "cursor.png")
 	testing.expect(t, cursor, "its cursor among its icons")
 
 	tourney, twhy, tok := res.srmod_open(utils.temp_path(mods_dir, "Tourney_HUD.srmod"))
 	defer res.srmod_close(&tourney)
 	testing.expect(t, tok && tourney.info.title == "Tourney HUD interface" && tourney.parts == {.Hud}, twhy)
+	_, tammo := res.srmod_file(&tourney, .Hud, "ammo.png")
+	testing.expect(t, tammo, "the player's ammo under the mod's too")
 }

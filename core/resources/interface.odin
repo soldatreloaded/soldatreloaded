@@ -1,6 +1,5 @@
 package resources
 
-import "core:fmt"
 import "core:log"
 import "core:os"
 import "core:slice"
@@ -430,45 +429,15 @@ interface_layer :: proc(dir, name: string) -> (layer: Mod_Layer, found: bool) {
 // ---------------------------------------------------------------------------------
 // Brought in from a Soldat 1
 
-// The custom interfaces of the Soldat 1 folders `dirs` (an install, a mod of its mods/),
-// each in its custom-interfaces/ as a folder or a .sint, each made a .srmod of its own in
-// `mods_dir`: its hud (its setup.sif as layout.json, its anchors and alignment as Soldat
-// 1 works them out, written down; and the HUD's pictures of its own) and its icons (the
-// rest of its pictures), each picture brought from its scale to SRMOD_SCALE, see-through
-// where it was green. Named as it was, but for what a mod's name can't have (made `_`);
-// one by a name a mod has already, one 1.7.1 ships with as it came, and the original's
-// own Default, left as they are.
-// The names made, with the temp allocator.
-interfaces_import :: proc(dirs: []string, mods_dir: string) -> []string {
-	made := make([dynamic]string, context.temp_allocator)
-	for dir in dirs {
-		from := utils.temp_path(dir, "custom-interfaces")
-		entries, err := os.read_all_directory_by_path(from, context.temp_allocator)
-		if err != nil do continue
-		for entry in entries {
-			title := entry.name
-			if entry.type != .Directory {
-				if !strings.has_suffix(strings.to_lower(title, context.temp_allocator), INTERFACE_EXTENSION) do continue
-				title = title[:len(title) - len(INTERFACE_EXTENSION)]
-			}
-			if title == "" || strings.has_prefix(title, ".") || strings.equal_fold(title, "default") do continue
-			if entry.type == .Directory && folder_is_stock(entry.fullpath) do continue // one 1.7.1 ships with, untouched: nobody's
-			name := mod_name_from(title)
-			if name == "" || mod_exists(mods_dir, name) || slice.contains(made[:], name) do continue
-			if interface_import(from, title, mods_dir, name) do append(&made, name)
-		}
-	}
-	return made[:]
-}
-
-// The interface `title` of `from` as the .srmod `name` in `mods_dir`. False if it has
-// no setup.sif, or can't be written.
-@(private = "file")
-interface_import :: proc(from, title, mods_dir, name: string) -> bool {
+// The Soldat 1 custom interface `title` of `from` (its custom-interfaces/), a folder or
+// a .sint, as a mod's entries, put over `entries`: its setup.sif as hud/layout.json (its
+// anchors and alignment as Soldat 1 works them out, written down), and its pictures, the
+// HUD's in hud/ and the rest in icons/, each brought from its scale to SRMOD_SCALE,
+// see-through where it was green. False if it has no setup.sif to read.
+interface_entries :: proc(from, title: string, entries: ^map[string][]byte) -> bool {
 	iface := interface_open(from, title, context.temp_allocator)
 	defer interface_close(&iface, context.temp_allocator)
 	if !iface.custom do return false
-	entries := make(map[string][]byte, context.temp_allocator)
 	layout := hud_layout_of(iface.setup, iface.anchoring, custom = true)
 	entries[strings.concatenate({PART_NAMES[.Hud], "/", HUD_LAYOUT_FILE}, context.temp_allocator)] = transmute([]byte)hud_layout_text(layout)
 	for stem in INTERFACE_PICTURES {
@@ -480,7 +449,7 @@ interface_import :: proc(from, title, mods_dir, name: string) -> bool {
 		part := Part.Hud if slice.contains(HUD_PICTURES[:], stem) else .Icons
 		entries[strings.concatenate({PART_NAMES[part], "/", stem, ".png"}, context.temp_allocator)] = texture_png(texture)
 	}
-	return srmod_write(mods_dir, name, fmt.tprintf("%s interface", title), fmt.tprintf("Soldat 1's custom interface %s, its HUD's layout and pictures.", title), entries)
+	return true
 }
 
 // A mod's name made of `title`: what a name can't have (srmod_name_ok) made `_`, at most

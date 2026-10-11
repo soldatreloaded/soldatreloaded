@@ -91,7 +91,7 @@ soldat_installs :: proc(allocator := context.allocator) -> []string {
 	found := make([dynamic]string, allocator)
 	for dir in candidates {
 		// the game itself, not a folder that only holds its art, nor this game's install
-		if !soldat_is_install(dir) || !(utils.file_exists(utils.temp_path(dir, "soldat.exe")) || utils.file_exists(utils.temp_path(dir, "soldat.ini"))) do continue
+		if !is_soldat(dir) do continue
 		full, err := os.get_absolute_path(dir, context.temp_allocator)
 		if err != nil do full = dir
 		already := false
@@ -121,8 +121,8 @@ Import_Result :: struct {
 }
 
 // The Soldat install a folder is of, or in (C:\Soldat, C:\Soldat\gostek-gfx,
-// C:\Soldat\mods\Foo): the first folder up from it, four at most, with soldat.exe or
-// soldat.ini; and the mod of its mods/ the folder is in, if it is in one. With
+// C:\Soldat\mods\Foo): the first folder up from it, four at most, that is one
+// (is_soldat); and the mod of its mods/ the folder is in, if it is in one. With
 // `allocator`. False if it isn't in one.
 soldat_root :: proc(path: string, allocator := context.allocator) -> (root, mod: string, ok: bool) {
 	context.allocator = context.temp_allocator
@@ -147,46 +147,85 @@ soldat_root :: proc(path: string, allocator := context.allocator) -> (root, mod:
 	return
 }
 
-// Whether `dir` is an original Soldat's install: soldat.exe or soldat.ini in it.
-@(private = "file")
+// Whether `dir` is an original Soldat's install: its program (soldat.exe; or soldat, a
+// build native to Linux or macOS) and its anims/ beside it, which a mod or a folder of
+// art never has; their names in any case. 1.7.1 on Linux is its Windows install played
+// through Wine or Proton, soldat.exe and all.
 is_soldat :: proc(dir: string) -> bool {
-	return utils.file_exists(utils.temp_path(dir, "soldat.exe")) || utils.file_exists(utils.temp_path(dir, "soldat.ini"))
+	entries, err := os.read_all_directory_by_path(dir, context.temp_allocator)
+	if err != nil do return false
+	exe, anims := false, false
+	for entry in entries {
+		if entry.type == .Directory do anims ||= strings.equal_fold(entry.name, "anims")
+		else do exe ||= strings.equal_fold(entry.name, "soldat.exe") || strings.equal_fold(entry.name, "soldat")
+	}
+	return exe && anims
 }
 
-// One place in a Soldat install a mod can be made from: its own folders, which a player
-// may have put their art and sounds over, or a mod of its mods/.
+// What a mod can be made of in a Soldat install: what the player changed of its own
+// files, a mod of its mods/, or a custom interface.
+Soldat_Source_Kind :: enum {
+	Own,
+	Mod,
+	Interface,
+}
+
+// One thing in a Soldat install a mod can be made of.
 Soldat_Source :: struct {
-	name:    string, // the mod's, in mods/; "" for the install's own folders
-	dir:     string,
-	changed: int,    // its art and sounds that differ from the game's
+	kind:    Soldat_Source_Kind,
+	name:    string, // the mod's, in mods/, or the interface's; "" for the install's own
+	dir:     string, // the install's, the mod's folder, or the custom-interfaces/ the interface is in
+	changed: int,    // its art and sounds a mod may have: of the install's own, those that differ from the game's
 	in_use:  bool,   // the mod Soldat was last played with (soldat.ini's Last_Mod)
 }
 
-// What a mod can be made from in the install at `root`: its own folders, then each mod
-// of its mods/ that has any art or sounds, by name; each looked through for what it
-// changes. With `allocator`; free with soldat_sources_destroy.
+// What mods can be made of in the install at `root`: what the player changed of its own
+// files (always first, its count perhaps 0); each mod of its mods/; each custom interface,
+// its own and its mods'. Those 1.7.1 ships with, every file as it came, are left out,
+// being nobody's. With `allocator`; free with soldat_sources_destroy.
 soldat_sources :: proc(root: string, classic: Mod, allocator := context.allocator) -> []Soldat_Source {
 	sources := make([dynamic]Soldat_Source, allocator)
 	stock := stock_load()
 	files, _ := scan(root, classic, &stock, own = true)
-	append(&sources, Soldat_Source{dir = strings.clone(root, allocator), changed = changed_of(files)})
+	append(&sources, Soldat_Source{kind = .Own, dir = strings.clone(root, allocator), changed = changed_of(files)})
 	last := last_mod(root)
+	interface_dirs := make([dynamic]string, context.temp_allocator)
+	append(&interface_dirs, utils.temp_path(root, "custom-interfaces"))
 	mods_dir := utils.temp_path(root, "mods")
-	entries, _ := os.read_all_directory_by_path(mods_dir, context.temp_allocator)
-	slice.sort_by(entries, proc(a, b: os.File_Info) -> bool {return strings.to_lower(a.name, context.temp_allocator) < strings.to_lower(b.name, context.temp_allocator)})
-	for entry in entries {
+	for entry in sorted_entries(mods_dir) {
 		if entry.type != .Directory do continue
 		dir := utils.temp_path(mods_dir, entry.name)
-		if !soldat_is_install(dir) do continue
+		append(&interface_dirs, utils.temp_path(folder_root(dir), "custom-interfaces")) // a mod's, though it be an interface alone
+		if !soldat_is_install(dir) || folder_is_stock(dir) do continue
 		mod_files, _ := scan(dir, classic, &stock, own = false)
 		append(&sources, Soldat_Source {
+			kind    = .Mod,
 			name    = strings.clone(entry.name, allocator),
 			dir     = strings.clone(dir, allocator),
 			changed = changed_of(mod_files),
 			in_use  = last != "" && strings.equal_fold(last, entry.name),
 		})
 	}
+	for dir in interface_dirs {
+		for entry in sorted_entries(dir) {
+			title := entry.name
+			if entry.type == .Directory {
+				if !utils.file_exists(utils.temp_path(marker_folder(entry.fullpath, INTERFACE_SETUP_FILE), INTERFACE_SETUP_FILE)) || folder_is_stock(entry.fullpath) do continue
+			} else {
+				if !strings.has_suffix(strings.to_lower(title, context.temp_allocator), INTERFACE_EXTENSION) do continue
+				title = title[:len(title) - len(INTERFACE_EXTENSION)]
+			}
+			if title == "" || strings.has_prefix(title, ".") || strings.equal_fold(title, "default") do continue
+			append(&sources, Soldat_Source{kind = .Interface, name = strings.clone(title, allocator), dir = strings.clone(dir, allocator), changed = 1})
+		}
+	}
 	return sources[:]
+
+	sorted_entries :: proc(dir: string) -> []os.File_Info {
+		entries, _ := os.read_all_directory_by_path(dir, context.temp_allocator)
+		slice.sort_by(entries, proc(a, b: os.File_Info) -> bool {return strings.to_lower(a.name, context.temp_allocator) < strings.to_lower(b.name, context.temp_allocator)})
+		return entries
+	}
 }
 
 soldat_sources_destroy :: proc(sources: []Soldat_Source, allocator := context.allocator) {
@@ -225,19 +264,10 @@ mod_import :: proc(dirs: []string, mods_dir, name: string, classic: Mod) -> (res
 		for key, value in config.anchors do anchors[key] = value
 	}
 
-	// the files, by where each goes in the mod; a .png before a .bmp of its name, as
-	// Soldat 1 takes it
-	entries := make(map[string][]byte, 256, context.temp_allocator)
-	from_png := make(map[string]bool, 256, context.temp_allocator)
-	for _, f in merged {
-		dest, data, ok := import_file(f)
-		if !ok do continue
-		png := strings.equal_fold(filepath.ext(f.name), ".png")
-		if from_png[dest] && !png do continue
-		entries[dest] = data
-		from_png[dest] = png
-		result.changed += 1
-	}
+	packed := make([dynamic]Packed, 0, len(merged), context.temp_allocator)
+	for _, f in merged do append(&packed, f)
+	entries: map[string][]byte
+	entries, result.changed = entries_of(packed[:], MOD_PARTS)
 
 	// the pivots that differ from Classic's
 	for part in ([]Part{.Soldier, .Weapons}) {
@@ -468,7 +498,9 @@ changed_of :: proc(files: []Packed) -> (n: int) {
 // The mod Soldat was last played with: soldat.ini's Last_Mod; empty for none.
 @(private = "file")
 last_mod :: proc(root: string) -> string {
-	text, read := utils.read_file(utils.temp_path(root, "soldat.ini"), context.temp_allocator)
+	ini := utils.temp_path(root, "soldat.ini")
+	if !utils.file_exists(ini) do return ""
+	text, read := utils.read_file(ini, context.temp_allocator)
 	if !read do return ""
 	rest := string(text)
 	for line in strings.split_lines_iterator(&rest) {
@@ -644,4 +676,43 @@ steam_soldats :: proc(candidates: ^[dynamic]string, library: string) {
 			append(candidates, utils.temp_path(common, entry.name))
 		}
 	}
+}
+
+// The Soldat 1 files `files` as a mod's entries, by where each goes in it (import_file),
+// those of `parts` alone: a .png before a .bmp of its name, as Soldat 1 takes it. And
+// how many there are. With the temp allocator.
+@(private = "file")
+entries_of :: proc(files: []Packed, parts: Parts) -> (entries: map[string][]byte, count: int) {
+	entries = make(map[string][]byte, 256, context.temp_allocator)
+	from_png := make(map[string]bool, 256, context.temp_allocator)
+	for f in files {
+		dest, data, ok := import_file(f)
+		if !ok do continue
+		part, _ := part_named(dest[:max(strings.index_byte(dest, '/'), 0)])
+		if part not_in parts do continue
+		png := strings.equal_fold(filepath.ext(f.name), ".png")
+		if from_png[dest] && !png do continue
+		if dest not_in entries do count += 1
+		entries[dest] = data
+		from_png[dest] = png
+	}
+	return
+}
+
+// The custom interface `title` of `from` (a custom-interfaces/ of the install at `root`,
+// or of one of its mods) made the .srmod of its name (mod_name_from) in `mods_dir`, its
+// hud and its icons; and under them the player's own changes to the install's HUD and
+// icons that it hasn't of its own. Its name; or why it couldn't be made.
+interface_install :: proc(root, from, title, mods_dir: string, classic: Mod) -> (name, problem: string) {
+	name = mod_name_from(title)
+	if name == "" do return "", "That interface's name can't be a mod's."
+	if mod_exists(mods_dir, name) do return name, "There is a mod by that name already."
+	stock := stock_load()
+	own, _ := scan(root, classic, &stock, own = true)
+	entries, _ := entries_of(own, {.Hud, .Icons})
+	if !interface_entries(from, title, &entries) do return name, "That interface has no setup.sif to read."
+	if !srmod_write(mods_dir, name, fmt.tprintf("%s interface", title), fmt.tprintf("Soldat 1's custom interface %s, its HUD's layout and pictures.", title), entries) {
+		return name, "The mod couldn't be written into mods/: is the disk full?"
+	}
+	return name, ""
 }
