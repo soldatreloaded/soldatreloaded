@@ -95,26 +95,15 @@ Art :: struct {
 	pictures:       [Picture]draw.Sprite,
 	guns:           [res.Weapon]draw.Sprite,
 	kill_left_text: f32, // a kill feed line's start with the feed on the left, past the widest icon
-	layout:         res.Interface_Setup,   // where the bars and the texts go: the interface worn's
-	anchors:        res.Interface_Anchors, // and what each is kept beside as the view widens
-	custom:         bool,                  // a custom interface's, which aligns some of them otherwise
+	layout:         res.Hud_Layout, // where the bars and the texts go: the hud worn's layout.json
 }
 
-// The HUD's pictures, each the custom interface's own if it has one (the mod's), else the
-// mods'; and its layout.
+// The HUD's pictures, the hud's and the icons' worn, and its layout.
 art_load :: proc(art: ^Art, mod: res.Mod) {
 	draw.sprite_book_open(&art.book, mod, ART_SIDE)
-	iface := mod.interface
-	worn := iface^ if iface != nil else res.interface_default()
-	art.layout, art.anchors, art.custom = worn.setup, worn.anchors, worn.custom
+	art.layout = res.worn_layout(mod.worn) if mod.worn != nil else res.hud_layout_default()
 	listings := draw.source_listings() // interface-gfx read once for them all
-	for file, picture in PICTURE_FILES {
-		if own, scale, found := res.interface_picture(iface, file, listings); found {
-			art.pictures[picture] = draw.sprite_book_add(&art.book, own, scale)
-		} else {
-			art.pictures[picture] = interface_image(art, file, listings)
-		}
-	}
+	for file, picture in PICTURE_FILES do art.pictures[picture] = interface_image(art, file, listings)
 	for file, weapon in GUN_FILES do art.guns[weapon] = interface_image(art, file, listings)
 	// the kill feed's lines on the left begin past the widest icon, drawn at 0.8, so a
 	// mod's wide guns don't cover the names

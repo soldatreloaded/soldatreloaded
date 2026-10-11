@@ -1,7 +1,6 @@
 package menu
 
 import "core:fmt"
-import "core:math"
 import "core:os"
 import "core:strings"
 
@@ -12,18 +11,17 @@ import "../../../core/utils"
 import "../online"
 import "../ui"
 
-// The mods, on three tabs. Installed Mods: the player's mods in mods/, each a .smod or a
-// folder, in one list (Classic, under them all, never listed): those on first, in their
-// order, the top one's files first (graphics.mods), then those off. Each is turned on or
-// off by its switch, one turned on going to the top; one on is dragged by its handle to
-// another place among them. Each says what it changes, or that it has nothing the game
-// uses; one picked can be deleted, after a second press to be sure, or its folder
-// opened. Any change is worn at once.
+// The mods, on three tabs. Installed Mods: the player's mods in mods/, each a .srmod or a
+// folder (Classic, under every part, never listed), each with the parts it has (the
+// soldier, the weapons, the sounds, ...). A part clicked is worn from that mod, and from
+// whichever wore it before no longer; clicked again, Classic's is worn again. Use All
+// wears every part the mod has (graphics.parts, docs/srmod.md). One picked can be
+// deleted, after a second press to be sure, or its folder opened. Any change is worn at
+// once.
 //
 // Mod Marketplace: the mods' catalogue (online's catalog.odin), each mod the mods
 // repository publishes, installed, or updated to its newest version, in a click, its
-// download's progress shown; one picked says what it is and whose. A mod installed is
-// turned on, at the top; one on, updated, is loaded again.
+// download's progress shown; one picked says what it is and whose.
 //
 // Create Mod From S1: a mod made of what the player changed in their Soldat 1.7.1, its
 // folder found, or typed.
@@ -39,8 +37,8 @@ TAB_NAMES := [len(Mods_Tab)]string{"Installed Mods", "Mod Marketplace", "Create 
 
 Mods :: struct {
 	tab:        Mods_Tab,
-	listings:   []res.Mod_Listing,
-	versions:   map[string]string, // each of the player's mods' version, as its about.json says
+	listings:   []res.Srmod_Listing,
+	versions:   map[string]string, // each of the catalogue's mods installed, by its version, as its about.json says
 	listed:     bool,   // read from mods/ since the page was opened
 	selected:   string, // the mod picked, by name; "" for none
 	about:      int,    // the catalogue's mod picked, to say what it is; -1 for none
@@ -48,12 +46,6 @@ Mods :: struct {
 	note:       string, // what was last done, or why it couldn't be
 	note_bad:   bool,
 	import_:    Soldat_Import, // Create Mod From S1's
-	dragging:   string, // the mod on being dragged by its handle, "" for none
-	drag_from:  int,    // its place among those on
-	drag_to:    int,    // where among them it would be dropped
-	grab:       f32,    // where on its row it was taken, from its top
-	drag_time:  f64,    // the kit's time at the last pass of the drag, for the others' slide
-	slide:      map[string]f32, // the others on, by name, where they are drawn as they slide aside
 }
 
 // Create Mod From S1: the Soldat install, what in it to make a mod from, and its name.
@@ -71,14 +63,15 @@ Soldat_Import :: struct {
 	named:    bool,   // the name typed by the player, not made from the source's
 }
 
-MOD_ROW :: 36
-GRIP_W :: 24 // the handle a mod on is dragged by, at its row's left
+MOD_ROW :: 50 // its name and what it is, and under them its parts
+CHIP_H :: 16
+CHIP_GAP :: 4
 CATALOG_ROW :: 36
 PROGRESS_W :: 110 // an install's progress bar
 ROW_BUTTON_GAP :: 4
 
 mods_destroy :: proc(mods: ^Mods) {
-	res.mods_list_destroy(mods.listings)
+	res.srmod_listings_destroy(mods.listings)
 	versions_forget(mods)
 	delete(mods.versions)
 	delete(mods.selected)
@@ -86,9 +79,6 @@ mods_destroy :: proc(mods: ^Mods) {
 	im := &mods.import_
 	for s in ([]string{im.folder, im.root, im.problem, im.name}) do delete(s)
 	res.soldat_sources_destroy(im.sources)
-	delete(mods.dragging)
-	for name in mods.slide do delete(name)
-	delete(mods.slide)
 	mods^ = {}
 }
 
@@ -123,33 +113,23 @@ page_mods :: proc(menu: ^Menu) {
 
 @(private = "file")
 tab_installed :: proc(menu: ^Menu) {
-	k := &menu.kit
 	mods := &menu.mods
-	on := enabled(menu)
-
 	if len(mods.listings) == 0 {
-		muted_line(k, "No mods yet: get one from the Mod Marketplace, or make one from Soldat 1.")
+		muted_line(&menu.kit, "No mods yet: get one from the Mod Marketplace, or make one from Soldat 1.")
 	} else {
-		muted_line(k, "Mods stack, with the top ones taking priority.")
+		muted_line(&menu.kit, "Each part is worn from the mod it is lit on, else Classic's: click a part to wear it.")
 	}
-	// one list: those on, in their order (drawn as they slide while one is dragged), then
-	// those off
-	list_top := k.y
-	if !drag_list(menu, on, list_top) {
-		for name, i in on do installed_row(menu, listing_of(mods, name) or_continue, true, i, len(on))
-	}
-	for &listing in mods.listings do if !is_on(on, listing.name) do installed_row(menu, &listing, false, -1, len(on))
-
+	for &listing in mods.listings do installed_row(menu, &listing)
 	if listing, picked := listing_of(mods, mods.selected); picked && !listing.packed {
 		page_making(menu, listing.name)
 	}
 }
 
-// A mod's row, `lit` if it is on, the `index`th of the `count` on: its switch, and its
-// handle to drag it by if there are others on to move it among; picked when clicked
-// elsewhere on it.
+// A mod's row: its name, and what it is; under them a chip for each part it has, lit if
+// that part is worn from it, which a click wears from it or gives back to Classic; and
+// Use All. Picked when clicked elsewhere on it.
 @(private = "file")
-installed_row :: proc(menu: ^Menu, listing: ^res.Mod_Listing, lit: bool, index, count: int) {
+installed_row :: proc(menu: ^Menu, listing: ^res.Srmod_Listing) {
 	k := &menu.kit
 	mods := &menu.mods
 	r := ui.row(k, MOD_ROW, true)
@@ -159,127 +139,65 @@ installed_row :: proc(menu: ^Menu, listing: ^res.Mod_Listing, lit: bool, index, 
 		ui.rrect(k.ui, r.x, r.y + 1, r.w, r.h - 2, ui.RADIUS, ui.ACCENT_SOFT)
 		ui.rrect(k.ui, r.x, r.y + 5, 2, r.h - 10, 1, ui.ACCENT)
 	}
-	cy := r.y + r.h / 2
-	sx := r.x + r.w - 8 - 30
-	if ui.switch_at(k, sx, cy, lit) {
-		if lit do turn_off(menu, listing.name)
-		else do turn_on(menu, listing.name)
-	}
-	movable := lit && count > 1
-	if movable && ui.take(k, -1, r.x, r.y, GRIP_W, r.h) { // the handle, held: dragged from here
-		set_text(&mods.dragging, listing.name)
-		mods.drag_from = index
-		mods.drag_to = index
-		mods.grab = k.ui.mouse.y - r.y
-		mods.drag_time = k.time
+	worn_any := false
+	for part in res.Part do worn_any ||= part in listing.parts && worn_from(menu, part) == listing.name
+
+	// Use All, at the right of its top line
+	all := listing.parts != {} && listing.problem == ""
+	every := true
+	for part in listing.parts do every &&= worn_from(menu, part) == listing.name
+	used, ux := row_button(k, r.x + r.w - 8, r.y + 5, "Use All", !all || every)
+	if used do use_all(menu, listing)
+
+	tx := r.x + 12
+	ui.text_fit(k, ui.LABEL, listing.title, tx, r.y + 13, ux - tx - 8, ui.TEXT if worn_any else ui.MUTED)
+	what, bad := listing_text(listing)
+	ui.text_fit(k, ui.TINY, what, tx + min(ui.width_of(k.ui, ui.LABEL, listing.title), ux - tx - 8) + 10, r.y + 13, ux - tx - 18, ui.WARN if bad else ui.FAINT)
+
+	// its parts, a chip each
+	x := tx
+	cy := r.y + MOD_ROW - 6 - CHIP_H / 2
+	for part in res.Part {
+		if part not_in listing.parts do continue
+		name := PART_TITLES[part]
+		w := ui.width_of(k.ui, ui.TINY, name) + 14
+		if x + w > r.x + r.w - 8 do break
+		lit := worn_from(menu, part) == listing.name
+		hot := ui.over(k, x, cy - CHIP_H / 2, w, CHIP_H)
+		ui.rrect(k.ui, x, cy - CHIP_H / 2, w, CHIP_H, CHIP_H / 2, ui.ACCENT if lit else (ui.HOVER if hot else ui.CONTROL))
+		ui.text_mid(k, ui.TINY, name, x + 7, cy, ui.TEXT if lit || hot else ui.MUTED)
+		if listing.problem == "" && ui.take(k, -1, x, cy - CHIP_H / 2, w, CHIP_H) {
+			wear(menu, part, "" if lit else listing.name)
+		}
+		x += w + CHIP_GAP
 	}
 	if ui.take(k, r.id, r.x, r.y, r.w, r.h) do pick(mods, listing.name)
-	if movable do ui.grip_draw(k, r.x + 9, cy, ui.TEXT if ui.over(k, r.x, r.y, GRIP_W, r.h) else ui.FAINT)
-	row_text(menu, listing, r.x, r.y, sx - 14, lit)
 }
 
-// A mod's name, and under it what it changes, or that it changes nothing, from past its
-// handle to `right`, on the row from `y`; a mod off, fainter.
-@(private = "file")
-row_text :: proc(menu: ^Menu, listing: ^res.Mod_Listing, x, y, right: f32, lit: bool) {
-	k := &menu.kit
-	tx := x + GRIP_W + 4
-	room := right - tx - 8
-	ui.text_fit(k, ui.LABEL, listing.title, tx, y + MOD_ROW / 2 - 7, room, ui.TEXT if lit else ui.MUTED)
-	what, bad := contents_text(menu, listing)
-	ui.text_fit(k, ui.TINY, what, tx, y + MOD_ROW / 2 + 8, room, ui.WARN if bad else ui.FAINT)
+// The parts as the chips name them.
+@(private = "file", rodata)
+PART_TITLES := [res.Part]string {
+	.Soldier  = "Soldier",
+	.Weapons  = "Weapons",
+	.Effects  = "Effects",
+	.Objects  = "Objects",
+	.Hud      = "HUD",
+	.Icons    = "Icons",
+	.Sounds   = "Sounds",
+	.Textures = "Textures",
+	.Scenery  = "Scenery",
+	.Fonts    = "Fonts",
 }
 
-// The mods on, one being dragged by its handle: it follows the cursor, lifted, held to
-// the list (whose rows begin at `list_top`), and the others slide aside to where it
-// would go; let go, it goes there, worn at once, `on` put in its new order. False,
-// drawing nothing, when none is dragged, or it was let go: the rows are drawn as they
-// are then.
+// What a mod is, beside its name: "v1.0.0  -  by Calp  -  .srmod"; or why it can't be
+// worn, or that it changes nothing.
 @(private = "file")
-drag_list :: proc(menu: ^Menu, on: []string, list_top: f32) -> bool {
-	k := &menu.kit
-	mods := &menu.mods
-	if mods.dragging == "" do return false
-	n := len(on)
-	from := -1
-	for name, i in on do if strings.equal_fold(name, mods.dragging) do from = i
-	if from < 0 || !k.held {
-		to := mods.drag_to
-		drag_end(mods)
-		if from >= 0 && to != from {
-			order := make([dynamic]string, context.temp_allocator)
-			for name, i in on do if i != from do append(&order, name)
-			inject_at(&order, clamp(to, 0, len(order)), on[from])
-			copy(on, order[:]) // drawn in its new order at once, as it is worn
-			use(menu, on)
-		}
-		return false
-	}
-
-	for _ in 0 ..< n do ui.row(k, MOD_ROW, false) // their room in the page, as their rows take it
-	lifted := clamp(k.ui.mouse.y - mods.grab, list_top, list_top + f32(n - 1) * MOD_ROW)
-	mods.drag_to = clamp(int((lifted - list_top) / MOD_ROW + 0.5), 0, n - 1)
-
-	// the others toward their places with it moved, eased, quick but not at once
-	ease := 1 - math.exp(-f32(k.time - mods.drag_time) * 22)
-	mods.drag_time = k.time
-	slot := 0
-	for name, i in on {
-		if i == from do continue
-		if slot == mods.drag_to do slot += 1
-		target := list_top + f32(slot) * MOD_ROW
-		slot += 1
-		y, sliding := mods.slide[name]
-		if !sliding {
-			y = list_top + f32(i) * MOD_ROW
-			mods.slide[strings.clone(name)] = y
-		}
-		y += (target - y) * ease
-		mods.slide[name] = y
-		listing := listing_of(mods, name) or_continue
-		drawn_row(menu, listing, y, false)
-	}
-	drawn_row(menu, listing_of(mods, on[from]) or_return, lifted, true) // over them all
-	return true
-}
-
-// A mod on as the drag draws it, at `y`: its handle, name and switch, without acting on
-// a click; `lifted`, the one dragged, raised over the rest.
-@(private = "file")
-drawn_row :: proc(menu: ^Menu, listing: ^res.Mod_Listing, y: f32, lifted: bool) {
-	k := &menu.kit
-	if y < k.top - 0.5 || y + MOD_ROW > k.bottom + 0.5 do return
-	x, w := k.x, k.w
-	if lifted {
-		ui.rrect(k.ui, x + 1, y + 4, w, MOD_ROW - 2, ui.RADIUS + 1, {0, 0, 0, 110}) // its shadow
-		ui.box(k.ui, x, y + 1, w, MOD_ROW - 2, ui.CONTROL_HOT, ui.BORDER_HOT)
-	}
-	cy := y + MOD_ROW / 2
-	ui.grip_draw(k, x + 9, cy, ui.TEXT if lifted else ui.FAINT)
-	sx := x + w - 8 - 30
-	ui.switch_draw(k, sx, cy, true, false)
-	row_text(menu, listing, x, y, sx - 14, true)
-}
-
-@(private = "file")
-drag_end :: proc(mods: ^Mods) {
-	set_text(&mods.dragging, "")
-	for name in mods.slide do delete(name)
-	clear(&mods.slide)
-}
-
-// What a mod changes, to show under its name: "Graphics, sounds  -  .smod  -  v1.0.0".
-@(private = "file")
-contents_text :: proc(menu: ^Menu, listing: ^res.Mod_Listing) -> (text: string, bad: bool) {
-	if listing.contents == {} do return "Nothing the game uses: its files go in gostek-gfx/, sfx/... at its root", true
-	parts := make([dynamic]string, context.temp_allocator)
-	names := [res.Mod_Content]string{.Graphics = "Graphics", .Sounds = "Sounds", .Fonts = "Fonts", .Config = "mod.ini"}
-	for content in res.Mod_Content do if content in listing.contents do append(&parts, names[content])
-	text = strings.join(parts[:], ", ", context.temp_allocator)
-	text = fmt.tprintf("%s  -  %s", text, ".smod" if listing.packed else "folder")
-	if version := menu.mods.versions[listing.name]; version != "" do text = fmt.tprintf("%s  -  v%s", text, version)
-	if listing.nested != "" do text = fmt.tprintf("%s  -  in %s", text, strings.trim_suffix(listing.nested, "/"))
-	return
+listing_text :: proc(listing: ^res.Srmod_Listing) -> (text: string, bad: bool) {
+	if listing.problem != "" do return fmt.tprintf("Can't be worn: %s", listing.problem), true
+	if listing.parts == {} do return "Nothing the game uses: its files go in soldier/, sounds/... at its root", true
+	text = fmt.tprintf("v%s", listing.version)
+	if listing.author != "" do text = fmt.tprintf("%s  -  by %s", text, listing.author)
+	return fmt.tprintf("%s  -  %s", text, ".srmod" if listing.packed else "folder, being made"), false
 }
 
 // A small button on a row, its right edge at `right`. Pressed, and where its left edge
@@ -297,9 +215,9 @@ row_button :: proc(k: ^ui.Kit, right, y: f32, caption: string, disabled: bool, p
 // folder opened, to put them there.
 @(private = "file", rodata)
 MAKING_LINES := [?]string {
-	"Drop gostek-gfx, weapons-gfx, sparks-gfx, interface-gfx, sfx, textures,",
-	"scenery-gfx, mod.ini or txt/font.ini into its folder. What it hasn't comes from",
-	"the mods under it, then Classic. Off and on again shows what you changed.",
+	"Put soldier/, weapons/, effects/, objects/, hud/, icons/, sounds/, textures/,",
+	"scenery/ or fonts/ in its folder, laid out as Classic's (mods/classic/). What a",
+	"part hasn't comes from Classic's. Wearing the part again shows what you changed.",
 }
 
 @(private = "file")
@@ -484,17 +402,11 @@ soldat_import :: proc(menu: ^Menu) {
 		return
 	}
 	// the install's custom interfaces too, and the mod's, into interfaces/
-	interfaces := res.interfaces_import({im.sources[0].dir, source.dir} if im.pick > 0 else {source.dir}, res.INTERFACES_DIR)
-	made := fmt.tprintf("%s made of %d changed file%s, and on.", name, result.changed, "" if result.changed == 1 else "s")
-	if len(interfaces) > 0 {
-		made = fmt.tprintf("%s %d custom interface%s brought into interfaces/: pick one on the Graphics page.", made, len(interfaces), "" if len(interfaces) == 1 else "s")
-	}
-	note(mods, made, false)
-	menu.interfaces_listed = false
+	note(mods, fmt.tprintf("%s made of %d changed file%s.", name, result.changed, "" if result.changed == 1 else "s"), false)
 	im.named = false
 	import_pick(im, im.pick)
 	mods.tab = .Installed
-	turn_on(menu, name)
+	mods_relist(mods)
 }
 
 // `base`, or "<base>2", "<base>3"..., the first no mod has yet.
@@ -611,15 +523,8 @@ install_taken :: proc(menu: ^Menu) {
 	switch state {
 	case .Done:
 		i.taken = true
-		was_on := is_on(enabled(menu), i.mod.name)
 		mods_relist(&menu.mods)
-		if was_on {
-			note(&menu.mods, fmt.tprintf("%s updated to %s.", i.mod.title, i.mod.version), false)
-			use(menu, enabled(menu)) // its new files, worn at once
-		} else {
-			note(&menu.mods, fmt.tprintf("%s %s installed, and on.", i.mod.title, i.mod.version), false)
-			turn_on(menu, i.mod.name)
-		}
+		note(&menu.mods, fmt.tprintf("%s %s installed.", i.mod.title, i.mod.version), false)
 	case .Failed:
 		i.taken = true
 		note(&menu.mods, fmt.tprintf("%s couldn't be installed: %s", i.mod.title, i.error), true)
@@ -666,7 +571,7 @@ action_bar :: proc(menu: ^Menu) {
 	case mods.note != "":
 		footer_text(menu, x, tw, mods.note, ui.WARN if mods.note_bad else ui.GOOD)
 	case mods.tab == .Installed:
-		footer_text(menu, x, tw, "Each file is the top mod's that has it, then Classic's.", ui.MUTED)
+		footer_text(menu, x, tw, "Each part is worn from one mod; what that mod hasn't of it is Classic's.", ui.MUTED)
 	case mods.tab == .Import:
 		footer_text(menu, x, tw, "Only what you changed goes in: Soldat's own art as it came is left out.", ui.MUTED)
 	case:
@@ -675,58 +580,45 @@ action_bar :: proc(menu: ^Menu) {
 }
 
 // ---------------------------------------------------------------------------------
-// The mods on, and changing them
+// The parts worn, and changing them
 
-// The mods on, the top first: the config's, those in mods/; with the temp allocator.
+// The mod `part` is worn from, by name; "" for Classic's: the config's, if that mod is
+// in mods/ and has the part.
 @(private = "file")
-enabled :: proc(menu: ^Menu) -> []string {
-	on := make([dynamic]string, context.temp_allocator)
-	for name in menu.config.graphics.mods {
-		if _, present := listing_of(&menu.mods, name); present && !is_on(on[:], name) do append(&on, name)
-	}
-	return on[:]
+worn_from :: proc(menu: ^Menu, part: res.Part) -> string {
+	name := res.part_choice_of(&menu.config.graphics.parts, part)^
+	listing, present := listing_of(&menu.mods, name)
+	if !present || part not_in listing.parts || listing.problem != "" do return ""
+	return listing.name
 }
 
+// `part` worn from the mod `name` ("" for Classic's), the others as they are: at once.
 @(private = "file")
-is_on :: proc(on: []string, name: string) -> bool {
-	for other in on do if strings.equal_fold(other, name) do return true
-	return false
+wear :: proc(menu: ^Menu, part: res.Part, name: string) {
+	parts: [res.Part]string
+	for p in res.Part do parts[p] = worn_from(menu, p)
+	parts[part] = strings.clone(name, context.temp_allocator)
+	menu.request = Use_Mod{parts}
 }
 
-// The mod `name` turned on, at the top, or off; worn at once.
+// Every part `listing` has worn from it, the others as they are.
 @(private = "file")
-turn_on :: proc(menu: ^Menu, name: string) {
-	on := make([dynamic]string, context.temp_allocator)
-	append(&on, name)
-	for other in enabled(menu) do if !strings.equal_fold(other, name) do append(&on, other)
-	use(menu, on[:])
-}
-
-@(private = "file")
-turn_off :: proc(menu: ^Menu, name: string) {
-	on := make([dynamic]string, context.temp_allocator)
-	for other in enabled(menu) do if !strings.equal_fold(other, name) do append(&on, other)
-	use(menu, on[:])
-}
-
-// The mods `on`, the top first, asked to be worn: the client loads them, and the menu
-// what it draws of them (menu_mods_changed).
-@(private = "file")
-use :: proc(menu: ^Menu, on: []string) {
-	mods := make([]string, len(on))
-	for name, i in on do mods[i] = strings.clone(name)
-	menu.request = Use_Mod{mods}
+use_all :: proc(menu: ^Menu, listing: ^res.Srmod_Listing) {
+	parts: [res.Part]string
+	for p in res.Part do parts[p] = strings.clone(listing.name, context.temp_allocator) if p in listing.parts else worn_from(menu, p)
+	menu.request = Use_Mod{parts}
 }
 
 // ---------------------------------------------------------------------------------
 
-// mods/ read again, and each of the player's mods' version.
+// mods/ read again; and the version of each of the catalogue's mods installed.
 @(private = "file")
 mods_relist :: proc(mods: ^Mods) {
-	res.mods_list_destroy(mods.listings)
-	mods.listings = res.mods_list(res.MODS_DIR)
+	res.srmod_listings_destroy(mods.listings)
+	mods.listings = res.srmod_listings(res.MODS_DIR)
 	versions_forget(mods)
-	for listing in mods.listings {
+	installed := res.mods_list(res.MODS_DIR, context.temp_allocator)
+	for listing in installed {
 		mods.versions[strings.clone(listing.name)] = strings.clone(online.installed_version(res.MODS_DIR, listing.name))
 	}
 	mods.listed = true
@@ -735,7 +627,7 @@ mods_relist :: proc(mods: ^Mods) {
 }
 
 @(private = "file")
-listing_of :: proc(mods: ^Mods, name: string) -> (listing: ^res.Mod_Listing, found: bool) {
+listing_of :: proc(mods: ^Mods, name: string) -> (listing: ^res.Srmod_Listing, found: bool) {
 	if name == "" do return
 	for &l in mods.listings do if strings.equal_fold(l.name, name) do return &l, true
 	return
@@ -762,7 +654,23 @@ pick :: proc(mods: ^Mods, name: string) {
 mod_delete :: proc(menu: ^Menu, name: string) {
 	mods := &menu.mods
 	gone := strings.clone(name, context.temp_allocator)
-	was_on := is_on(enabled(menu), gone)
+	// the parts worn from it, Classic's again
+	parts: [res.Part]string
+	worn := false
+	for p in res.Part {
+		parts[p] = worn_from(menu, p)
+		if strings.equal_fold(parts[p], gone) {
+			parts[p] = ""
+			worn = true
+		}
+	}
+	if worn {
+		// let go of first: the client wears it, and a .srmod worn is a file open
+		menu.request = Use_Mod{parts}
+		note(mods, fmt.tprintf("%s is no longer worn: press Delete again to delete it.", gone), false)
+		mods.confirm = false
+		return
+	}
 	if !res.mod_delete(res.MODS_DIR, gone) {
 		note(mods, fmt.tprintf("%s couldn't be deleted (a file of it may be open).", gone), true)
 		mods.confirm = false
@@ -770,7 +678,6 @@ mod_delete :: proc(menu: ^Menu, name: string) {
 	}
 	note(mods, fmt.tprintf("%s deleted.", gone), false)
 	mods_relist(mods)
-	if was_on do turn_off(menu, gone) // no longer worn
 }
 
 // A folder shown in the system's file browser.
