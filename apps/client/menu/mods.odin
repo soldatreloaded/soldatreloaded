@@ -119,37 +119,10 @@ tab_installed :: proc(menu: ^Menu) {
 		muted_line(k, "No mods yet: get one from the Mod Marketplace, or make one from Soldat 1.")
 		return
 	}
-	wearing(menu)
-	ui.section(k, "INSTALLED")
-	muted_line(k, "A part lit is worn from that mod: click one to wear it, or again for Classic's.")
+	muted_line(k, "Click a mod's part to wear it from that mod, and from no other; again, for Classic's.")
 	for &listing in mods.listings do installed_row(menu, &listing)
 	if listing, picked := listing_of(mods, mods.selected); picked && !listing.packed {
 		page_making(menu, listing.name)
-	}
-}
-
-// What each part is worn from, a picker each: Classic, or any mod installed that has the
-// part.
-@(private = "file")
-wearing :: proc(menu: ^Menu) {
-	k := &menu.kit
-	ui.section(k, "WEARING")
-	for part in res.Part {
-		names := make([dynamic]string, context.temp_allocator)
-		owners := make([dynamic]string, context.temp_allocator)
-		append(&names, "Classic")
-		append(&owners, "")
-		current := 0
-		worn := worn_from(menu, part)
-		for &listing in menu.mods.listings {
-			if part not_in listing.parts || listing.problem != "" do continue
-			if strings.equal_fold(listing.name, worn) do current = len(names)
-			append(&names, listing.title)
-			append(&owners, listing.name)
-		}
-		if picked := ui.select_box(k, PART_TITLES[part], names[:], nil, current); picked >= 0 && picked != current {
-			wear(menu, part, owners[picked])
-		}
 	}
 }
 
