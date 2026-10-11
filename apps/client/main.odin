@@ -282,17 +282,19 @@ menu_open :: proc(client: ^Client) -> Screen {
 	return m
 }
 
-// Each part worn from the mod `parts` names for it ("" for Classic's), from now on, and
-// kept in the config: the faces, the sounds and the menu's art loaded again from them,
-// the menu standing as it is. A match loads its own art as it starts.
+// Each part worn from the mod `parts` names for it ("" for Classic's; the names the
+// request's, which it takes), from now on, and kept in the config: the faces, the sounds
+// and the menu's art loaded again from them, the menu standing as it is. A match loads
+// its own art as it starts.
 mod_use :: proc(client: ^Client, parts: [res.Part]string) {
 	choice := &client.config.graphics.parts
 	for name, part in parts {
 		res.part_choice_of(choice, part)^ = strings.clone(name, virtual.arena_allocator(&client.config.arena))
+		delete(name) // the request's, which the client takes
 	}
 	config_save(client.config)
 	res.mod_destroy(&client.mod)
-	client.mod = res.mod_make(res.MODS_DIR, parts)
+	client.mod = res.mod_make(res.MODS_DIR, res.part_choices(choice^))
 	ui.ui_destroy(&client.ui)
 	ui.ui_init(&client.ui, client.mod)
 	sound.sound_destroy(&client.sound)

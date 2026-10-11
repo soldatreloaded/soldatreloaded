@@ -131,7 +131,8 @@ Refresh :: struct {}
 
 // Each part worn from the mod of mods/ `parts` names for it ("" for Classic's), from now
 // on: what the game looks and sounds like loaded again from them, and the Mods page
-// opened again as it was (menu_mods_changed). The names are the temp allocator's.
+// opened again as it was (menu_mods_changed). The names are the context allocator's,
+// which the client frees.
 Use_Mod :: struct {
 	parts: [res.Part]string,
 }
