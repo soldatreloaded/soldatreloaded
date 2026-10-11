@@ -106,6 +106,7 @@ Control_Settings :: struct {
 
 Graphics_Settings :: struct {
 	mods:              []string `jsoncomment:"the mods the game looks and sounds like, over Classic (mods/classic/), the top first: each a .smod or a folder of mods/, by its name. A file is the first of them's that has it, else Classic's. Empty for Classic alone. Chosen on the Mods page, which uses them at once."`,
+	interface:         string `jsoncomment:"the HUD's layout and pictures: a Soldat 1 custom interface in interfaces/, a folder or a .sint, by its name; empty for the game's own. Chosen on the Graphics page."`,
 	screen_width:      i32 `jsoncomment:"the resolution's width: windowed, the window's; fullscreen, the world is drawn at it and scaled to the screen"`,
 	screen_height:     i32 `jsoncomment:"the resolution's height"`,
 	window_mode:       Window_Mode `jsoncomment:"windowed, or fullscreen: a window without borders over the whole screen"`,

@@ -52,6 +52,7 @@ MAX_FRAME :: 0.25 // seconds: a stall never turns into a burst of ticks
 Client :: struct {
 	config:        ^res.Client_Config,
 	mod:           res.Mod,
+	interface:     res.Interface, // the custom interface worn, the mod's (res.Mod.interface)
 	ui:            ui.Ui,
 	sound:         sound.Sound,
 	window:        Window, // as it was last made
@@ -89,6 +90,8 @@ main :: proc() {
 	client: Client
 	client.config = res.client_config_load(CONFIG_PATH, OLD_CONFIG_PATH)
 	client.mod = res.mod_make(res.MODS_DIR, client.config.graphics.mods)
+	client.interface = res.interface_open(res.INTERFACES_DIR, client.config.graphics.interface)
+	client.mod.interface = &client.interface
 	client.last_map = strings.clone(menu.FIRST_MAP)
 	if !online.line_init(&client.line) do log.error("ENet wouldn't start: there is no playing online")
 	window_open(&client.window, &client.config.graphics)
@@ -127,6 +130,7 @@ main :: proc() {
 	rl.CloseWindow()
 	config_save(client.config)
 	delete(client.last_map)
+	res.interface_close(&client.interface)
 	res.mod_destroy(&client.mod)
 	res.client_config_destroy(client.config)
 }
@@ -196,6 +200,8 @@ update :: proc(client: ^Client, dt: f32) {
 			online.browser_refresh(&client.browser, client.config.network.lobby)
 		case menu.Use_Mod:
 			mod_use(client, request.mods)
+		case menu.Use_Interface:
+			interface_use(client, request.name)
 		case menu.Back: // the settings over a game's alone
 		case menu.Quit:
 			screen_switch(client, nil)
@@ -298,10 +304,23 @@ mod_use :: proc(client: ^Client, mods: []string) {
 	config_save(client.config)
 	res.mod_destroy(&client.mod)
 	client.mod = res.mod_make(res.MODS_DIR, graphics.mods)
+	client.mod.interface = &client.interface
 	ui.ui_destroy(&client.ui)
 	ui.ui_init(&client.ui, client.mod)
 	sound.sound_destroy(&client.sound)
 	sound.sound_init(&client.sound, client.mod)
+	if m, is_menu := client.screen.(^menu.Menu); is_menu do menu.menu_mods_changed(m, client.mod)
+	if client.settings != nil do menu.menu_mods_changed(client.settings, client.mod)
+}
+
+// The custom interface `name` worn ("" the game's own), as the Graphics page asks: the
+// config saved, and the menu's art loaded again with it. A match loads its own art as it
+// starts.
+interface_use :: proc(client: ^Client, name: string) {
+	client.config.graphics.interface = strings.clone(name, virtual.arena_allocator(&client.config.arena))
+	config_save(client.config)
+	res.interface_close(&client.interface)
+	client.interface = res.interface_open(res.INTERFACES_DIR, name)
 	if m, is_menu := client.screen.(^menu.Menu); is_menu do menu.menu_mods_changed(m, client.mod)
 	if client.settings != nil do menu.menu_mods_changed(client.settings, client.mod)
 }

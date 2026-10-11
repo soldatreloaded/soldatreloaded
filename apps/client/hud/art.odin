@@ -95,12 +95,26 @@ Art :: struct {
 	pictures:       [Picture]draw.Sprite,
 	guns:           [res.Weapon]draw.Sprite,
 	kill_left_text: f32, // a kill feed line's start with the feed on the left, past the widest icon
+	layout:         res.Interface_Setup,   // where the bars and the texts go: the interface worn's
+	anchors:        res.Interface_Anchors, // and what each is kept beside as the view widens
+	custom:         bool,                  // a custom interface's, which aligns some of them otherwise
 }
 
+// The HUD's pictures, each the custom interface's own if it has one (the mod's), else the
+// mods'; and its layout.
 art_load :: proc(art: ^Art, mod: res.Mod) {
 	draw.sprite_book_open(&art.book, mod, ART_SIDE)
+	iface := mod.interface
+	worn := iface^ if iface != nil else res.interface_default()
+	art.layout, art.anchors, art.custom = worn.setup, worn.anchors, worn.custom
 	listings := draw.source_listings() // interface-gfx read once for them all
-	for file, picture in PICTURE_FILES do art.pictures[picture] = interface_image(art, file, listings)
+	for file, picture in PICTURE_FILES {
+		if own, scale, found := res.interface_picture(iface, file, listings); found {
+			art.pictures[picture] = draw.sprite_book_add(&art.book, own, scale)
+		} else {
+			art.pictures[picture] = interface_image(art, file, listings)
+		}
+	}
 	for file, weapon in GUN_FILES do art.guns[weapon] = interface_image(art, file, listings)
 	// the kill feed's lines on the left begin past the widest icon, drawn at 0.8, so a
 	// mod's wide guns don't cover the names
@@ -131,7 +145,6 @@ interface_image :: proc(art: ^Art, path: string, listings: ^utils.Dir_Listings) 
 LAYOUT_WIDTH :: 640 // the view the layout was made for
 STATUS_ALPHA :: 200 // ui_status_transparency: the pictures' and the boxes' alpha
 BOX_ALPHA :: STATUS_ALPHA * 56 / 100
-FULL_BOX_ALPHA :: 255 * 56 / 100 // the team box's, of the interface's own alpha
 BACK_SIDE :: 64 // the Back picture's side, in units
 
 // How much wider the view is than the layout's: what is anchored across it is placed

@@ -80,7 +80,7 @@ odin test tests/network
 odin test tests/server -define:ODIN_TEST_THREADS=1
 ```
 
-The other suites run the same way: `tests/bots`, `tests/configs`, `tests/lists`, `tests/lobby`, `tests/mods`,
+The other suites run the same way: `tests/bots`, `tests/configs`, `tests/interfaces`, `tests/lists`, `tests/lobby`, `tests/mods`,
 `tests/script` and `tests/client`. The server's and the client's tests use real sockets
 on the loopback, so they run one at a time.
 
@@ -126,6 +126,13 @@ empty folder, and says what to put in it), uses one at once, and deletes one. It
 pinned, and its `txt/font.ini` the HUD's fonts. Players' mods are shared at
 [soldatreloaded-mods](https://github.com/soldatreloaded/soldatreloaded-mods), which says
 how to add one; the Mods page lists them, and installs or updates one in a click.
+
+The HUD's layout is a Soldat 1 custom interface's, or the game's own: drop one (its
+folder, or its `.sint`) into `interfaces/` and pick it on the Graphics page, or make a mod
+from a Soldat 1 install and its `custom-interfaces/` come along. Its `setup.sif` places,
+shows and turns each part, its bars as bars or numbers, as Soldat 1 draws it; its
+pictures replace the HUD's, the rest coming from the mods. Classic's own icons carry
+their bar's frame, so an interface that moves a bar should bring its own icon.
 
 A server is scripted in Lua: [docs/scripting.md](docs/scripting.md) is the API, and a
 script is a `.lua` in the server's `scripts/`. None ship with it; examples, and the

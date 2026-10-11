@@ -1,7 +1,9 @@
 package menu
 
 import "core:fmt"
+import "core:os"
 import "core:slice"
+import "core:strings"
 
 import rl "vendor:raylib"
 
@@ -63,6 +65,7 @@ page_graphics :: proc(menu: ^Menu) {
 	ui.toggle(k, "VSync", &graphics.vsync)
 	ui.toggle(k, "Limit frame rate", &graphics.fps_limit)
 	if graphics.fps_limit do ui.slider(k, "Max frame rate", &graphics.max_fps, MAX_FPS_LOWEST, MAX_FPS_HIGHEST, 10, "%d FPS")
+	if !menu.in_game do interface_select(menu) // the HUD's art is loaded with the game, as a mod is
 	ui.section(k, "WORLD")
 	ui.toggle(k, "Background scenery", &graphics.scenery)
 	ui.toggle(k, "Weather", &graphics.weather)
@@ -118,4 +121,34 @@ resolution_name :: proc(size: [2]i32) -> string {
 		if abs(aspect / shape.aspect - 1) < 0.02 do return fmt.tprintf("%d x %d (%s)", size.x, size.y, shape.name)
 	}
 	return fmt.tprintf("%d x %d", size.x, size.y)
+}
+
+// The HUD's interface: the game's own, or one of interfaces/, a Soldat 1 custom interface
+// dropped there as its folder or its .sint; and the folder, to drop one in.
+@(private = "file")
+interface_select :: proc(menu: ^Menu) {
+	k := &menu.kit
+	if !menu.interfaces_listed {
+		for name in menu.interfaces do delete(name)
+		clear(&menu.interfaces)
+		for name in res.interfaces_list(res.INTERFACES_DIR) do append(&menu.interfaces, strings.clone(name))
+		menu.interfaces_listed = true
+	}
+	names := make([]string, len(menu.interfaces) + 1, context.temp_allocator)
+	names[0] = "The game's own"
+	current := 0
+	for name, i in menu.interfaces {
+		names[i + 1] = name
+		if strings.equal_fold(name, menu.config.graphics.interface) do current = i + 1
+	}
+	ui.section(k, "INTERFACE")
+	if picked := ui.select_box(k, "Interface", names, nil, current); picked >= 0 && picked != current {
+		menu.request = Use_Interface{"" if picked == 0 else names[picked]}
+	}
+	r := ui.row(k, ui.ROW_H + 6, false)
+	caption := "Open interfaces/"
+	if r.shown && ui.button_at(k, r.x + 12, r.y + (r.h - ui.CTRL_H) / 2, ui.button_w(k, caption), ui.CTRL_H, caption, false, false) {
+		os.make_directory_all(res.INTERFACES_DIR)
+		folder_open(res.INTERFACES_DIR)
+	}
 }
