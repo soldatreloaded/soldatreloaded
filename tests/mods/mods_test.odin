@@ -90,8 +90,6 @@ imported :: proc(t: ^testing.T) {
 	classic := res.mod_make(mods_dir)
 	defer res.mod_destroy(&classic)
 
-	write(utils.temp_path(soldat, "soldat.exe"), "")
-	write(utils.temp_path(soldat, "anims", "stoi.poa"), "")
 	write(utils.temp_path(soldat, "mod.ini"), "[GOSTEK]\nHead_CenterX=0.6\n")
 	// Classic's chest as it is, and its belt as the original's .bmp: the same pictures
 	write(utils.temp_path(soldat, "gostek-gfx", "klata.png"), chest_png)
@@ -136,10 +134,9 @@ imported :: proc(t: ^testing.T) {
 	testing.expect(t, stock.problem != "", "nor from a folder that isn't Soldat's")
 }
 
-// A Soldat install found from any folder of it or in it; what a mod can be made from in
-// it, its own folders and each mod of its mods/, the one it was last played with marked;
-// and a mod of mods/ made with the changes to its own folders under it, the mod's own
-// over them.
+// What a mod can be made from in a Soldat install: its own folders and each mod of its
+// mods/, the one it was last played with marked; and a mod of mods/ made with the
+// changes to its own folders under it, the mod's own over them.
 @(test)
 soldat_sources :: proc(t: ^testing.T) {
 	dir := scratch(t, "sources")
@@ -150,8 +147,6 @@ soldat_sources :: proc(t: ^testing.T) {
 	classic := res.mod_make(mods_dir)
 	defer res.mod_destroy(&classic)
 
-	write(utils.temp_path(soldat, "soldat.exe"), "")
-	write(utils.temp_path(soldat, "anims", "stoi.poa"), "")
 	write(utils.temp_path(soldat, "soldat.ini"), "[GAME]\nLast_Mod=Loud\n")
 	write(utils.temp_path(soldat, "gostek-gfx", "klata.png"), picture(3, 27, 18)) // its own chest, put over the game's
 	write(utils.temp_path(soldat, "sfx", "spas12-fire.wav"), "own shotgun")
@@ -161,14 +156,7 @@ soldat_sources :: proc(t: ^testing.T) {
 	write(utils.temp_path(soldat, "mods", "Plain", "gostek-gfx", "morda.png"), picture(2, 27, 18)) // the game's head again
 	write(utils.temp_path(soldat, "mods", "Notes", "readme.txt"), "not a mod")
 
-	root, in_mod, found := res.soldat_root(utils.temp_path(soldat, "mods", "Loud", "sfx"), context.temp_allocator)
-	testing.expect(t, found && strings.has_suffix(root, "Games/Soldat") && in_mod == "Loud", "found from a folder of a mod of it")
-	root, in_mod, found = res.soldat_root(utils.temp_path(soldat, "gostek-gfx"), context.temp_allocator)
-	testing.expect(t, found && in_mod == "", "and from a folder of its own")
-	_, _, found = res.soldat_root(mods_dir, context.temp_allocator)
-	testing.expect(t, !found, "not from a folder that isn't in one")
-
-	sources := res.soldat_sources(root, classic)
+	sources := res.soldat_sources(soldat, classic)
 	defer res.soldat_sources_destroy(sources)
 	testing.expect_value(t, len(sources), 3)
 	testing.expect(t, sources[0].name == "" && sources[0].changed == 2, "its own folders: its chest and its shotgun")

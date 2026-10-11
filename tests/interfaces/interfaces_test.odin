@@ -175,8 +175,6 @@ imported :: proc(t: ^testing.T) {
 	classic := res.mod_make(mods_dir)
 	defer res.mod_destroy(&classic)
 
-	write(utils.temp_path(install, "soldat.exe"), {})
-	write(utils.temp_path(install, "anims", "stoi.poa"), {})
 	write(utils.temp_path(install, "interface-gfx", "ammo.png"), res.texture_png(red)) // the player's own, under each interface
 	write(utils.temp_path(install, "interface-gfx", "health.png"), res.texture_png(red)) // under Neo's own, which is worn
 	write(utils.temp_path(install, "custom-interfaces", "Neo", "setup.sif"), sif)

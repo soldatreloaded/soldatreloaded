@@ -241,12 +241,12 @@ page_making :: proc(menu: ^Menu, name: string) {
 // Mod Marketplace, and Create Mod From S1
 
 // Mods made from the player's Soldat 1.7.1. Its install, found where it is usually put
-// (res.soldat_installs), else picked in the system's folder dialog: any folder of it, or
-// in it, finds it (res.soldat_root). Once it is, the install is not shown again: each
-// thing in it a mod can be made of is, an Install each (res.soldat_sources), named for
-// it: what the player changed of its own files, My S1 Mod; each mod of its mods/, those
-// changes under it, as Soldat wore a mod over its own folders; each custom interface, the
-// changes to its HUD's art under it. Those 1.7.1 ships with, untouched, aren't offered.
+// (res.soldat_installs), else the folder picked in the system's folder dialog, taken as
+// it is. Once it is, the install is not shown again: each thing in it a mod can be made
+// of is, an Import each (res.soldat_sources), named for it: what the player changed of
+// its own files, My S1 Mod; each mod of its mods/, those changes under it, as Soldat wore
+// a mod over its own folders; each custom interface, the changes to its HUD's art under
+// it. Those 1.7.1 ships with, untouched, aren't offered.
 @(private = "file")
 page_import :: proc(menu: ^Menu) {
 	k := &menu.kit
@@ -281,16 +281,7 @@ page_import :: proc(menu: ^Menu) {
 		import_look(menu)
 	}
 	if im.root == "" {
-		r := ui.row(k, ui.ROW_H + 4, false)
-		if r.shown {
-			picking := im.pick.thread != nil
-			bw := ui.button_w(k, "Browse...")
-			if ui.button_at(k, r.x + r.w - 8 - bw, ui.ctrl_y(r), bw, ui.CTRL_H, "Picking..." if picking else "Browse...", true, picking) {
-				folder_pick_start(&im.pick, "Pick your Soldat 1.7.1 folder", rl.GetWindowHandle())
-			}
-			said := im.problem if im.problem != "" else "No Soldat 1.7.1 found where it is usually installed: browse to its folder."
-			ui.text_fit(k, ui.LABEL, said, r.x + 12, r.y + r.h / 2, r.w - bw - 32, ui.WARN if im.problem != "" else ui.MUTED)
-		}
+		browse_row(menu, im.problem if im.problem != "" else "No Soldat 1.7.1 found where it is usually installed: browse to its folder.", im.problem != "")
 		return
 	}
 	if im.install >= 0 && im.install < len(im.sources) {
@@ -314,9 +305,24 @@ page_import :: proc(menu: ^Menu) {
 		}
 	}
 	if !offered {
-		line(k, "Your Soldat is as it came: there is nothing in it to make a mod of.", ui.MUTED)
-		line(k, "Change its art or sounds, or put a mod or an interface in it, then look again.", ui.MUTED)
+		line(k, "Nothing there to make a mod of: no art or sounds changed, no mods, no interfaces.", ui.MUTED)
+		browse_row(menu, "Not your Soldat 1.7.1's folder? Browse to it.", false)
 	}
+}
+
+// Browse..., the system's folder dialog to pick the Soldat install with, beside `said`.
+@(private = "file")
+browse_row :: proc(menu: ^Menu, said: string, warn: bool) {
+	k := &menu.kit
+	im := &menu.mods.import_
+	r := ui.row(k, ui.ROW_H + 4, false)
+	if !r.shown do return
+	picking := im.pick.thread != nil
+	bw := ui.button_w(k, "Browse...")
+	if ui.button_at(k, r.x + r.w - 8 - bw, ui.ctrl_y(r), bw, ui.CTRL_H, "Picking..." if picking else "Browse...", true, picking) {
+		folder_pick_start(&im.pick, "Pick your Soldat 1.7.1 folder", rl.GetWindowHandle())
+	}
+	ui.text_fit(k, ui.LABEL, said, r.x + 12, r.y + r.h / 2, r.w - bw - 32, ui.WARN if warn else ui.MUTED)
 }
 
 // The mod of the install's own changes: its name, and its title as the Mods page shows it.
@@ -365,16 +371,15 @@ ask_install :: proc(menu: ^Menu, i: int) {
 @(private = "file")
 import_look :: proc(menu: ^Menu) {
 	im := &menu.mods.import_
-	root, _, found := res.soldat_root(im.folder, context.temp_allocator)
-	if !found {
-		set_text(&im.problem, "No Soldat 1.7.1 there: pick the folder its anims folder is in.")
+	if !os.is_dir(im.folder) {
+		set_text(&im.problem, "That folder can't be opened: browse to your Soldat 1.7.1's.")
 		set_text(&im.root, "")
 		return
 	}
 	set_text(&im.problem, "")
-	set_text(&im.root, root)
+	set_text(&im.root, im.folder)
 	res.soldat_sources_destroy(im.sources)
-	im.sources = res.soldat_sources(root, res.mod_classic(menu.mod))
+	im.sources = res.soldat_sources(im.root, res.mod_classic(menu.mod))
 	im.install = -1
 }
 

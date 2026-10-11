@@ -25,12 +25,11 @@ import "../utils"
 // Classic's (an image by its pixels as the game draws it, so the same picture as a .bmp
 // is the same), each laid out by part and its images brought to SRMOD_SCALE; and the
 // pivots its mod.ini changes. The rest is Classic's already. Its custom interfaces are
-// made mods of their own (interfaces_import).
+// made mods of their own (interface_install).
 //
-// The install is found where Soldat is usually put (soldat_installs), or from any folder
-// of it (soldat_root); what a mod can be made from in it is its own folders, which a
-// player may have put their art over, and each mod of its mods/ (soldat_sources), a mod
-// over its own folders, as Soldat wears it.
+// The install is found where Soldat is usually put (soldat_installs), or picked by the
+// player; what a mod can be made from in it is its own folders, which a player may have
+// put their art over, each mod of its mods/ and each custom interface (soldat_sources).
 
 // The files of an original Soldat 1.7.1 install as it came (data/'s, from the client's
 // working directory): "<size> <crc32, hex> <path in lower case>" a line.
@@ -90,8 +89,8 @@ soldat_installs :: proc(allocator := context.allocator) -> []string {
 	}
 	found := make([dynamic]string, allocator)
 	for dir in candidates {
-		// the game itself, not a folder that only holds its art, nor this game's install
-		if !is_soldat(dir) do continue
+		// the game's art folders in it itself (gostek-gfx, sfx...), not a folder or two down
+		if !soldat_is_install(dir) || !strings.equal_fold(folder_root(dir), dir) do continue
 		full, err := os.get_absolute_path(dir, context.temp_allocator)
 		if err != nil do full = dir
 		already := false
@@ -114,52 +113,10 @@ soldat_is_install :: proc(dir: string) -> bool {
 	return false
 }
 
-// Whether `dir` is an original Soldat's install: its anims/, which a mod or a folder of
-// art never has, and beside it a file named for the game: its program, soldat.exe, or a
-// build native to Linux or macOS by whatever name (soldat, soldat_x64...), or the
-// soldat.ini it writes; their names in any case, anims/ a link or not.
-is_soldat :: proc(dir: string) -> bool {
-	entries, err := os.read_all_directory_by_path(dir, context.temp_allocator)
-	if err != nil do return false
-	exe, anims := false, false
-	for entry in entries {
-		if strings.equal_fold(entry.name, "anims") do anims ||= os.is_dir(entry.fullpath)
-		else do exe ||= strings.has_prefix(strings.to_lower(entry.name, context.temp_allocator), "soldat") && !os.is_dir(entry.fullpath)
-	}
-	return exe && anims
-}
-
 // What making a mod found: how many of its files change something of the game's.
 Import_Result :: struct {
 	changed: int,    // its art and sounds that differ from Classic's
 	problem: string, // why no mod was made; empty if one was
-}
-
-// The Soldat install a folder is of, or in (C:\Soldat, C:\Soldat\gostek-gfx,
-// C:\Soldat\mods\Foo): the first folder up from it, four at most, that is one
-// (is_soldat); and the mod of its mods/ the folder is in, if it is in one. With
-// `allocator`. False if it isn't in one.
-soldat_root :: proc(path: string, allocator := context.allocator) -> (root, mod: string, ok: bool) {
-	context.allocator = context.temp_allocator
-	full, err := os.get_absolute_path(strings.trim_space(path), context.temp_allocator)
-	if err != nil do return
-	full, _ = strings.replace_all(full, "\\", "/", context.temp_allocator)
-	full = strings.trim_right(full, "/")
-	dir := full
-	for _ in 0 ..= 4 {
-		if is_soldat(dir) {
-			below := strings.trim_prefix(strings.trim_prefix(full, dir), "/")
-			if strings.has_prefix(strings.to_lower(below, context.temp_allocator), "mods/") {
-				rest := below[len("mods/"):]
-				mod = rest[:strings.index_byte(rest, '/')] if strings.index_byte(rest, '/') >= 0 else rest
-			}
-			return strings.clone(dir, allocator), strings.clone(mod, allocator), true
-		}
-		up := filepath.dir(dir)
-		if up == dir || up == "" || up == "." do break
-		dir, _ = strings.replace_all(up, "\\", "/", context.temp_allocator)
-	}
-	return
 }
 
 // What a mod can be made of in a Soldat install: what the player changed of its own
@@ -186,7 +143,7 @@ Soldat_Source :: struct {
 soldat_sources :: proc(root: string, classic: Mod, allocator := context.allocator) -> []Soldat_Source {
 	sources := make([dynamic]Soldat_Source, allocator)
 	stock := stock_load()
-	files, _ := scan(root, classic, &stock, own = true)
+	files, _ := scan(root, root, classic, &stock, own = true)
 	append(&sources, Soldat_Source{kind = .Own, dir = strings.clone(root, allocator), changed = changed_of(files)})
 	last := last_mod(root)
 	interface_dirs := make([dynamic]string, context.temp_allocator)
@@ -196,8 +153,8 @@ soldat_sources :: proc(root: string, classic: Mod, allocator := context.allocato
 		if entry.type != .Directory do continue
 		dir := utils.temp_path(mods_dir, entry.name)
 		append(&interface_dirs, utils.temp_path(folder_root(dir), "custom-interfaces")) // a mod's, though it be an interface alone
-		if !soldat_is_install(dir) || folder_is_stock(dir) do continue
-		mod_files, _ := scan(dir, classic, &stock, own = false)
+		if !soldat_is_install(dir) || folder_is_stock(root, dir) do continue
+		mod_files, _ := scan(root, dir, classic, &stock, own = false)
 		append(&sources, Soldat_Source {
 			kind    = .Mod,
 			name    = strings.clone(entry.name, allocator),
@@ -210,7 +167,7 @@ soldat_sources :: proc(root: string, classic: Mod, allocator := context.allocato
 		for entry in sorted_entries(dir) {
 			title := entry.name
 			if entry.type == .Directory {
-				if !utils.file_exists(utils.temp_path(marker_folder(entry.fullpath, INTERFACE_SETUP_FILE), INTERFACE_SETUP_FILE)) || folder_is_stock(entry.fullpath) do continue
+				if !utils.file_exists(utils.temp_path(marker_folder(entry.fullpath, INTERFACE_SETUP_FILE), INTERFACE_SETUP_FILE)) || folder_is_stock(root, entry.fullpath) do continue
 			} else {
 				if !strings.has_suffix(strings.to_lower(title, context.temp_allocator), INTERFACE_EXTENSION) do continue
 				title = title[:len(title) - len(INTERFACE_EXTENSION)]
@@ -236,15 +193,15 @@ soldat_sources_destroy :: proc(sources: []Soldat_Source, allocator := context.al
 	delete(sources, allocator)
 }
 
-// The mod `name` (titled `title`, else its name) made in `mods_dir`, a .srmod, from the folders `dirs` of an original
-// Soldat install, each over the last as Soldat wears a mod over its own folders (the
-// install's own first, then a mod of its mods/): each file of their art and sounds that
-// is one of Classic's, neither 1.7.1's own as it came nor the same as Classic's, laid out
-// by part (MOD_PATHS), each image keyed as the game keys it, its see-through made alpha,
-// and brought from the scale Soldat 1 drew it at to SRMOD_SCALE (import_image); and the
-// soldier's and the weapons' pivots, from their mod.inis' [GOSTEK], where they differ
-// from Classic's. A folder that is the install itself is looked through for its own
-// folders alone, not its mods/ or maps/.
+// The mod `name` (titled `title`, else its name) made in `mods_dir`, a .srmod, from the
+// folders `dirs` of an original Soldat install, each over the last as Soldat wears a mod
+// over its own folders: the install itself first, looked through for its own folders
+// alone, not its mods/ or maps/; then a mod of its mods/. Each file of their art and
+// sounds that is one of Classic's, neither 1.7.1's own as it came nor the same as
+// Classic's, laid out by part (MOD_PATHS), each image keyed as the game keys it, its
+// see-through made alpha, and brought from the scale Soldat 1 drew it at to SRMOD_SCALE
+// (import_image); and the soldier's and the weapons' pivots, from their mod.inis'
+// [GOSTEK], where they differ from Classic's.
 mod_import :: proc(dirs: []string, mods_dir, name: string, classic: Mod, title := "") -> (result: Import_Result) {
 	if problem := mod_name_problem(mods_dir, name); problem != "" do return {problem = problem}
 	if !srmod_name_ok(name) do return {problem = "A mod's name is letters, digits, - and _, 32 at most."}
@@ -252,14 +209,14 @@ mod_import :: proc(dirs: []string, mods_dir, name: string, classic: Mod, title :
 	stock := stock_load()
 	merged := make(map[string]Packed, 256, context.temp_allocator)
 	anchors := make(map[string]f32, context.temp_allocator)
-	for dir in dirs {
+	for dir, i in dirs {
 		if !soldat_is_install(dir) do return {problem = "That isn't a Soldat folder: there is no gostek-gfx, weapons-gfx or the like in it."}
-		own := is_soldat(dir)
-		files, _ := scan(dir, classic, &stock, own)
+		own := i == 0 // the install itself
+		files, _ := scan(dirs[0], dir, classic, &stock, own)
 		for f in files do merged[strings.to_lower(f.name, context.temp_allocator)] = f
 		// its mod.ini's pivots, unless it is 1.7.1's own as it came: those are no player's
 		root := dir if own else folder_root(dir)
-		if !utils.file_exists(utils.temp_path(root, MOD_CONFIG_FILE)) || is_stock(&stock, utils.temp_path(root, MOD_CONFIG_FILE), MOD_CONFIG_FILE, install_path(root)) do continue
+		if !utils.file_exists(utils.temp_path(root, MOD_CONFIG_FILE)) || is_stock(&stock, utils.temp_path(root, MOD_CONFIG_FILE), MOD_CONFIG_FILE, install_path(dirs[0], root)) do continue
 		config := soldat_config(root)
 		for key, value in config.anchors do anchors[key] = value
 	}
@@ -318,9 +275,9 @@ Packed :: struct {
 // that is neither 1.7.1's as it came nor Classic's, its game's folders alone looked
 // through. With the temp allocator.
 @(private = "file")
-scan :: proc(dir: string, classic: Mod, stock: ^map[string]Stock_File, own: bool) -> (files: []Packed, ok: bool) {
+scan :: proc(install, dir: string, classic: Mod, stock: ^map[string]Stock_File, own: bool) -> (files: []Packed, ok: bool) {
 	root := dir if own else folder_root(dir)
-	at := install_path(root) // where its files are in the install, as the stock list has them
+	at := install_path(install, root) // where its files are in the install, as the stock list has them
 	config := soldat_config(root)
 	packed := make([dynamic]Packed, context.temp_allocator)
 	// Classic's folders, read once for every file; kept in an arena of their own, as the
@@ -467,18 +424,21 @@ srmod_write :: proc(mods_dir, name, title, description: string, entries: map[str
 	return true
 }
 
-// Where the folder `dir` is in the Soldat install it is in, in lower case, with its slash
-// ("mods/classic/"); "" for the install itself, or a folder in none.
+// Where the folder `dir` is in the Soldat install `install`, in lower case, with its
+// slash ("mods/classic/"); "" for the install itself, or a folder not in it.
 @(private = "file")
-install_path :: proc(dir: string) -> string {
-	root, _, found := soldat_root(dir, context.temp_allocator)
-	if !found do return ""
-	full, err := os.get_absolute_path(dir, context.temp_allocator)
-	if err != nil do return ""
-	full, _ = strings.replace_all(full, "\\", "/", context.temp_allocator)
-	below := strings.trim(strings.trim_prefix(strings.trim_right(full, "/"), root), "/")
+install_path :: proc(install, dir: string) -> string {
+	slashed :: proc(path: string) -> string {
+		full, err := os.get_absolute_path(path, context.temp_allocator)
+		if err != nil do full = path
+		full, _ = strings.replace_all(full, "\\", "/", context.temp_allocator)
+		return strings.to_lower(strings.trim_right(full, "/"), context.temp_allocator)
+	}
+	root, full := slashed(install), slashed(dir)
+	if !strings.has_prefix(full, root) do return ""
+	below := strings.trim(full[len(root):], "/")
 	if below == "" do return ""
-	return strings.to_lower(strings.concatenate({below, "/"}, context.temp_allocator), context.temp_allocator)
+	return strings.concatenate({below, "/"}, context.temp_allocator)
 }
 
 // How many of the files are art or sounds a mod may have: not the fonts, the scenery or
@@ -655,9 +615,9 @@ steam_libraries :: proc(steam: string) -> []string {
 // Whether every file of the folder `dir` is Soldat 1.7.1's own as it came, by where the
 // folder is in its install: one of the custom interfaces it ships with, untouched.
 @(private)
-folder_is_stock :: proc(dir: string) -> bool {
+folder_is_stock :: proc(install, dir: string) -> bool {
 	stock := stock_load()
-	at := install_path(dir)
+	at := install_path(install, dir)
 	files := files_below(dir)
 	if len(files) == 0 do return false
 	for file in files do if !is_stock(&stock, utils.temp_path(dir, file), file, at) do return false
@@ -708,7 +668,7 @@ interface_install :: proc(root, from, title, mods_dir: string, classic: Mod) -> 
 	if name == "" do return "", "That interface's name can't be a mod's."
 	if mod_exists(mods_dir, name) do return name, "There is a mod by that name already."
 	stock := stock_load()
-	own, _ := scan(root, classic, &stock, own = true)
+	own, _ := scan(root, root, classic, &stock, own = true)
 	entries, _ := entries_of(own, {.Hud, .Icons})
 	if !interface_entries(from, title, &entries) do return name, "That interface has no setup.sif to read."
 	if !srmod_write(mods_dir, name, fmt.tprintf("%s interface", title), fmt.tprintf("Soldat 1's custom interface %s, its HUD's layout and pictures.", title), entries) {

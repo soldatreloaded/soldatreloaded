@@ -192,11 +192,12 @@ no importer of them.
 
 The install is found where it is usually put: `C:\Soldat`, Program Files, Steam's
 libraries (its registry, `libraryfolders.vdf`, any `steamapps/common` folder named for
-Soldat), and on Linux Wine's, Steam's, Flatpak's and Snap's. A folder is an install when
-it holds `anims/` and beside it a file named for the game (`soldat.exe`, a native
-build's `soldat` or `soldat_x64`, or `soldat.ini`). Failing that, **Browse...**
-brings up the system's folder dialog (Windows' own; zenity, kdialog or osascript
-elsewhere). Once found, the install isn't shown again.
+Soldat), and on Linux Wine's, Steam's, Flatpak's and Snap's: a folder there is an install when
+the game's art folders (`gostek-gfx/`, `sfx/` and the like) are in it. Failing that,
+**Browse...** brings up the system's folder dialog (Windows' own; zenity, kdialog or
+osascript elsewhere), and the folder picked is taken as it is, unchecked; if there is
+nothing in it to make a mod of, the tab says so and offers **Browse...** again. Once
+found, the install isn't shown again.
 
 Then the tab offers each thing in the install a mod can be made of, an **Import** each
 (**Imported** once a mod by its name is):
