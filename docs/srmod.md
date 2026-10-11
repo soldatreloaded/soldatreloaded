@@ -1,9 +1,9 @@
 # .srmod: Soldat Reloaded's mods
 
-Being built: the format, Classic laid out as one, and wearing mods by part are done
-(steps 1 to 3, below). It replaces the mods of before (folders and `.smod`s laid out as
-Soldat 1's, stacked). How Soldat 1 does it, which this is measured against and imports
-from, is [soldat1-mods.md](soldat1-mods.md).
+Being built: the format, Classic laid out as one, wearing mods by part and bringing them
+in from Soldat 1 are done (steps 1 to 4, below). It replaces the mods of before (folders
+and `.smod`s laid out as Soldat 1's, stacked). How Soldat 1 does it, which this is
+measured against and imports from, is [soldat1-mods.md](soldat1-mods.md).
 
 ## Why
 

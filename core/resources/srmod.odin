@@ -431,6 +431,15 @@ pivots_over :: proc(pivots: ^map[string][2]f32, mod: ^Srmod, part: Part) {
 	}
 }
 
+// The pivots of one mod's `part`, its own alone, by id in lower case: with the temp
+// allocator.
+srmod_pivots :: proc(mod: ^Srmod, part: Part) -> map[string][2]f32 {
+	context.allocator = context.temp_allocator
+	pivots := make(map[string][2]f32)
+	pivots_over(&pivots, mod, part)
+	return pivots
+}
+
 // The pivots `pivots` as a pivots.json's text, by id, sorted: with the temp allocator.
 pivots_text :: proc(pivots: map[string][2]f32) -> string {
 	ids := make([dynamic]string, context.temp_allocator)
