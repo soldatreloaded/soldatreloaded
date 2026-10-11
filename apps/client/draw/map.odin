@@ -78,7 +78,7 @@ Map_Edge :: struct {
 	colors:  [4]utils.Rgba,
 }
 
-EDGE_LENGTH :: 90 // the length of edge the edge texture's width stands for
+EDGE_LENGTH :: 90 // the length of edge the edge texture's width, in units, stands for
 EDGE_ALPHA :: 0.75 // of the polygon's corners'
 
 // The polygon types no edge is hidden under (the original's CollisionTestExcept leaves
@@ -96,7 +96,7 @@ edges_load :: proc(art: ^Art, mod: res.Mod, polymap: ^res.Poly_Map, map_dirs: []
 	art.edge_texture = texture_upload(image)
 	rl.GenTextureMipmaps(&art.edge_texture)
 	rl.SetTextureFilter(art.edge_texture, .TRILINEAR)
-	size := [2]f32{f32(image.width), f32(image.height)}
+	size := [2]f32{f32(image.width), f32(image.height)} / res.SRMOD_SCALE // in units, as every image
 
 	edges: [Polygon_Layer][dynamic]Map_Edge
 	for &polygon, i in polymap.polygons {

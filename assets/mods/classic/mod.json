@@ -1,0 +1,11 @@
+{
+  "format": 1,
+  "name": "classic",
+  "title": "Classic",
+  "version": "1.0.0",
+  "author": "Soldat Reloaded, from OpenSoldat's base content",
+  "description": "The game's own look and sound, which every part falls back to.",
+  "licence": "CC BY 4.0, and the fonts the SIL Open Font License: see NOTICE.md",
+  "source": "https://github.com/soldatreloaded/soldatreloaded-odin",
+  "parts": ["soldier", "weapons", "effects", "objects", "hud", "icons", "sounds", "textures", "scenery", "fonts"]
+}

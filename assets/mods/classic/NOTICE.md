@@ -10,7 +10,11 @@ with it, and this notice.
 - **Licence:** CC BY 4.0, <https://creativecommons.org/licenses/by/4.0/>
 - **Modifications:** the files were reorganised: what the game looks and sounds like
   is here, in `mods/classic/`, and what it plays by is in `data/`, which has its own
-  notice. Upstream keeps them under `shared/`, `client/` and `server/configs/`.
+  notice. Upstream keeps them under `shared/`, `client/` and `server/configs/`. Here
+  they are laid out as a Soldat Reloaded mod (docs/srmod.md): by part, `soldier/`,
+  `weapons/`, `sounds/` and the rest; the bitmaps made PNGs as they were; the crosshair
+  and the edges' textures resized; the soldier's and the weapons' pivots, from
+  `mod.ini`, in `pivots.json`.
 
 Credits named in the upstream `Credits.md`:
 

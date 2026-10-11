@@ -9,45 +9,46 @@ import "core:strings"
 
 import "../utils"
 
-// What the game looks and sounds like: a stack of mods over Classic. Classic,
-// mods/classic/, is the game's own, ships with it and is kept by the launcher; under
-// every other, it is never listed nor turned off. The players' mods are theirs, in
-// mods/, each a .smod (a zip, as OpenSoldat's are, and what the Mods page installs) or a
-// folder (for making one, its changes seen as they are made), and never touched by an
-// update. The player turns on any of them, in an order (graphics.mods, the top first),
-// and each file is looked for in each mod in turn, then in Classic: so a mod holds only
-// what it changes, and a mod of the soldier's art and one of sounds are worn together.
+// What the game looks and sounds like: each part of it (the soldier, the weapons, the
+// sounds, ...) from a mod chosen for it, Classic's under it (srmod.odin, Worn). Classic,
+// mods/classic/, is the game's own, ships with it and is kept by the launcher; it has
+// every file the game draws or plays. The players' mods are theirs, in mods/, each a
+// .srmod or a folder, never touched by an update.
 //
-// A mod's files sit at its root as Classic's do (gostek-gfx/, sfx/, mod.ini, ...); one
-// packed or unpacked a folder or two down, as zips often are, is read from where its
-// files are. Names are matched without regard to case. Each mod's images are sized and
-// pinned by its own mod.ini, or by Classic's if it hasn't one. What the game plays by
-// (the maps, animations, skeletons) is not a mod's but data/'s, the same for everyone.
+// The game asks for a file by the path Soldat 1 gives it ("gostek-gfx/klata.png",
+// "sfx/radio/efcup.wav"), and finds it in the part that holds it ("soldier/klata.png",
+// "sounds/radio/efcup.wav"): MOD_PATHS. Names are matched without regard to case; an
+// image is a .png of the name before the name itself, as Soldat's are. Every image is
+// SRMOD_SCALE pixels to a unit. What the game plays by (the maps, animations, skeletons)
+// is not a mod's but data/'s, the same for everyone.
 
 MOD_CLASSIC :: "classic"
 MODS_DIR :: "mods" // where the mods are, from the client's working directory
-MOD_EXTENSION :: ".smod"
+MOD_EXTENSION :: ".smod" // the mods of before, which the game no longer wears
 MOD_NAME_MAX :: 32
+SRMOD_SCALE :: 4.5 // every image's pixels to a unit
 
-// What is at a mod's root, by which its root is known: its folders and its mod.ini.
+// What is at a Soldat 1 mod's root, by which its root is known: its folders and its
+// mod.ini.
 @(rodata)
 MOD_FOLDERS := [?]string{"gostek-gfx", "weapons-gfx", "interface-gfx", "sparks-gfx", "objects-gfx", "scenery-gfx", "textures", "sfx", "txt", "fonts"}
 
 Mod :: struct {
-	layers:    []Mod_Layer, // the mods on, the top first, then Classic, always last
-	interface: ^Interface,  // the custom interface worn over them, the HUD's: the client's own, which outlives the mods made again; nil for the game's own
+	worn:         ^Worn,      // each part's mod, Classic under them; nil where Classic couldn't be read
+	classic_only: bool,       // mod_classic's: Classic alone
+	interface:    ^Interface, // the custom interface worn over them, the HUD's: the client's own, which outlives the mods made again; nil for the game's own
 }
 
-// One mod of the stack: a folder, or an .smod open.
+// One mod as its files: a folder, or a zip open.
 Mod_Layer :: struct {
 	name:       string,
-	dir:        string,       // a folder's root: where its files are; "" for an .smod
-	archive:    ^Mod_Archive, // an .smod's
-	config:     ^Mod_Config,  // its mod.ini's, else Classic's
+	dir:        string,       // a folder's root: where its files are; "" for a zip
+	archive:    ^Mod_Archive, // a zip's
+	config:     ^Mod_Config,  // a Soldat 1 mod's mod.ini's, as the importer reads it
 	own_config: bool,
 }
 
-// An .smod open: its files, by their path below the mod's root in lower case.
+// A zip open: its files, by their path below the mod's root in lower case.
 Mod_Archive :: struct {
 	path:  string,
 	zip:   utils.Zip_File,
@@ -57,109 +58,170 @@ Mod_Archive :: struct {
 
 // A file found in a mod: read it with mod_read.
 Mod_File :: struct {
-	layer:   int,          // of the mod's layers; -1 for a map's own folder of art
-	archive: ^Mod_Archive, // its .smod; nil for a file on disk
+	layer:   int,          // the Part it is of; -1 for a map's own folder of art
+	archive: ^Mod_Archive, // its zip; nil for a file on disk
 	path:    string,       // on disk, or the zip's name for it; with the temp allocator
 }
 
-// The mods `names`, the top first, over Classic, all under `mods_dir`. A name that
-// isn't in mods/ is passed over, logged. Free with mod_destroy.
-mod_make :: proc(mods_dir: string, names: []string, allocator := context.allocator) -> (mod: Mod) {
+Mod_Path :: struct {
+	soldat: string, // Soldat 1's folder
+	part:   Part,   // the part that holds it
+	dir:    string, // and the folder there
+}
+
+// Where each of Soldat 1's folders is in a mod: the part, and the folder in it. The
+// longest matching folder wins; interface-gfx is the HUD's or the icons' by the
+// picture (HUD_PICTURES).
+@(rodata)
+MOD_PATHS := [?]Mod_Path {
+	{"gostek-gfx", .Soldier, ""},
+	{"weapons-gfx", .Weapons, ""},
+	{"interface-gfx/guns", .Weapons, "icons"},
+	{"interface-gfx", .Icons, ""},
+	{"sparks-gfx", .Effects, ""},
+	{"objects-gfx", .Objects, ""},
+	{"textures/objects", .Objects, "textures"},
+	{"textures", .Textures, ""},
+	{"scenery-gfx", .Scenery, ""},
+	{"sfx", .Sounds, ""},
+	{"fonts", .Fonts, ""},
+	{"txt", .Fonts, ""}, // font.ini, as Soldat 1's txt/font.ini
+}
+
+// The pictures of interface-gfx that the HUD's layout places: the hud part's. The rest
+// are the icons'.
+@(rodata)
+HUD_PICTURES := [?]string{"health", "ammo", "jet", "health-bar", "jet-bar", "reload-bar", "fire-bar", "fire-bar-r", "nade", "cluster-nade", "vest-bar"}
+
+// Soldat 1's folder `dir` ("interface-gfx/guns") and a file in it, as the part that holds
+// it and the folder there.
+mod_part_of :: proc(dir, name: string) -> (part: Part, in_part: string, ok: bool) {
+	best := -1
+	for path, i in MOD_PATHS {
+		whole := strings.equal_fold(dir, path.soldat)
+		below := len(dir) > len(path.soldat) && dir[len(path.soldat)] == '/' && strings.equal_fold(dir[:len(path.soldat)], path.soldat)
+		if !whole && !below do continue
+		if best < 0 || len(path.soldat) > len(MOD_PATHS[best].soldat) do best = i
+	}
+	if best < 0 do return
+	path := MOD_PATHS[best]
+	part = path.part
+	rest := dir[len(path.soldat):]
+	if strings.has_prefix(rest, "/") do rest = rest[1:]
+	in_part = path.dir
+	if rest != "" do in_part = utils.temp_path(in_part, rest) if in_part != "" else rest
+	if part == .Icons && rest == "" {
+		stem := strings.to_lower(filepath.stem(name), context.temp_allocator)
+		if slice.contains(HUD_PICTURES[:], stem) do part = .Hud
+	}
+	return part, in_part, true
+}
+
+// The mods worn, Classic's under the chosen ones: each part from `choice`, the mod
+// named for it in `mods_dir` ("" for Classic's). Free with mod_destroy.
+mod_make :: proc(mods_dir: string, choice: [Part]string = {}, allocator := context.allocator) -> (mod: Mod) {
 	context.allocator = allocator
-	layers := make([dynamic]Mod_Layer)
-	for name in names {
-		if name == "" || mod_builtin(name) || reserved(name) do continue
-		layer, found := layer_open(mods_dir, name)
-		if !found {
-			log.warnf("the mod %s isn't in %s/; passed over", name, mods_dir)
-			continue
-		}
-		append(&layers, layer)
+	worn := new(Worn)
+	ok: bool
+	if worn^, ok = worn_make(utils.temp_path(mods_dir, MOD_CLASSIC), mods_dir, choice); !ok {
+		free(worn)
+		return
 	}
-	classic := Mod_Layer{name = strings.clone(MOD_CLASSIC), dir = strings.join({mods_dir, MOD_CLASSIC}, "/")}
-	classic.config = new(Mod_Config)
-	classic.config^, _ = mod_config_read(&classic)
-	classic.own_config = true // freed with it, read or not
-	append(&layers, classic)
-	for &layer in layers[:len(layers) - 1] {
-		config, has := mod_config_read(&layer)
-		if has {
-			layer.config = new(Mod_Config)
-			layer.config^ = config
-			layer.own_config = true
-		} else {
-			mod_config_destroy(&config)
-			layer.config = classic.config
-		}
-	}
-	mod.layers = layers[:]
+	mod.worn = worn
 	return
 }
 
 mod_destroy :: proc(mod: ^Mod, allocator := context.allocator) {
 	context.allocator = allocator
-	for &layer in mod.layers {
-		if layer.own_config {
-			mod_config_destroy(layer.config)
-			free(layer.config)
-		}
-		layer_close(&layer)
+	if mod.worn != nil {
+		worn_close(mod.worn)
+		free(mod.worn)
 	}
-	delete(mod.layers)
 	mod^ = {}
 }
 
-// Classic alone, of `mod`: its last layer.
+// Classic alone, of `mod`.
 mod_classic :: proc(mod: Mod) -> Mod {
-	return {layers = mod.layers[len(mod.layers) - 1:]}
+	return {worn = mod.worn, classic_only = true}
+}
+
+// Where `part` is looked for, in order: its chosen mod, then Classic; Classic alone for
+// mod_classic's. With the temp allocator.
+mod_packs :: proc(mod: Mod, part: Part) -> []^Srmod {
+	if mod.worn == nil do return nil
+	packs := make([dynamic]^Srmod, 0, 2, context.temp_allocator)
+	if !mod.classic_only {
+		if i := mod.worn.chosen[part]; i >= 0 do append(&packs, &mod.worn.mods[i])
+	}
+	append(&packs, &mod.worn.classic)
+	return packs[:]
 }
 
 // ---------------------------------------------------------------------------------
 // Finding and reading a mod's files
 
-// The file at `path` relative to a mod ("txt/font.ini"), in any case: the top mod's that
-// has it, else Classic's. False if none has it.
+// The file at Soldat 1's path `path` ("txt/font.ini"), in any case: the chosen mod's
+// part's, else Classic's. False if neither has it.
 mod_file :: proc(mod: Mod, path: string) -> (file: Mod_File, found: bool) {
-	for &layer, i in mod.layers {
-		if file, found = layer_file(&layer, i, path); found do return
+	slash := strings.last_index_byte(path, '/')
+	dir, name := path[:max(slash, 0)], path[slash + 1:]
+	part, in_part := mod_part_of(dir, name) or_return
+	for pack in mod_packs(mod, part) {
+		if file, found = srmod_file(pack, part, utils.temp_path(in_part, name) if in_part != "" else name); found {
+			file.layer = int(part)
+			return
+		}
 	}
 	return
 }
 
-// An image in a mod's folder `dir` ("scenery-gfx"), as Soldat finds one: in any case,
+// An image in Soldat 1's folder `dir` ("scenery-gfx"), as Soldat finds one: in any case,
 // preferring a .png whatever extension `name` gives, then `name` itself, then a .bmp of
-// it. The top mod's that has it, else Classic's.
+// it. The chosen mod's part's, else Classic's.
 mod_image :: proc(mod: Mod, dir, name: string, listings: ^utils.Dir_Listings = nil) -> (file: Mod_File, found: bool) {
-	for &layer, i in mod.layers {
-		if file, found = layer_find(&layer, i, dir, name, ".png", listings); found do return
+	part, in_part := mod_part_of(dir, name) or_return
+	for pack in mod_packs(mod, part) {
+		if file, found = pack_image(pack, part, in_part, name, listings); found do return
 	}
 	return
 }
 
-// Whether a mod over Classic, not Classic, has the image `name` in `dir`, found as
+// Whether a mod chosen over Classic, not Classic, has the image `name` in `dir`, found as
 // mod_image finds one.
 mod_has_image :: proc(mod: Mod, dir, name: string, listings: ^utils.Dir_Listings = nil) -> bool {
-	for &layer, i in mod.layers[:max(len(mod.layers) - 1, 0)] {
-		if _, found := layer_find(&layer, i, dir, name, ".png", listings); found do return true
+	part, in_part := mod_part_of(dir, name) or_return
+	packs := mod_packs(mod, part)
+	for pack in packs[:max(len(packs) - 1, 0)] {
+		if _, found := pack_image(pack, part, in_part, name, listings); found do return true
 	}
 	return false
 }
 
-// An image a map draws with, in `dir` ("scenery-gfx"), as mod_image finds one: the mods'
-// over Classic, then the map's own (in each of `map_dirs`, the map's folders of art, as
-// it shipped or was downloaded with it), then Classic's.
+// An image a map draws with, in Soldat 1's folder `dir` ("scenery-gfx"), as mod_image
+// finds one: the chosen mod's part's, then the map's own (in each of `map_dirs`, the
+// map's folders of art, laid out as Soldat 1's, as it shipped or was downloaded with
+// it), then Classic's.
 map_image :: proc(mod: Mod, map_dirs: []string, dir, name: string) -> (file: Mod_File, found: bool) {
-	last := len(mod.layers) - 1
-	for &layer, i in mod.layers[:max(last, 0)] {
-		if file, found = layer_find(&layer, i, dir, name, ".png"); found do return
+	part, in_part := mod_part_of(dir, name) or_return
+	packs := mod_packs(mod, part)
+	for pack in packs[:max(len(packs) - 1, 0)] {
+		if file, found = pack_image(pack, part, in_part, name); found do return
 	}
 	for map_dir in map_dirs {
 		if path, ok := utils.find_file_any_case(utils.temp_path(map_dir, dir), name, ".png", context.temp_allocator); ok {
 			return {layer = -1, path = path}, true
 		}
 	}
-	if last >= 0 do return layer_find(&mod.layers[last], last, dir, name, ".png")
+	if len(packs) > 0 do return pack_image(packs[len(packs) - 1], part, in_part, name)
 	return
+}
+
+// The image `name` in the folder `in_part` of a mod's `part`, as mod_image finds one.
+@(private)
+pack_image :: proc(pack: ^Srmod, part: Part, in_part, name: string, listings: ^utils.Dir_Listings = nil) -> (file: Mod_File, found: bool) {
+	if part not_in pack.parts do return
+	dir := utils.temp_path(PART_NAMES[part], in_part) if in_part != "" else PART_NAMES[part]
+	return layer_find(&pack.pack, int(part), dir, name, ".png", listings)
 }
 
 // A file found in a mod, its bytes allocated with `allocator`. False, logged, if it

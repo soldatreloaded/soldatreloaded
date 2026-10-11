@@ -89,7 +89,7 @@ main :: proc() {
 
 	client: Client
 	client.config = res.client_config_load(CONFIG_PATH, OLD_CONFIG_PATH)
-	client.mod = res.mod_make(res.MODS_DIR, client.config.graphics.mods)
+	client.mod = res.mod_make(res.MODS_DIR) // Classic, each part, until the Mods page chooses by part
 	client.interface = res.interface_open(res.INTERFACES_DIR, client.config.graphics.interface)
 	client.mod.interface = &client.interface
 	client.last_map = strings.clone(menu.FIRST_MAP)
@@ -303,7 +303,7 @@ mod_use :: proc(client: ^Client, mods: []string) {
 	graphics.mods = kept
 	config_save(client.config)
 	res.mod_destroy(&client.mod)
-	client.mod = res.mod_make(res.MODS_DIR, graphics.mods)
+	client.mod = res.mod_make(res.MODS_DIR)
 	client.mod.interface = &client.interface
 	ui.ui_destroy(&client.ui)
 	ui.ui_init(&client.ui, client.mod)

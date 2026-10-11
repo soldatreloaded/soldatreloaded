@@ -183,7 +183,7 @@ map_fetched :: proc(t: ^testing.T) {
 	testing.expect(t, art_read == nil && string(art) == ART, "and its own image, in the map's folder of downloads")
 	testing.expect(t, !os.exists(online.DOWNLOADS_DIR + "/maps/ctf_Ash/scenery-gfx/unused.png"), "but nothing it doesn't draw with")
 	dirs := online.map_art_dirs("ctf_Ash")
-	classic := res.mod_make(res.MODS_DIR, nil)
+	classic := res.mod_make(res.MODS_DIR)
 	defer res.mod_destroy(&classic)
 	found, has := res.map_image(classic, dirs[:], "scenery-gfx", polymap.scenery[0])
 	testing.expect(t, has && filepath.base(found.path) == image, "which the map's scenery is drawn with, before Classic's")
