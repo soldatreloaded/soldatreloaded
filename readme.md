@@ -151,6 +151,7 @@ community's, are at
 - [netcode.md](docs/netcode.md): the network model.
 - [porting.md](docs/porting.md): porting the simulation from C, and checking it.
 - [scripting.md](docs/scripting.md): the server's Lua API.
+- [soldat1-mods.md](docs/soldat1-mods.md): how Soldat 1 finds, layers and sizes its mods' art, and its custom interfaces.
 - [git.md](docs/git.md): commit messages, branches and releases.
 
 ## Licence
