@@ -197,8 +197,8 @@ it holds `soldat.exe` (or `soldat`) with `anims/` beside it. Failing that, **Bro
 brings up the system's folder dialog (Windows' own; zenity, kdialog or osascript
 elsewhere). Once found, the install isn't shown again.
 
-Then the tab offers each thing in the install a mod can be made of, an **Install** each
-(**Installed** once a mod by its name is):
+Then the tab offers each thing in the install a mod can be made of, an **Import** each
+(**Imported** once a mod by its name is):
 
 - **Your changes**: art and sounds copied over the install's own `gostek-gfx/`, `sfx/` and
   the rest, if any. Each file is weighed against 1.7.1 as it shipped
