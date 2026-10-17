@@ -13,7 +13,7 @@ import "../ui"
 // following the list being picked from before the pick is made.
 
 @(rodata)
-STYLE_NAMES := [?]string{"Male", "Female", "Waifu", "Rat", "Furry"}
+STYLE_NAMES := [?]string{"Male", "Female", "Waifu", "Rat", "Furry", "Kang"}
 @(rodata)
 HAIR_NAMES := [?]string{"Army", "Dreadlocks", "Punk", "Mr. T", "Normal", "Fringe", "Bob", "Mullet", "Wolfcut", "Baldcut", "Afro", "Emo"}
 @(rodata)
@@ -26,11 +26,13 @@ CHAIN_NAMES := [?]string{"None", "Dog tags", "Gold chain"}
 SECONDARY_NAMES := [?]string{"USSOCOM", "Combat Knife", "Chainsaw", "LAW"}
 
 // The rat and the furry wear only dreadlocks, punk, Mr. T, mullet and wolfcut, and no
-// headgear.
+// headgear; the kang wears only army.
 @(rodata)
 FURRED_HAIR_LOCKED := [?]bool{false, false, false, false, true, true, true, false, false, true, true, true}
 @(rodata)
 FURRED_HEAD_LOCKED := [?]bool{false, true, true, true, true}
+@(rodata)
+KANG_HAIR_LOCKED := [?]bool{false, true, true, true, true, true, true, true, true, true, true, true}
 
 page_player :: proc(menu: ^Menu) {
 	k := &menu.kit
@@ -47,7 +49,10 @@ page_player :: proc(menu: ^Menu) {
 	look := look_of(player)
 	look.gostek = ui.enum_select(k, "Style", &player.gostek, STYLE_NAMES[:])
 	furred := look.gostek == .Rat || look.gostek == .Furry
-	look.hair_style = ui.enum_select(k, "Hair", &player.hair_style, HAIR_NAMES[:], FURRED_HAIR_LOCKED[:] if furred else nil)
+	hair_locked: []bool
+	if look.gostek == .Kang do hair_locked = KANG_HAIR_LOCKED[:]
+	else if furred do hair_locked = FURRED_HAIR_LOCKED[:]
+	look.hair_style = ui.enum_select(k, "Hair", &player.hair_style, HAIR_NAMES[:], hair_locked)
 	look.head_style = ui.enum_select(k, "Headgear", &player.head_style, HEAD_NAMES[:], FURRED_HEAD_LOCKED[:] if furred else nil)
 	look.eyewear = ui.enum_select(k, "Eyewear", &player.eyewear, EYEWEAR_NAMES[:])
 	look.chain_style = ui.enum_select(k, "Chain", &player.chain_style, CHAIN_NAMES[:])

@@ -43,13 +43,13 @@ Client_Config :: struct {
 
 Player_Settings :: struct {
 	name:             string `jsoncomment:"your name"`,
-	gostek:           Gostek `jsoncomment:"male, female, waifu, rat or furry"`,
+	gostek:           Gostek `jsoncomment:"male, female, waifu, rat, furry or kang"`,
 	shirt:            utils.Rgba `jsoncomment:"the shirt's colour, RRGGBB"`,
 	pants:            utils.Rgba `jsoncomment:"the pants' colour, RRGGBB"`,
 	skin:             utils.Rgba `jsoncomment:"the skin's colour, RRGGBB"`,
 	hair:             utils.Rgba `jsoncomment:"the hair's colour, RRGGBB"`,
 	jet:              utils.Rgba `jsoncomment:"the jet flame's colour, RRGGBB"`,
-	hair_style:       Hair_Style `jsoncomment:"army; the male's dreadlocks, punk, mr_t or normal; the waifu's fringe or bob; mullet, wolfcut, baldcut, afro or emo. The rat and the furry wear only army, dreadlocks, punk, mr_t, mullet or wolfcut."`,
+	hair_style:       Hair_Style `jsoncomment:"army; the male's dreadlocks, punk, mr_t or normal; the waifu's fringe or bob; mullet, wolfcut, baldcut, afro or emo. The rat and the furry wear only army, dreadlocks, punk, mr_t, mullet or wolfcut. The kang wears only army."`,
 	head_style:       Head_Style `jsoncomment:"none; the male's helmet or hat; the waifu's own; or backwards_cap. The rat and the furry wear none."`,
 	eyewear:          Eyewear `jsoncomment:"none or sunglasses"`,
 	chain_style:      Chain_Style `jsoncomment:"none, dog_tags or gold_chain"`,
@@ -62,6 +62,7 @@ Gostek :: enum {
 	Waifu,
 	Rat,
 	Furry,
+	Kang,
 }
 
 Hair_Style :: enum {
