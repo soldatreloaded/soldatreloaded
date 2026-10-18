@@ -54,9 +54,8 @@ Soldat_Import :: struct {
 	root:     string, // the install found from it; "" until one is
 	problem:  string, // why none was
 	looked:   bool,   // the install looked for where it is usually put, as the tab first opened
-	scan:     enum {None, Due, Now}, // the install to be looked through: said this pass, done the next
 	sources:  []res.Soldat_Source,
-	install:  int,    // the source being installed: said this pass, done the next; -1 for none
+	job:      Soldat_Job,  // looking for the install, looking through it, or importing, while it runs
 	pick:     Folder_Pick, // the system's folder dialog, while it is up
 }
 
@@ -74,6 +73,7 @@ mods_destroy :: proc(mods: ^Mods) {
 	delete(mods.selected)
 	delete(mods.note)
 	im := &mods.import_
+	soldat_job_forget(&im.job) // waited for, if it runs
 	for s in ([]string{im.folder, im.root, im.problem}) do delete(s)
 	res.soldat_sources_destroy(im.sources)
 	mods^ = {}
@@ -266,6 +266,10 @@ page_making :: proc(menu: ^Menu, name: string) {
 // its own files, My S1 Mod; each mod of its mods/, those changes under it, as Soldat wore
 // a mod over its own folders; each custom interface, the changes to its HUD's art under
 // it. Those 1.7.1 ships with, untouched, aren't offered.
+//
+// Looking for the install, looking through it and importing each take a while (a Steam
+// library on every drive; every file of the install weighed; every image of a mod
+// rescaled), so each runs on a thread (Soldat_Job), said while it does, the game drawn on.
 @(private = "file")
 page_import :: proc(menu: ^Menu) {
 	k := &menu.kit
@@ -273,40 +277,31 @@ page_import :: proc(menu: ^Menu) {
 	im := &mods.import_
 	if !im.looked {
 		im.looked = true
-		if installs := res.soldat_installs(context.temp_allocator); len(installs) > 0 {
-			set_text(&im.folder, installs[0])
-			im.scan = .Due
-		}
+		soldat_job_start(&im.job, .Find, rl.GetTime())
 	}
+	if soldat_job_take(&im.job) do soldat_job_taken(menu)
 	if picked, taken := folder_pick_take(&im.pick); taken {
 		if picked != "" {
 			set_text(&im.folder, picked)
-			im.scan = .Due
+			import_look(menu)
 		}
 		delete(picked)
 	}
 	muted_line(k, "Make mods of what you changed or added in your Soldat 1.7.1.")
 
-	// looked through, and installed, a frame after it is asked for, so that it says so
-	// while it does
-	switch im.scan {
-	case .None:
-	case .Due:
-		im.scan = .Now
-		line(k, "Looking through your Soldat...", ui.MUTED)
+	busy := soldat_job_busy(&im.job)
+	if busy && im.job.kind != .Import {
+		said := "Looking for your Soldat..." if im.job.kind == .Find else "Looking through your Soldat..."
+		line(k, fmt.tprintf("%s %s", said, elapsed(rl.GetTime() - im.job.started)), ui.MUTED)
 		return
-	case .Now:
-		im.scan = .None
-		import_look(menu)
 	}
 	if im.root == "" {
 		browse_row(menu, im.problem if im.problem != "" else "No Soldat 1.7.1 found where it is usually installed: browse to its folder.", im.problem != "")
 		return
 	}
-	if im.install >= 0 && im.install < len(im.sources) {
-		i := im.install
-		im.install = -1
-		soldat_install(menu, i)
+	if busy { // importing: the rest of the tab shown, its Imports held
+		title := OWN_TITLE if im.job.source.kind == .Own else im.job.source.name
+		line(k, fmt.tprintf("Importing %s... %s", title, elapsed(rl.GetTime() - im.job.started)), ui.MUTED)
 	}
 
 	offered := false
@@ -345,9 +340,7 @@ browse_row :: proc(menu: ^Menu, said: string, warn: bool) {
 }
 
 // The mod of the install's own changes: its name, and its title as the Mods page shows it.
-@(private = "file")
 OWN_NAME :: "My_S1_Mod"
-@(private = "file")
 OWN_TITLE :: "My S1 Mod"
 
 // What the player changed of the install, a mod of mods/, or a custom interface: its
@@ -359,8 +352,14 @@ source_row :: proc(menu: ^Menu, source: res.Soldat_Source, i, own: int) {
 	if !r.shown do return
 	name := OWN_NAME if source.kind == .Own else res.mod_name_from(source.name)
 	taken := name == "" || name_taken(menu, name)
-	pressed, bx := row_button(k, r.x + r.w - 8, r.y + (r.h - ui.CTRL_H) / 2, "Imported" if taken else "Import", taken, primary = !taken)
-	if pressed && !taken do ask_install(menu, i)
+	job := &menu.mods.import_.job
+	importing := soldat_job_busy(job) && job.kind == .Import && job.source.kind == source.kind && job.source.name == source.name
+	caption := "Importing..." if importing else "Imported" if taken else "Import"
+	pressed, bx := row_button(k, r.x + r.w - 8, r.y + (r.h - ui.CTRL_H) / 2, caption, taken || soldat_job_busy(job), primary = !taken)
+	if pressed && !taken && !soldat_job_busy(job) {
+		soldat_job_start(job, .Import, rl.GetTime(), menu.mods.import_.root, source)
+		set_text(&menu.mods.note, "")
+	}
 	title, detail: string
 	switch source.kind {
 	case .Own:
@@ -379,54 +378,55 @@ source_row :: proc(menu: ^Menu, source: res.Soldat_Source, i, own: int) {
 	ui.text_fit(k, ui.TINY, detail, r.x + 12, r.y + 31, bx - r.x - 24, ui.FAINT)
 }
 
-// The source `i` to be installed the next pass, Installing... said meanwhile.
-@(private = "file")
-ask_install :: proc(menu: ^Menu, i: int) {
-	menu.mods.import_.install = i
-	note(&menu.mods, "Importing...", false)
-}
-
-// The install of the folder given found, and looked through for what mods can be made of.
+// The folder given, if it opens, looked through (on the job's thread) for what mods can be
+// made of.
 @(private = "file")
 import_look :: proc(menu: ^Menu) {
 	im := &menu.mods.import_
+	if soldat_job_busy(&im.job) do return
 	if !os.is_dir(im.folder) {
 		set_text(&im.problem, "That folder can't be opened: browse to your Soldat 1.7.1's.")
 		set_text(&im.root, "")
 		return
 	}
 	set_text(&im.problem, "")
-	set_text(&im.root, im.folder)
-	res.soldat_sources_destroy(im.sources)
-	im.sources = res.soldat_sources(im.root, res.mod_classic(menu.mod))
-	im.install = -1
+	soldat_job_start(&im.job, .Scan, rl.GetTime(), im.folder)
 }
 
-// The source `i` made a mod: the install's own changes, a mod of its mods/ with them
-// under it, or a custom interface with the HUD's of them under it. Said how it went.
+// What the job that is over came to: the install found, and looked through next; what it
+// holds that mods can be made of, the install taken as found; or a mod made, and said how
+// it went.
 @(private = "file")
-soldat_install :: proc(menu: ^Menu, i: int) {
+soldat_job_taken :: proc(menu: ^Menu) {
 	mods := &menu.mods
 	im := &mods.import_
-	source := im.sources[i]
-	classic := res.mod_classic(menu.mod)
-	name, problem: string
-	switch source.kind {
-	case .Own:
-		name = OWN_NAME
-		problem = res.mod_import({im.root}, res.MODS_DIR, name, classic, OWN_TITLE).problem
-	case .Mod:
-		name = res.mod_name_from(source.name)
-		problem = res.mod_import({im.root, source.dir}, res.MODS_DIR, name, classic).problem
-	case .Interface:
-		name, problem = res.interface_install(im.root, source.dir, source.name, res.MODS_DIR, classic)
+	job := &im.job
+	switch job.kind {
+	case .Find:
+		if len(job.installs) > 0 {
+			set_text(&im.folder, job.installs[0])
+			import_look(menu)
+		}
+	case .Scan:
+		set_text(&im.root, job.root)
+		res.soldat_sources_destroy(im.sources)
+		im.sources, job.sources = job.sources, nil // the tab's now
+	case .Import:
+		if job.problem != "" {
+			note(mods, fmt.tprintf("%s couldn't be made: %s", job.name, job.problem), true)
+			return
+		}
+		note(mods, fmt.tprintf("%s imported: wear its parts on Installed Mods.", OWN_TITLE if job.source.kind == .Own else job.name), false)
+		mods_relist(mods)
 	}
-	if problem != "" {
-		note(mods, fmt.tprintf("%s couldn't be made: %s", name, problem), true)
-		return
-	}
-	note(mods, fmt.tprintf("%s imported: wear its parts on Installed Mods.", OWN_TITLE if source.kind == .Own else name), false)
-	mods_relist(mods)
+}
+
+// "4s", "1m 05s": how long a job has been running.
+@(private = "file")
+elapsed :: proc(seconds: f64) -> string {
+	s := int(seconds)
+	if s < 60 do return fmt.tprintf("%ds", s)
+	return fmt.tprintf("%dm %02ds", s / 60, s % 60)
 }
 
 // The catalogue's section: each mod it has, and what may be done with it; or why there
