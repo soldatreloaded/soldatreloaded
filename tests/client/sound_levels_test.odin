@@ -13,12 +13,12 @@ import res "../../core/resources"
 @(test)
 sound_levels_played :: proc(t: ^testing.T) {
 	covered: bit_set[res.Sound_Group]
-	for dir in ([2]string{"mods/classic/sfx", "mods/classic/sfx/radio"}) {
+	for dir in ([2]string{"mods/classic/sounds", "mods/classic/sounds/radio"}) {
 		entries, err := os.read_all_directory_by_path(dir, context.temp_allocator)
 		testing.expectf(t, err == nil, "%s listed", dir)
 		for entry in entries {
 			if !strings.has_suffix(entry.name, ".wav") do continue
-			name := entry.name if dir == "mods/classic/sfx" else strings.concatenate({"radio/", entry.name}, context.temp_allocator)
+			name := entry.name if dir == "mods/classic/sounds" else strings.concatenate({"radio/", entry.name}, context.temp_allocator)
 			if group, grouped := sound.sound_group(name); grouped do covered += {group}
 		}
 	}
