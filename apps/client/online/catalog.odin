@@ -223,7 +223,7 @@ install_do :: proc(i: ^Install) -> string {
 	download := utils.temp_path(i.mods_dir, fmt.tprintf(".%s.download", m.name))
 	defer os.remove(download)
 	if os.write_entire_file(download, zip) != nil do return "it couldn't be written: is the disk full?"
-	if _, problem := res.mod_unpack(download, i.mods_dir, replace = true, allocator = context.temp_allocator); problem != "" do return problem
+	if _, problem := res.mod_unpack(download, i.mods_dir, name = m.name, replace = true, allocator = context.temp_allocator); problem != "" do return problem
 	return ""
 }
 

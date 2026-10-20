@@ -656,7 +656,7 @@ marker_folder :: proc(folder, marker: string) -> string {
 }
 
 // Whether `v` is three numbers, as 1.0.0.
-@(private = "file")
+@(private)
 version_ok :: proc(v: string) -> bool {
 	parts := strings.split(v, ".", context.temp_allocator)
 	if len(parts) != 3 do return false

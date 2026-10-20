@@ -1,6 +1,5 @@
 package resources
 
-import "core:encoding/json"
 import "core:log"
 import "core:os"
 import "core:path/filepath"
@@ -303,126 +302,15 @@ layer_folder :: proc(layer: ^Mod_Layer, dir: string) -> []string {
 // ---------------------------------------------------------------------------------
 // The mods in mods/
 
-// A mod as the Mods page lists it.
-Mod_Listing :: struct {
-	name:     string,
-	title:    string,        // what it is shown as: its about.json's title, else its name
-	packed:   bool,          // an .smod; else a folder
-	contents: Mod_Contents,  // what of the game it changes
-	nested:   string,        // the folders its files are found under, if not at its root
-}
-
-Mod_Content :: enum {
-	Graphics, // gostek, weapons, interface, sparks, objects, scenery or textures
-	Sounds,
-	Fonts,    // txt/font.ini, or fonts/
-	Config,   // mod.ini
-}
-Mod_Contents :: bit_set[Mod_Content]
-
-// The players' mods under `mods_dir`, by name, Classic left out: each .smod and each
-// folder, a folder before an .smod of its name, which it hides. Free with
-// mods_list_destroy.
-mods_list :: proc(mods_dir: string, allocator := context.allocator) -> []Mod_Listing {
-	listings := make([dynamic]Mod_Listing, allocator)
-	entries, err := os.read_all_directory_by_path(mods_dir, context.temp_allocator)
-	if err != nil do return listings[:]
-	names := make([dynamic]string, context.temp_allocator)
-	for entry in entries {
-		name := entry.name
-		if entry.type != .Directory {
-			if !strings.equal_fold(filepath.ext(name), MOD_EXTENSION) do continue
-			name = name[:len(name) - len(MOD_EXTENSION)]
-		}
-		// a hidden one isn't a mod: one being installed is written as one
-		if name == "" || mod_builtin(name) || reserved(name) || strings.has_prefix(name, ".") do continue
-		if !slice.contains(names[:], name) do append(&names, name)
-	}
-	slice.sort_by(names[:], proc(a, b: string) -> bool {return strings.to_lower(a, context.temp_allocator) < strings.to_lower(b, context.temp_allocator)})
-	for name in names {
-		layer, found := layer_open(mods_dir, name, context.temp_allocator)
-		if !found do continue
-		listing := Mod_Listing{name = strings.clone(name, allocator), packed = layer.archive != nil, contents = layer_contents(&layer)}
-		title := layer_about(&layer).title
-		listing.title = strings.clone(title if strings.trim_space(title) != "" else name, allocator)
-		if layer.archive != nil {
-			listing.nested = strings.clone(layer.archive.root, allocator)
-		} else {
-			listing.nested = strings.clone(strings.trim_prefix(strings.trim_prefix(layer.dir, utils.temp_path(mods_dir, name)), "/"), allocator)
-		}
-		layer_close(&layer, context.temp_allocator)
-		append(&listings, listing)
-	}
-	return listings[:]
-}
-
-mods_list_destroy :: proc(listings: []Mod_Listing, allocator := context.allocator) {
-	for listing in listings {
-		delete(listing.name, allocator)
-		delete(listing.title, allocator)
-		delete(listing.nested, allocator)
-	}
-	delete(listings, allocator)
-}
-
-// The version of the mod `name`, as its mod.json says (else, a mod of before, its
-// about.json, as the mods repository wrote it); empty if it says none, or isn't there.
-// With the temp allocator.
+// The version of the mod `name`, as its mod.json says; empty if it can't be read, or isn't
+// there. With the temp allocator.
 mod_version :: proc(mods_dir, name: string) -> string {
-	if path := srmod_path(mods_dir, name); path != "" {
-		mod, _, ok := srmod_open(path, context.temp_allocator)
-		if !ok do return ""
-		defer srmod_close(&mod, context.temp_allocator)
-		return strings.clone(mod.info.version, context.temp_allocator)
-	}
-	layer, found := layer_open(mods_dir, name, context.temp_allocator)
-	if !found do return ""
-	defer layer_close(&layer, context.temp_allocator)
-	return layer_about(&layer).version
-}
-
-// What a mod's about.json says of it, as the mods repository writes it; empty where it
-// says nothing, or has none. With the temp allocator.
-Mod_About :: struct {
-	version: string,
-	title:   string, // the name it is shown by, spaces and all
-}
-
-@(private = "file")
-layer_about :: proc(layer: ^Mod_Layer) -> (about: Mod_About) {
-	file, found := layer_file(layer, 0, "about.json")
-	if !found do return
-	data, read := mod_read(file, context.temp_allocator)
-	if !read do return
-	json.unmarshal(data, &about, allocator = context.temp_allocator)
-	return
-}
-
-// The mod `name` in `mods_dir`, open: its folder, else its .smod.
-@(private = "file")
-layer_open :: proc(mods_dir, name: string, allocator := context.allocator) -> (layer: Mod_Layer, found: bool) {
-	context.allocator = allocator
-	folder := utils.temp_path(mods_dir, name)
-	if os.is_dir(folder) {
-		return {name = strings.clone(name), dir = strings.clone(folder_root(folder))}, true
-	}
-	path := strings.concatenate({folder, MOD_EXTENSION}, context.temp_allocator)
-	if !os.is_file(path) do return
-	a := new(Mod_Archive)
-	ok: bool
-	if a.zip, ok = utils.zip_open(path); !ok {
-		log.errorf("%s isn't a zip the game can read", path)
-		free(a)
-		return
-	}
-	a.path = strings.clone(path)
-	a.root = strings.clone(archive_root(a.zip.entries))
-	a.files = make(map[string]string, len(a.zip.entries))
-	for zip_name in a.zip.entries {
-		if !strings.has_prefix(zip_name, a.root) do continue
-		a.files[strings.to_lower(zip_name[len(a.root):])] = zip_name
-	}
-	return {name = strings.clone(name), archive = a}, true
+	path := srmod_path(mods_dir, name)
+	if path == "" do return ""
+	mod, _, ok := srmod_open(path, context.temp_allocator)
+	if !ok do return ""
+	defer srmod_close(&mod, context.temp_allocator)
+	return strings.clone(mod.info.version, context.temp_allocator)
 }
 
 @(private)
@@ -439,34 +327,6 @@ layer_close :: proc(layer: ^Mod_Layer, allocator := context.allocator) {
 	delete(layer.name)
 	delete(layer.dir)
 	layer^ = {}
-}
-
-// What a layer has of the game's: its root's folders and files.
-@(private = "file")
-layer_contents :: proc(layer: ^Mod_Layer) -> (contents: Mod_Contents) {
-	tops := make([dynamic]string, context.temp_allocator)
-	if a := layer.archive; a != nil {
-		for key in a.files {
-			slash := strings.index_byte(key, '/')
-			append(&tops, key[:slash] if slash >= 0 else key)
-		}
-	} else {
-		entries, _ := os.read_all_directory_by_path(layer.dir, context.temp_allocator)
-		for entry in entries do append(&tops, strings.to_lower(entry.name, context.temp_allocator))
-	}
-	for top in tops {
-		switch top {
-		case "gostek-gfx", "weapons-gfx", "interface-gfx", "sparks-gfx", "objects-gfx", "scenery-gfx", "textures":
-			contents += {.Graphics}
-		case "sfx":
-			contents += {.Sounds}
-		case "txt", "fonts":
-			contents += {.Fonts}
-		case "mod.ini":
-			contents += {.Config}
-		}
-	}
-	return
 }
 
 // Where a folder's mod's files are: the folder, if they are at its root; else the
@@ -492,27 +352,6 @@ folder_root :: proc(folder: string) -> string {
 	return folder
 }
 
-// Where in a zip a mod's files are: "" if at its root, else the shallowest folder that
-// has them ("Competitive/"), with its slash.
-@(private = "file")
-archive_root :: proc(entries: map[string]utils.Zip_Entry) -> string {
-	best := ""
-	best_depth := max(int)
-	for name in entries {
-		parts := strings.split(name, "/", context.temp_allocator)
-		for part, i in parts {
-			if i >= best_depth do break
-			if is_root_name(part, i < len(parts) - 1) {
-				best_depth = i
-				best = strings.join(parts[:i], "/", context.temp_allocator)
-				break
-			}
-		}
-	}
-	if best_depth == max(int) || best == "" do return ""
-	return strings.concatenate({best, "/"}, context.temp_allocator)
-}
-
 // Whether a name, of a folder or a file, is one a mod's root has.
 @(private)
 is_root_name :: proc(name: string, folder: bool) -> bool {
@@ -528,7 +367,7 @@ is_root_name :: proc(name: string, folder: bool) -> bool {
 
 // A name no player's mod may have besides Classic's: the old default's, which an install
 // updated from before may still hold until the launcher clears it.
-@(private = "file")
+@(private)
 reserved :: proc(name: string) -> bool {
 	return strings.equal_fold(name, "default")
 }

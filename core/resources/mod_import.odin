@@ -113,6 +113,34 @@ soldat_is_install :: proc(dir: string) -> bool {
 	return false
 }
 
+// How a mod is made (mod_import): from a Soldat install, the default; or from a mod of
+// before, whole.
+Import_Options :: struct {
+	whole:         bool,        // every file of the first folder goes in, laid out as a Soldat 1 mod: a mod of before
+	default_scale: f32,         // pixels to a unit where a mod.ini says none: Soldat 1's 1 (0), our mods of before Classic's 4.5
+	about:         Srmod_About, // what its mod.json says of it beside its name and title
+	description:   string,      // its description; "" for where it was made from
+}
+
+// What a mod's mod.json says of it, as it is written (srmod_write), beside its name,
+// title and description: "" where it says nothing, its version 1.0.0 if none.
+Srmod_About :: struct {
+	version: string,
+	author:  string,
+	licence: string,
+	source:  string,
+}
+
+// Whether `dir` is a mod laid out as Soldat 1's, of any of its folders (txt/ and fonts/
+// too) or its mod.ini, at its root or a folder or two down.
+old_layout :: proc(dir: string) -> bool {
+	if dir == "" || !os.is_dir(dir) do return false
+	entries, err := os.read_all_directory_by_path(folder_root(dir), context.temp_allocator)
+	if err != nil do return false
+	for entry in entries do if is_root_name(entry.name, entry.type == .Directory) do return true
+	return false
+}
+
 // What making a mod found: how many of its files change something of the game's.
 Import_Result :: struct {
 	changed: int,    // its art and sounds that differ from Classic's
@@ -201,23 +229,26 @@ soldat_sources_destroy :: proc(sources: []Soldat_Source, allocator := context.al
 // Classic's, laid out by part (MOD_PATHS), each image keyed as the game keys it, its
 // see-through made alpha, its pixels as they were and its mod.json saying the scale
 // Soldat 1 drew it at (import_file); and the soldier's and the weapons' pivots, from their mod.inis'
-// [GOSTEK], where they differ from Classic's.
-mod_import :: proc(dirs: []string, mods_dir, name: string, classic: Mod, title := "") -> (result: Import_Result) {
+// [GOSTEK], where they differ from Classic's. With `options.whole`, the first folder is a
+// mod of its own, all of it going in (a mod of before, converted: mods_tidy).
+mod_import :: proc(dirs: []string, mods_dir, name: string, classic: Mod, title := "", options := Import_Options{}) -> (result: Import_Result) {
 	if problem := mod_name_problem(mods_dir, name); problem != "" do return {problem = problem}
 	if !srmod_name_ok(name) do return {problem = "A mod's name is letters, digits, - and _, 32 at most."}
 	if len(dirs) == 0 do return {problem = "Pick what to make the mod from."}
+	default_scale := options.default_scale if options.default_scale > 0 else 1
 	stock := stock_load()
 	merged := make(map[string]Packed, 256, context.temp_allocator)
 	anchors := make(map[string]f32, context.temp_allocator)
 	for dir, i in dirs {
-		if !soldat_is_install(dir) do return {problem = "That isn't a Soldat folder: there is no gostek-gfx, weapons-gfx or the like in it."}
-		own := i == 0 // the install itself
-		files, _ := scan(dirs[0], dir, classic, &stock, own)
+		whole := options.whole && i == 0
+		if !soldat_is_install(dir) && !(whole && old_layout(dir)) do return {problem = "That isn't a Soldat folder: there is no gostek-gfx, weapons-gfx or the like in it."}
+		own := i == 0 && !whole // the install itself
+		files, _ := scan(dirs[0], dir, classic, &stock, own, default_scale)
 		for f in files do merged[strings.to_lower(f.name, context.temp_allocator)] = f
 		// its mod.ini's pivots, unless it is 1.7.1's own as it came: those are no player's
 		root := dir if own else folder_root(dir)
 		if !utils.file_exists(utils.temp_path(root, MOD_CONFIG_FILE)) || is_stock(&stock, utils.temp_path(root, MOD_CONFIG_FILE), MOD_CONFIG_FILE, install_path(dirs[0], root)) do continue
-		config := soldat_config(root)
+		config := soldat_config(root, default_scale)
 		for key, value in config.anchors do anchors[key] = value
 	}
 
@@ -255,7 +286,8 @@ mod_import :: proc(dirs: []string, mods_dir, name: string, classic: Mod, title :
 	if result.changed == 0 {
 		return {problem = "Nothing there differs from the game as it came. Put your art and sounds in its folders first."}
 	}
-	if !srmod_write(mods_dir, name, title if title != "" else name, fmt.tprintf("Made from %s, in Soldat 1.7.1.", strings.join(dirs, " and ", context.temp_allocator)), entries, scales) {
+	description := options.description if options.description != "" else fmt.tprintf("Made from %s, in Soldat 1.7.1.", strings.join(dirs, " and ", context.temp_allocator))
+	if !srmod_write(mods_dir, name, title if title != "" else name, description, entries, scales, options.about) {
 		return {problem = "The mod couldn't be written into mods/: is the disk full?"}
 	}
 	log.infof("made the mod %s from %v: %d files that differ from the game's", name, dirs, result.changed)
@@ -276,10 +308,10 @@ Packed :: struct {
 // that is neither 1.7.1's as it came nor Classic's, its game's folders alone looked
 // through. With the temp allocator.
 @(private = "file")
-scan :: proc(install, dir: string, classic: Mod, stock: ^map[string]Stock_File, own: bool) -> (files: []Packed, ok: bool) {
+scan :: proc(install, dir: string, classic: Mod, stock: ^map[string]Stock_File, own: bool, default_scale: f32 = 1) -> (files: []Packed, ok: bool) {
 	root := dir if own else folder_root(dir)
 	at := install_path(install, root) // where its files are in the install, as the stock list has them
-	config := soldat_config(root)
+	config := soldat_config(root, default_scale)
 	packed := make([dynamic]Packed, context.temp_allocator)
 	// Classic's folders, read once for every file; kept in an arena of their own, as the
 	// temp allocator's is let go of file by file
@@ -312,9 +344,9 @@ scan :: proc(install, dir: string, classic: Mod, stock: ^map[string]Stock_File, 
 // A Soldat 1 folder's mod.ini, as Soldat 1 reads it: its scales 1 where it doesn't say,
 // as a mod without one is; with the temp allocator.
 @(private = "file")
-soldat_config :: proc(root: string) -> Mod_Config {
+soldat_config :: proc(root: string, default_scale: f32 = 1) -> Mod_Config {
 	layer := Mod_Layer{dir = root}
-	config, _ := mod_config_read(&layer, context.temp_allocator, default_scale = 1)
+	config, _ := mod_config_read(&layer, context.temp_allocator, default_scale = default_scale)
 	return config
 }
 
@@ -369,6 +401,13 @@ import_file :: proc(f: Packed) -> (dest: string, data: []byte, scale: f32, ok: b
 	case ".wav", ".ogg", ".mp3":
 		if part != .Sounds do return
 		return utils.temp_path(base, file), bytes, 0, true
+	case ".ttf", ".otf":
+		if part != .Fonts do return
+		return utils.temp_path(base, file), bytes, 0, true
+	case ".ini":
+		// txt/font.ini: the fonts' own, which the fonts part holds; no other of txt/
+		if part != .Fonts || !strings.equal_fold(file, "font.ini") do return
+		return utils.temp_path(base, file), bytes, 0, true
 	}
 	return
 }
@@ -393,7 +432,7 @@ image_key :: proc(path: string) -> Maybe(utils.Rgba) {
 // say them (scales_compact), SRMOD_SCALE those it hasn't. Written into a hidden folder
 // first, which the game passes over, then moved into its place whole, over a mod of its
 // name already there (the HUD editor saving over its own). False, logged, if it can't be.
-srmod_write :: proc(mods_dir, name, title, description: string, entries: map[string][]byte, scales: map[string]f32 = nil) -> bool {
+srmod_write :: proc(mods_dir, name, title, description: string, entries: map[string][]byte, scales: map[string]f32 = nil, about := Srmod_About{}) -> bool {
 	parts := make([dynamic]string, context.temp_allocator)
 	for part in Part {
 		for dest in entries {
@@ -415,7 +454,19 @@ srmod_write :: proc(mods_dir, name, title, description: string, entries: map[str
 		}
 	}
 	scale, compact := scales_compact(per_image)
-	info := Srmod_Info{format = SRMOD_FORMAT, name = name, title = title, version = "1.0.0", author = "", description = description, parts = parts[:], scale = scale, scales = compact}
+	info := Srmod_Info {
+		format      = SRMOD_FORMAT,
+		name        = name,
+		title       = title,
+		version     = about.version if version_ok(about.version) else "1.0.0",
+		author      = about.author,
+		description = description,
+		licence     = about.licence,
+		source      = about.source,
+		parts       = parts[:],
+		scale       = scale,
+		scales      = compact,
+	}
 	options := json.Marshal_Options{spec = .JSON, pretty = true, use_spaces = true, spaces = 2}
 	text, err := json.marshal(info, options, context.temp_allocator)
 	if err != nil do return false

@@ -64,31 +64,82 @@ read :: proc(file: res.Mod_File) -> string {
 	return string(data)
 }
 
-// mods/ listed: Classic left out, each .smod and folder by name, with what it changes,
-// and where its files were found if not at its root.
+// Mods of before, as the game starts: an .smod (its files a folder down, its about.json,
+// its mod.ini's scales) and a folder of sounds and fonts, each converted whole into a mod
+// of now, its parts by Soldat 1's folders, its images as they were at their scales
+// (Classic's 4.5 where its mod.ini said none), its about.json its mod.json; each put aside
+// in .old/. A folder of nothing the game uses, and Classic, left be; a name taken, said.
 @(test)
-listed :: proc(t: ^testing.T) {
-	dir := scratch(t, "listed")
+converted :: proc(t: ^testing.T) {
+	dir := scratch(t, "converted")
 	defer os.remove_all(dir)
-	write(utils.temp_path(dir, "classic", "mod.ini"), "")
-	write_zip(utils.temp_path(dir, "Art.smod"), {{"Art/weapons-gfx/ak74.png", "gun"}, {"Art/mod.ini", ""}, {"Art/about.json", `{"name": "Art", "title": "Art and More", "version": "1.2.0"}`}})
-	write(utils.temp_path(dir, "Sounds", "sfx", "shotgun.wav"), "shot")
+	write_classic(dir, {{"soldier/klata.png", picture(1)}, {"sounds/shot.wav", "classic shot"}, {"fonts/font.ini", "[FONTS]\n"}})
+	write_zip(utils.temp_path(dir, "Art.smod"), {
+		{"Art/weapons-gfx/ak74.png", picture(2)},
+		{"Art/gostek-gfx/klata.png", picture(3, 12, 8)},
+		{"Art/mod.ini", "[SCALE]\nDefaultScale=2\ngostek-gfx=9\n"},
+		{"Art/about.json", `{"name": "Art", "title": "Art and More", "version": "1.2.0", "author": "Me", "description": "Shiny guns.", "licence": "CC0"}`},
+	})
+	write(utils.temp_path(dir, "Loud Sounds", "sfx", "shot.wav"), "loud shot")
+	write(utils.temp_path(dir, "Loud Sounds", "txt", "font.ini"), "[FONTS]\nFont1File=big.ttf\n")
+	write(utils.temp_path(dir, "Loud Sounds", "fonts", "big.ttf"), "a font")
+	write(utils.temp_path(dir, "Loud Sounds", "txt", "weaponnames.txt"), "not the fonts'")
 	write(utils.temp_path(dir, "Empty", "readme.txt"), "nothing the game uses")
-	write(utils.temp_path(dir, ".Half.part"), "an install under way")
+	write_zip(utils.temp_path(dir, "Taken.smod"), {{"sfx/shot.wav", "x"}})
+	write(utils.temp_path(dir, "Taken", "mod.json"), `{"format": 1, "name": "Taken", "version": "1.0.0"}`)
 
-	listings := res.mods_list(dir)
-	defer res.mods_list_destroy(listings)
-	names := make([dynamic]string, context.temp_allocator)
-	for l in listings do append(&names, l.name)
-	testing.expect(t, slice.equal(names[:], []string{"Art", "Empty", "Sounds"}), "the players' mods, by name, Classic and what is being installed left out")
-	testing.expect(t, listings[0].packed && listings[0].contents == {.Graphics, .Config} && listings[0].nested == "Art/", "an .smod: its art and its mod.ini, a folder down")
-	testing.expect(t, listings[1].contents == {}, "a folder of nothing the game uses, said so")
-	testing.expect(t, !listings[2].packed && listings[2].contents == {.Sounds} && listings[2].nested == "", "a folder of sounds")
-	testing.expect_value(t, res.mod_version(dir, "Art"), "1.2.0")
-	testing.expect(t, listings[0].title == "Art and More" && listings[2].title == "Sounds", "shown by its about.json's title, else its name")
+	notes := res.mods_tidy(dir)
+	testing.expectf(t, len(notes) == 3, "three said: %v", notes)
+	testing.expect(t, slice.equal(res.srmods_list(dir), []string{"Art", "Loud_Sounds", "Taken"}), "Art and Loud Sounds converted, named as mods may be")
 
-	testing.expect(t, res.mod_name_problem(dir, "sounds") != "", "a name taken, in any case, by a folder")
-	testing.expect(t, res.mod_delete(dir, "Sounds") && !os.exists(utils.temp_path(dir, "Sounds")), "a mod's folder deleted")
+	art, why, ok := res.srmod_open(utils.temp_path(dir, "Art"))
+	defer res.srmod_close(&art)
+	if !testing.expectf(t, ok, "Art opens (%s)", why) do return
+	testing.expect(t, art.info.title == "Art and More" && art.info.version == "1.2.0" && art.info.author == "Me" && art.info.licence == "CC0" && art.info.description == "Shiny guns.", "its about.json its mod.json")
+	testing.expect_value(t, art.parts, res.Parts{.Soldier, .Weapons})
+	testing.expect_value(t, res.srmod_scale(&art, "weapons/ak74.png"), 2)
+	testing.expect_value(t, res.srmod_scale(&art, "soldier/klata.png"), 9)
+	chest, _ := res.srmod_file(&art, .Soldier, "klata.png")
+	image, decoded := res.texture_decode(transmute([]byte)read(chest), nil, context.temp_allocator)
+	testing.expect(t, decoded && image.width == 12 && image.height == 8, "its pixels as they were")
+
+	loud, lwhy, lok := res.srmod_open(utils.temp_path(dir, "Loud_Sounds"))
+	defer res.srmod_close(&loud)
+	if !testing.expectf(t, lok, "Loud Sounds opens (%s)", lwhy) do return
+	testing.expect_value(t, loud.parts, res.Parts{.Sounds, .Fonts})
+	font, has_font := res.srmod_file(&loud, .Fonts, "big.ttf")
+	ini, has_ini := res.srmod_file(&loud, .Fonts, "font.ini")
+	testing.expect(t, has_font && read(font) == "a font" && has_ini && strings.contains(read(ini), "big.ttf"), "its fonts and its font.ini")
+	_, names := res.srmod_file(&loud, .Fonts, "weaponnames.txt")
+	testing.expect(t, !names, "no other of txt/")
+
+	for kept in ([]string{"Art.smod", "Loud Sounds", "Taken.smod"}) do testing.expectf(t, os.exists(utils.temp_path(dir, ".old", kept)), "%s put aside", kept)
+	testing.expect(t, os.is_dir(utils.temp_path(dir, "Empty")) && !os.exists(utils.temp_path(dir, ".converting")), "a folder of nothing left be, nothing left half made")
+	testing.expect_value(t, res.mod_version(dir, "Taken"), "1.0.0")
+
+	testing.expect(t, res.mod_name_problem(dir, "art") != "", "a name taken, in any case, by a folder")
+	testing.expect(t, res.mod_delete(dir, "Art") && !os.exists(utils.temp_path(dir, "Art")), "a mod's folder deleted")
+}
+
+// A zip of a Soldat 1 mod, with no mod.json, unpacked (as the catalogue's of before are,
+// and a zip dropped on the game): converted, named as asked, over the one there with
+// replace.
+@(test)
+zipped_soldat_mod :: proc(t: ^testing.T) {
+	dir := scratch(t, "zipped_soldat_mod")
+	defer os.remove_all(dir)
+	mods := utils.temp_path(dir, "mods")
+	write_classic(mods, {{"sounds/shot.wav", "classic shot"}})
+	zip := utils.temp_path(dir, "download")
+	write_zip(zip, {{"Competitive/sfx/shot.wav", "quiet"}, {"Competitive/about.json", `{"title": "Competitive", "version": "2.0.0"}`}})
+	name, problem := res.mod_unpack(zip, mods, name = "Competitive", allocator = context.temp_allocator)
+	testing.expectf(t, problem == "" && name == "Competitive", "converted (%s)", problem)
+	testing.expect_value(t, res.mod_version(mods, "Competitive"), "2.0.0")
+	write_zip(zip, {{"Competitive/sfx/shot.wav", "quieter"}, {"Competitive/about.json", `{"version": "2.1.0"}`}})
+	_, again := res.mod_unpack(zip, mods, name = "Competitive", replace = true, allocator = context.temp_allocator)
+	testing.expect(t, again == "" && res.mod_version(mods, "Competitive") == "2.1.0", "updated over itself")
+	shot, _ := utils.read_file(utils.temp_path(mods, "Competitive", "sounds", "shot.wav"), context.temp_allocator)
+	testing.expect_value(t, string(shot), "quieter")
 }
 
 // A mod made from a Soldat install: only what differs from Classic goes in, an image by

@@ -629,9 +629,8 @@ mods_relist :: proc(mods: ^Mods) {
 	res.srmod_listings_destroy(mods.listings)
 	mods.listings = res.srmod_listings(res.MODS_DIR)
 	versions_forget(mods)
-	installed := res.mods_list(res.MODS_DIR, context.temp_allocator)
-	for listing in installed {
-		mods.versions[strings.clone(listing.name)] = strings.clone(online.installed_version(res.MODS_DIR, listing.name))
+	for listing in mods.listings {
+		mods.versions[strings.clone(listing.name)] = strings.clone(listing.version)
 	}
 	mods.listed = true
 	if _, still := listing_of(mods, mods.selected); !still do set_text(&mods.selected, "")
