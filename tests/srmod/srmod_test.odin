@@ -148,6 +148,49 @@ scaled :: proc(t: ^testing.T) {
 	for path, s in per_file do testing.expectf(t, res.srmod_scale(&said, path) == s, "%s at %v", path, s)
 }
 
+// A mod's mod.json as the Mods page changes it: what it says of itself and its parts'
+// scales written, a part at the mod's own not said, a folder's own kept; a version or a
+// title it can't have refused. A new mod: its folder and its mod.json, of no part, not
+// over one by its name.
+@(test)
+edited :: proc(t: ^testing.T) {
+	dir := scratch(t, "edited")
+	defer os.remove_all(dir)
+	write(utils.temp_path(dir, "Old", "mod.json"), `{"format": 1, "name": "Old", "version": "1.0.0", "parts": ["soldier", "weapons"], "scale": 1, "scales": {"weapons": 2, "soldier/ranny": 3}}`)
+	write(utils.temp_path(dir, "Old", "soldier", "klata.png"), "chest")
+	write(utils.temp_path(dir, "Old", "weapons", "ak74.png"), "gun")
+	details, why, ok := res.srmod_details(dir, "Old")
+	if !testing.expectf(t, ok, "read (%s)", why) do return
+	testing.expect(t, details.scale == 1 && details.scales[.Weapons] == 2 && details.scales[.Soldier] == 1 && details.own[.Weapons] && !details.own[.Soldier], "its scales, part by part")
+	testing.expect_value(t, details.deeper, 1)
+
+	details.title = "  The Old One "
+	details.author = "Me"
+	details.version = "1.1.0"
+	details.scales[.Weapons] = 0 // the mod's own
+	details.scales[.Soldier] = 4.5
+	testing.expect_value(t, res.srmod_details_write(dir, "Old", details), "")
+	again, _, _ := res.srmod_details(dir, "Old")
+	testing.expect(t, again.title == "The Old One" && again.author == "Me" && again.version == "1.1.0", "what it says of itself")
+	testing.expect(t, again.scales[.Weapons] == 1 && again.scales[.Soldier] == 4.5 && again.deeper == 1, "its parts' scales, and its folder's own kept")
+	mod, _, opened := res.srmod_open(utils.temp_path(dir, "Old"))
+	testing.expect(t, opened && mod.parts == {.Soldier, .Weapons} && res.srmod_scale(&mod, "soldier/ranny/krew.png") == 3, "its parts and its folder's scale as they were")
+	res.srmod_close(&mod)
+
+	bad := again
+	bad.version = "two"
+	testing.expect(t, res.srmod_details_write(dir, "Old", bad) != "", "a version that isn't three numbers refused")
+	bad = again
+	bad.title = ""
+	testing.expect(t, res.srmod_details_write(dir, "Old", bad) != "", "no title refused")
+
+	testing.expect_value(t, res.mod_new(dir, "Fresh"), "")
+	fresh, fwhy, fok := res.srmod_open(utils.temp_path(dir, "Fresh"))
+	testing.expectf(t, fok && fresh.parts == {} && fresh.info.title == "Fresh" && len(fresh.problems) == 0, "a new mod, empty (%s)", fwhy)
+	res.srmod_close(&fresh)
+	testing.expect(t, res.mod_new(dir, "fresh") != "" && res.mod_new(dir, "Bad Name") != "", "not over one by its name, nor of a name a mod can't have")
+}
+
 // The mods in a folder: each folder with a mod.json; not a zip, Classic, a folder that is
 // no mod, nor a hidden one (being written, or put aside in .old/).
 @(test)

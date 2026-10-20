@@ -1,11 +1,13 @@
 #+build windows
 package menu
 
+import "core:strings"
 import win "core:sys/windows"
 
-// Windows' own folder dialog (IFileOpenDialog, picking folders), over `owner`. The folder
-// picked, with the context allocator; false if the player cancelled it.
-pick_folder :: proc(title: string, owner: rawptr) -> (path: string, ok: bool) {
+// Windows' own file dialog (IFileOpenDialog), over `owner`: picking a folder, or with
+// `file` a mod's file. The path picked, with the context allocator; false if the player
+// cancelled it.
+pick_path :: proc(title: string, owner: rawptr, file: bool) -> (path: string, ok: bool) {
 	win.CoInitializeEx(nil, .APARTMENTTHREADED)
 	defer win.CoUninitialize()
 	dialog: ^win.IFileOpenDialog
@@ -13,7 +15,16 @@ pick_folder :: proc(title: string, owner: rawptr) -> (path: string, ok: bool) {
 	defer dialog->Release()
 	options: win.FILEOPENDIALOGOPTIONS
 	dialog->GetOptions(&options)
-	dialog->SetOptions(options | win.FOS_PICKFOLDERS | win.FOS_FORCEFILESYSTEM)
+	if file {
+		dialog->SetOptions(options | win.FOS_FILEMUSTEXIST | win.FOS_FORCEFILESYSTEM)
+		patterns := MOD_FILE_PATTERNS
+		types := [?]win.COMDLG_FILTERSPEC {
+			{win.utf8_to_wstring("Mods", context.temp_allocator), win.utf8_to_wstring(strings.join(patterns[:], ";", context.temp_allocator), context.temp_allocator)},
+		}
+		dialog->SetFileTypes(len(types), &types[0])
+	} else {
+		dialog->SetOptions(options | win.FOS_PICKFOLDERS | win.FOS_FORCEFILESYSTEM)
+	}
 	dialog->SetTitle(win.utf8_to_wstring(title, context.temp_allocator))
 	if dialog->Show(win.HWND(owner)) < 0 do return // cancelled
 	item: ^win.IShellItem

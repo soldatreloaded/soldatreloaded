@@ -6,10 +6,11 @@ import "core:thread"
 
 import res "../../../core/resources"
 
-// From your Soldat 1's slow work, on a thread of its own so the game draws on while it
-// runs: looking for the install where it is usually put (Steam's libraries on every
-// drive, Wine's), looking through one for what mods can be made of, and making one of
-// them a mod. One at a time, started, then taken once it is done, as a Folder_Pick is.
+// The Mods page's slow work, on a thread of its own so the game draws on while it runs:
+// looking for the Soldat 1 install where it is usually put (Steam's libraries on every
+// drive, Wine's), looking through one for what mods can be made of, making one of them a
+// mod, and unpacking a mod's zip (converting it, a Soldat 1 mod's). One at a time,
+// started, then taken once it is done, as a Folder_Pick is.
 //
 // The job wears a Classic of its own (res.mod_make), never the game's, which the Mods
 // page may wear anew while it runs. What it gives back is the context allocator's, the
@@ -18,6 +19,7 @@ Soldat_Job_Kind :: enum {
 	Find,   // the installs where Soldat is usually put
 	Scan,   // what in `root` mods can be made of
 	Import, // `source` of `root` made a mod
+	Unpack, // the zip at `root` (a mod's, or a Soldat 1 mod's) unpacked into mods/
 }
 
 Soldat_Job :: struct {
@@ -31,8 +33,8 @@ Soldat_Job :: struct {
 	// what came of it
 	installs: []string,             // Find's
 	sources:  []res.Soldat_Source,  // Scan's
-	name:     string,               // Import's: the mod made, or meant to be
-	problem:  string,               // Import's: why it wasn't; "" if it was
+	name:     string,               // Import's and Unpack's: the mod made, or meant to be
+	problem:  string,               // and why it wasn't; "" if it was
 }
 
 // The job's name, and its own copies of `root` and `source`, for `kind`. Nothing if one is
@@ -88,6 +90,9 @@ soldat_job_run :: proc(data: rawptr) {
 	switch job.kind {
 	case .Find:
 		job.installs = res.soldat_installs()
+	case .Unpack:
+		name, problem := res.mod_unpack(job.root, res.MODS_DIR, allocator = context.temp_allocator)
+		job.name, job.problem = strings.clone(name), strings.clone(problem) // out of this thread's temp allocator
 	case .Scan, .Import:
 		own := res.mod_make(res.MODS_DIR)
 		defer res.mod_destroy(&own)

@@ -4,16 +4,24 @@ package menu
 import "core:os"
 import "core:strings"
 
-// The desktop's own folder dialog: zenity's (GNOME and most others), else kdialog's
-// (KDE); macOS's, through osascript. The folder picked, with the context allocator; false
-// if the player cancelled it, or there is no dialog to show.
-pick_folder :: proc(title: string, owner: rawptr) -> (path: string, ok: bool) {
-	commands := [?][]string {
+// The desktop's own file dialog: zenity's (GNOME and most others), else kdialog's (KDE);
+// macOS's, through osascript. Picking a folder, or with `file` a mod's file. The path
+// picked, with the context allocator; false if the player cancelled it, or there is no
+// dialog to show.
+pick_path :: proc(title: string, owner: rawptr, file: bool) -> (path: string, ok: bool) {
+	patterns := MOD_FILE_PATTERNS
+	spaced := strings.join(patterns[:], " ", context.temp_allocator)
+	folders := [?][]string {
 		{"zenity", "--file-selection", "--directory", strings.concatenate({"--title=", title}, context.temp_allocator)},
 		{"kdialog", "--getexistingdirectory", ".", "--title", title},
 		{"osascript", "-e", strings.concatenate({`POSIX path of (choose folder with prompt "`, title, `")`}, context.temp_allocator)},
 	}
-	for command in commands {
+	files := [?][]string {
+		{"zenity", "--file-selection", strings.concatenate({"--title=", title}, context.temp_allocator), strings.concatenate({"--file-filter=Mods | ", spaced}, context.temp_allocator)},
+		{"kdialog", "--getopenfilename", ".", spaced, "--title", title},
+		{"osascript", "-e", strings.concatenate({`POSIX path of (choose file with prompt "`, title, `")`}, context.temp_allocator)},
+	}
+	for command in (files[:] if file else folders[:]) {
 		state, stdout, _, err := os.process_exec({command = command}, context.temp_allocator)
 		if err != nil do continue // not here: the next
 		if !state.success do return // cancelled

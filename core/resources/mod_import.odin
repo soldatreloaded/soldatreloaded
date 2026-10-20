@@ -478,7 +478,7 @@ srmod_write :: proc(mods_dir, name, title, description: string, entries: map[str
 		scale       = scale,
 		scales      = compact,
 	}
-	options := json.Marshal_Options{spec = .JSON, pretty = true, use_spaces = true, spaces = 2}
+	options := json.Marshal_Options{spec = .JSON, pretty = true, use_spaces = true, spaces = 2, sort_maps_by_key = true}
 	text, err := json.marshal(info, options, context.temp_allocator)
 	if err != nil do return false
 

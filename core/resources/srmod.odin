@@ -259,7 +259,7 @@ scale_key :: proc(path: string) -> string {
 	return key
 }
 
-@(private = "file")
+@(private)
 scale_ok :: proc(scale: f32) -> bool {
 	return scale >= SRMOD_SCALE_MIN && scale <= SRMOD_SCALE_MAX
 }

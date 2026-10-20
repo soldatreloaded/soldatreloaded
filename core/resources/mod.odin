@@ -411,18 +411,6 @@ mod_name_problem :: proc(mods_dir, name: string) -> string {
 	return ""
 }
 
-// A new mod of the player's, `name`: an empty folder, which changes nothing until files
-// are put in it. Why not, if it can't be made.
-mod_create :: proc(mods_dir, name: string) -> (problem: string) {
-	if problem = mod_name_problem(mods_dir, name); problem != "" do return
-	dir := utils.temp_path(mods_dir, name)
-	if err := os.make_directory_all(dir); err != nil {
-		log.errorf("cannot make %s: %v", dir, err)
-		return "Its folder couldn't be made."
-	}
-	return
-}
-
 // The player's mod `name` gone from `mods_dir`, its folder; never Classic. False, with the
 // reason logged, if it couldn't be.
 mod_delete :: proc(mods_dir, name: string) -> bool {

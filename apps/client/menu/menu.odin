@@ -254,7 +254,7 @@ pages_draw :: proc(menu: ^Menu, u: ^ui.Ui) {
 	case .Controls: page_controls(menu)
 	case .Settings: k.w = min(w, 520); page_settings(menu)
 	case .Taunts:   page_taunts(menu)
-	case .Mods:     k.w = min(w, 520); page_mods(menu)
+	case .Mods:     k.w = min(w, 900); page_mods(menu)
 	}
 	k.x, k.w = x, w
 	notes := &IN_GAME_NOTES if menu.in_game else &PAGE_NOTES
@@ -306,7 +306,7 @@ PAGE_LINES := [Page]string {
 	.Controls = "The keys. Click a binding, then press the new key; Escape cancels.",
 	.Settings = "What is drawn, the sound, the mouse and the interface.",
 	.Taunts   = "What a key says: a message to everyone or the team, or your own words as a radio call.",
-	.Mods     = "How the game looks and sounds: each part, the soldier, the weapons, the sounds..., from a mod.",
+	.Mods     = "How the game looks, sounds and speaks: each part, the soldier, the weapons, the sounds, the words..., from a mod.",
 }
 
 // What the footer says on the pages with nothing of their own to say there.
