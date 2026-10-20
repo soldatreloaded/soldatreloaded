@@ -63,7 +63,8 @@ Client :: struct {
 	catalog:       online.Catalog, // the mods' catalogue, and the mod being installed from it
 	settings:      ^menu.Menu, // the settings over a match, while they are up (the escape menu's Settings)
 	last_map:      string, // Offline Play's last, which the menu offers again
-	discord:       online.Discord, // the pipe to the Discord app here
+	tidied:        string, // what was done to mods/ as the game started, said on the first menu's Mods page
+	discord:      online.Discord, // the pipe to the Discord app here
 	showing:       Maybe(Showing), // what Discord was last shown (discord_update), none before the first
 	showing_since: i64, // and since when, Unix seconds
 }
@@ -96,6 +97,8 @@ main :: proc() {
 
 	client: Client
 	client.config = res.client_config_load(CONFIG_PATH, OLD_CONFIG_PATH)
+	// mods/ as folders of the format, before any is worn: what was zipped, unpacked
+	if tidied := res.mods_tidy(res.MODS_DIR); len(tidied) > 0 do client.tidied = strings.join(tidied, " ")
 	client.mod = res.mod_make(res.MODS_DIR, res.part_choices(client.config.graphics.parts))
 	client.last_map = strings.clone(menu.FIRST_MAP)
 	if !online.line_init(&client.line) do log.error("ENet wouldn't start: there is no playing online")
@@ -305,6 +308,11 @@ settings_close :: proc(client: ^Client) {
 menu_open :: proc(client: ^Client) -> Screen {
 	m := new(menu.Menu)
 	menu.menu_init(m, client.config, client.mod, client.last_map, &client.line, &client.browser, &client.catalog)
+	if client.tidied != "" { // said once, on the first menu's Mods page
+		menu.mods_note(m, client.tidied)
+		delete(client.tidied)
+		client.tidied = ""
+	}
 	return m
 }
 

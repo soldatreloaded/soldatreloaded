@@ -356,9 +356,16 @@ mods_list_destroy :: proc(listings: []Mod_Listing, allocator := context.allocato
 	delete(listings, allocator)
 }
 
-// What the mod `name` says of itself in its about.json, as the mods repository writes
-// it: its version; empty if it has none.
+// The version of the mod `name`, as its mod.json says (else, a mod of before, its
+// about.json, as the mods repository wrote it); empty if it says none, or isn't there.
+// With the temp allocator.
 mod_version :: proc(mods_dir, name: string) -> string {
+	if path := srmod_path(mods_dir, name); path != "" {
+		mod, _, ok := srmod_open(path, context.temp_allocator)
+		if !ok do return ""
+		defer srmod_close(&mod, context.temp_allocator)
+		return strings.clone(mod.info.version, context.temp_allocator)
+	}
 	layer, found := layer_open(mods_dir, name, context.temp_allocator)
 	if !found do return ""
 	defer layer_close(&layer, context.temp_allocator)
@@ -523,18 +530,12 @@ mod_builtin :: proc(name: string) -> bool {
 	return strings.equal_fold(name, MOD_CLASSIC)
 }
 
-// Whether a mod `name` is in `mods_dir`, as a folder or an .smod, in any case.
+// Whether a mod `name` is in `mods_dir`, its folder, in any case.
 mod_exists :: proc(mods_dir, name: string) -> bool {
 	entries, err := os.read_all_directory_by_path(mods_dir, context.temp_allocator)
 	if err != nil do return false
 	for entry in entries {
-		other := entry.name
-		if entry.type != .Directory {
-			ext := filepath.ext(other)
-			if !strings.equal_fold(ext, MOD_EXTENSION) && !strings.equal_fold(ext, SRMOD_EXTENSION) do continue
-			other = other[:len(other) - len(ext)]
-		}
-		if strings.equal_fold(other, name) do return true
+		if entry.type == .Directory && strings.equal_fold(entry.name, name) do return true
 	}
 	return false
 }
@@ -573,22 +574,14 @@ mod_create :: proc(mods_dir, name: string) -> (problem: string) {
 	return
 }
 
-// The player's mod `name` gone from `mods_dir`: its folder and its .smod, both if it has
-// both; never Classic. False, with the reason logged, if it couldn't be.
+// The player's mod `name` gone from `mods_dir`, its folder; never Classic. False, with the
+// reason logged, if it couldn't be.
 mod_delete :: proc(mods_dir, name: string) -> bool {
 	if name == "" || reserved(name) || mod_builtin(name) || name == "." || name == ".." || strings.contains_any(name, "\\/") do return false
 	dir := utils.temp_path(mods_dir, name)
 	if os.is_dir(dir) {
 		if err := os.remove_all(dir); err != nil {
 			log.errorf("cannot delete %s: %v", dir, err)
-			return false
-		}
-	}
-	for extension in ([]string{MOD_EXTENSION, SRMOD_EXTENSION}) {
-		packed := strings.concatenate({dir, extension}, context.temp_allocator)
-		if !os.is_file(packed) do continue
-		if err := os.remove(packed); err != nil {
-			log.errorf("cannot delete %s: %v", packed, err)
 			return false
 		}
 	}

@@ -202,7 +202,7 @@ imported :: proc(t: ^testing.T) {
 	}
 	testing.expect(t, slice.equal(installed[:], []string{"Neo", "Tourney_HUD"}), "Neo and the mod's, not over Taken")
 
-	neo, why, ok := res.srmod_open(utils.temp_path(mods_dir, "Neo.srmod"))
+	neo, why, ok := res.srmod_open(utils.temp_path(mods_dir, "Neo"))
 	defer res.srmod_close(&neo)
 	if !testing.expectf(t, ok, "Neo a mod (%s)", why) do return
 	testing.expect(t, neo.parts == {.Hud, .Icons} && neo.info.title == "Neo interface", "its hud and its icons")
@@ -219,7 +219,7 @@ imported :: proc(t: ^testing.T) {
 	_, cursor := res.srmod_file(&neo, .Icons, "cursor.png")
 	testing.expect(t, cursor, "its cursor among its icons")
 
-	tourney, twhy, tok := res.srmod_open(utils.temp_path(mods_dir, "Tourney_HUD.srmod"))
+	tourney, twhy, tok := res.srmod_open(utils.temp_path(mods_dir, "Tourney_HUD"))
 	defer res.srmod_close(&tourney)
 	testing.expect(t, tok && tourney.info.title == "Tourney HUD interface" && tourney.parts == {.Hud}, twhy)
 	_, tammo := res.srmod_file(&tourney, .Hud, "ammo.png")

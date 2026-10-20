@@ -120,9 +120,7 @@ tab_installed :: proc(menu: ^Menu) {
 	muted_line(k, "Click a mod's part to wear it from that mod, and from no other; again, for Classic's.")
 	classic_row(menu)
 	for &listing in mods.listings do installed_row(menu, &listing)
-	if listing, picked := listing_of(mods, mods.selected); picked && !listing.packed {
-		page_making(menu, listing.name)
-	}
+	if listing, picked := listing_of(mods, mods.selected); picked do page_making(menu, listing.name)
 }
 
 // Classic, the game's own: not worn as a mod is, but its HUD may begin one in the editor.
@@ -209,15 +207,15 @@ PART_TITLES := [res.Part]string {
 	.Fonts    = "Fonts",
 }
 
-// What a mod is, beside its name: "v1.0.0  -  by Calp  -  .srmod"; or why it can't be
-// worn, or that it changes nothing.
+// What a mod is, beside its name: "v1.0.0  -  by Calp"; or why it can't be worn, or that
+// it changes nothing.
 @(private = "file")
 listing_text :: proc(listing: ^res.Srmod_Listing) -> (text: string, bad: bool) {
 	if listing.problem != "" do return fmt.tprintf("Can't be worn: %s", listing.problem), true
 	if listing.parts == {} do return "Nothing the game uses: its files go in soldier/, sounds/... at its root", true
 	text = fmt.tprintf("v%s", listing.version)
 	if listing.author != "" do text = fmt.tprintf("%s  -  by %s", text, listing.author)
-	return fmt.tprintf("%s  -  %s", text, ".srmod" if listing.packed else "folder, being made"), false
+	return text, false
 }
 
 // A small button on a row, its right edge at `right`. Pressed, and where its left edge
@@ -565,10 +563,10 @@ action_bar :: proc(menu: ^Menu) {
 			if mods.confirm do mod_delete(menu, listing.name)
 			else do mods.confirm = true
 		}
-		if picked && listing.packed {
+		if picked {
 			opened, ox := big_button(menu, right, "SHOW", false, false)
 			right = ox - 10
-			if opened do folder_open(res.MODS_DIR)
+			if opened do folder_open(utils.temp_path(res.MODS_DIR, listing.name))
 		}
 	}
 	tw := right - x - 6
@@ -730,6 +728,11 @@ line :: proc(k: ^ui.Kit, text: string, color: rl.Color) {
 note :: proc(mods: ^Mods, text: string, bad: bool) {
 	set_text(&mods.note, text)
 	mods.note_bad = bad
+}
+
+// What the client did to mods/ as it started, said on the Mods page until something else is.
+mods_note :: proc(menu: ^Menu, text: string) {
+	note(&menu.mods, text, false)
 }
 
 // Each part worn from the mod `parts` names for it, asked of the client, which takes the

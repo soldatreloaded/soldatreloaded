@@ -389,8 +389,10 @@ image_key :: proc(path: string) -> Maybe(utils.Rgba) {
 	return COLOR_KEY
 }
 
-// A .srmod written, `mods_dir`/`name`.srmod: its mod.json, of the parts `entries` have
-// (by their paths in it), and them. False, logged, if it can't be.
+// A mod written, the folder `mods_dir`/`name`: its mod.json, of the parts `entries` have
+// (by their paths in it), and them. Written into a hidden folder first, which the game
+// passes over, then moved into its place whole, over a mod of its name already there (the
+// HUD editor saving over its own). False, logged, if it can't be.
 srmod_write :: proc(mods_dir, name, title, description: string, entries: map[string][]byte) -> bool {
 	parts := make([dynamic]string, context.temp_allocator)
 	for part in Part {
@@ -406,18 +408,23 @@ srmod_write :: proc(mods_dir, name, title, description: string, entries: map[str
 	text, err := json.marshal(info, options, context.temp_allocator)
 	if err != nil do return false
 
-	os.make_directory_all(mods_dir)
-	path := utils.temp_path(mods_dir, strings.concatenate({name, SRMOD_EXTENSION}, context.temp_allocator))
+	path := utils.temp_path(mods_dir, name)
 	partial := utils.temp_path(mods_dir, strings.concatenate({".", name, ".part"}, context.temp_allocator))
-	w: utils.Zip_Writer
-	if !utils.zip_write_begin(&w, partial) do return false
-	utils.zip_write_add(&w, SRMOD_INFO_FILE, text)
-	names := make([dynamic]string, context.temp_allocator)
-	for dest in entries do append(&names, dest)
-	slice.sort(names[:])
-	for dest in names do utils.zip_write_add(&w, dest, entries[dest])
-	if !utils.zip_write_end(&w) || os.rename(partial, path) != nil {
-		os.remove(partial)
+	os.remove_all(partial)
+	written := os.make_directory_all(partial) == nil && os.write_entire_file(utils.temp_path(partial, SRMOD_INFO_FILE), text) == nil
+	for dest in entries {
+		if !written do break
+		if !zip_name_safe(dest) {
+			log.errorf("%s: %s is no path within a mod", name, dest)
+			written = false
+			break
+		}
+		at := utils.temp_path(partial, dest)
+		written = os.make_directory_all(filepath.dir(at)) == nil && os.write_entire_file(at, entries[dest]) == nil
+	}
+	if written && os.is_dir(path) do written = os.remove_all(path) == nil
+	if !written || os.rename(partial, path) != nil {
+		os.remove_all(partial)
 		log.errorf("could not write %s", path)
 		return false
 	}

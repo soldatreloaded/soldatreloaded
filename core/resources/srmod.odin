@@ -10,9 +10,10 @@ import "core:unicode/utf8"
 
 import "../utils"
 
-// Soldat Reloaded's mods (docs/srmod.md): a mod is one file, <name>.srmod, a zip; or,
-// being made, its folder, mods/<name>/, laid out the same. At its root, mod.json says
-// what it is; each of its parts is a folder there (soldier/, weapons/, hud/, ...). The
+// Soldat Reloaded's mods (docs/srmod.md): a mod is a folder, mods/<name>/; zipped, a
+// .srmod or a .zip, is how one is handed over, unpacked as it comes in (mod_tidy.odin).
+// At its root, mod.json says what it is; each of its parts is a folder there (soldier/,
+// weapons/, hud/, ...). The
 // player wears each part from a mod of its own (Worn): a file the chosen mod's part
 // hasn't is Classic's, which has them all. Every image is 4.5 pixels to a unit: there
 // is no mod.ini.
@@ -120,8 +121,7 @@ Srmod_Info :: struct {
 Srmod :: struct {
 	info:     Srmod_Info,
 	parts:    Parts,     // the parts it has: its folders that are parts
-	pack:     Mod_Layer, // its folder or its zip, its root where its mod.json is
-	packed:   bool,      // a .srmod, installed or handed over, worn as it is; else a folder, being made, its mod.json the player's to edit
+	pack:     Mod_Layer, // its folder (or, being unpacked, its zip), its root where its mod.json is
 	problems: []string,  // what is wrong with it, that it is worn all the same (a part listed without its folder): the allocator's
 }
 
@@ -149,7 +149,6 @@ srmod_open :: proc(path: string, allocator := context.allocator, classic := fals
 	if classic ? !strings.equal_fold(info.name, MOD_CLASSIC) : !srmod_name_ok(info.name) {
 		return mod, "its name isn't letters, digits, - and _, 32 at most", false
 	}
-	mod.packed = mod.pack.archive != nil
 	if strings.trim_space(info.title) == "" {
 		delete(info.title)
 		info.title = strings.clone(info.name)
@@ -247,22 +246,17 @@ srmod_name_ok :: proc(name: string) -> bool {
 	return true
 }
 
-// The mods in `dir`, by name: each .srmod, and each folder with a mod.json, a folder
-// before an .srmod of its name, which it hides; Classic left out. With the temp allocator.
+// The mods in `dir`, by name: each folder with a mod.json; Classic, and the hidden (one
+// being written, mods/.old/), left out. With the temp allocator.
 srmods_list :: proc(dir: string) -> []string {
 	names := make([dynamic]string, context.temp_allocator)
 	entries, err := os.read_all_directory_by_path(dir, context.temp_allocator)
 	if err != nil do return nil
 	for entry in entries {
 		name := entry.name
-		if strings.has_prefix(name, ".") do continue
-		if entry.type == .Directory {
-			if !utils.file_exists(utils.temp_path(entry.fullpath, SRMOD_INFO_FILE)) do continue
-		} else {
-			if !strings.has_suffix(strings.to_lower(name, context.temp_allocator), SRMOD_EXTENSION) do continue
-			name = name[:len(name) - len(SRMOD_EXTENSION)]
-		}
-		if strings.equal_fold(name, MOD_CLASSIC) || slice.contains(names[:], name) do continue
+		if strings.has_prefix(name, ".") || entry.type != .Directory do continue
+		if !utils.file_exists(utils.temp_path(entry.fullpath, SRMOD_INFO_FILE)) do continue
+		if strings.equal_fold(name, MOD_CLASSIC) do continue
 		append(&names, name)
 	}
 	slice.sort(names[:])
@@ -277,8 +271,7 @@ Srmod_Listing :: struct {
 	author:      string,
 	description: string,
 	parts:       Parts,
-	packed:      bool,   // a .srmod; else a folder, being made
-	problem:     string, // why it can't be worn, if it can't: it is listed to be deleted
+	problem:    string, // why it can't be worn, if it can't: it is listed to be deleted
 }
 
 // The mods in `dir` (srmods_list), each opened to say what it is. Free with
@@ -288,7 +281,7 @@ srmod_listings :: proc(dir: string, allocator := context.allocator) -> []Srmod_L
 	for name in srmods_list(dir) {
 		path := srmod_path(dir, name)
 		mod, problem, ok := srmod_open(path, context.temp_allocator)
-		listing := Srmod_Listing{name = strings.clone(name, allocator), packed = !os.is_dir(path)}
+		listing := Srmod_Listing{name = strings.clone(name, allocator)}
 		if ok {
 			listing.title = strings.clone(mod.info.title, allocator)
 			listing.version = strings.clone(mod.info.version, allocator)
@@ -312,12 +305,10 @@ srmod_listings_destroy :: proc(listings: []Srmod_Listing, allocator := context.a
 	delete(listings, allocator)
 }
 
-// Where the mod `name` in `dir` is: its folder, else its .srmod; "" if neither.
+// Where the mod `name` in `dir` is: its folder; "" if it has none with a mod.json.
 srmod_path :: proc(dir, name: string) -> string {
 	folder := utils.temp_path(dir, name)
 	if os.is_dir(folder) && utils.file_exists(utils.temp_path(folder, SRMOD_INFO_FILE)) do return folder
-	packed := strings.concatenate({folder, SRMOD_EXTENSION}, context.temp_allocator)
-	if os.is_file(packed) do return packed
 	return ""
 }
 

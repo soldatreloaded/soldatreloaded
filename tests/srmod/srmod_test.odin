@@ -54,7 +54,6 @@ opened :: proc(t: ^testing.T) {
 	if !testing.expectf(t, ok, "a folder opens (%s)", why) do return
 	testing.expect_value(t, plain.info.name, "Plain")
 	testing.expect_value(t, plain.info.title, "Plain") // none given: its name
-	testing.expect(t, !plain.packed, "a folder: being made, its mod.json the player's")
 	testing.expect_value(t, plain.parts, res.Parts{.Soldier, .Weapons})
 	testing.expect_value(t, len(plain.problems), 3) // hats, sounds without a folder, weapons unlisted
 	file, found := res.srmod_file(&plain, .Soldier, "KLATA.PNG")
@@ -72,7 +71,6 @@ opened :: proc(t: ^testing.T) {
 	defer res.srmod_close(&zipped)
 	if !testing.expectf(t, zok, "a .srmod opens, its files a folder down (%s)", zwhy) do return
 	testing.expect(t, zipped.info.title == "Packed Up" && zipped.parts == {.Hud} && len(zipped.problems) == 0, "its title, its one part, nothing wrong")
-	testing.expect(t, zipped.packed, "a .srmod: packed")
 	layout, has := res.srmod_file(&zipped, .Hud, "layout.json")
 	testing.expect(t, has && read(layout) == `{"alpha": 100}`, "its file read from the zip")
 }
@@ -102,21 +100,92 @@ refused :: proc(t: ^testing.T) {
 	}
 }
 
-// The mods in a folder: each .srmod and each folder with a mod.json, a folder hiding an
-// .srmod of its name; not Classic, nor a folder that is no mod.
+// The mods in a folder: each folder with a mod.json; not a zip, Classic, a folder that is
+// no mod, nor a hidden one (being written, or put aside in .old/).
 @(test)
 listed :: proc(t: ^testing.T) {
 	dir := scratch(t, "listed")
 	defer os.remove_all(dir)
 	write(utils.temp_path(dir, "Alpha", "mod.json"), info("Alpha", ""))
-	write(utils.temp_path(dir, "Alpha.srmod"), "zip")
-	write(utils.temp_path(dir, "Beta.SRMOD"), "zip")
+	write(utils.temp_path(dir, "Beta", "mod.json"), info("Beta", ""))
+	write(utils.temp_path(dir, "Gamma.srmod"), "zip")
 	write(utils.temp_path(dir, "classic", "mod.json"), info("classic", ""))
 	write(utils.temp_path(dir, "Loose", "klata.png"), "chest")
-	write(utils.temp_path(dir, "Old.smod"), "zip")
+	write(utils.temp_path(dir, ".Delta.part", "mod.json"), info("Delta", ""))
 	testing.expect(t, slice.equal(res.srmods_list(dir), []string{"Alpha", "Beta"}), "Alpha and Beta")
-	testing.expect(t, strings.has_suffix(res.srmod_path(dir, "Alpha"), "Alpha"), "Alpha's folder before its .srmod")
-	testing.expect_value(t, res.srmod_path(dir, "Gone"), "")
+	testing.expect(t, strings.has_suffix(res.srmod_path(dir, "Alpha"), "Alpha"), "Alpha's folder")
+	testing.expect_value(t, res.srmod_path(dir, "Gamma"), "")
+}
+
+// A zip of a mod, its mod.json a folder down, unpacked into the folder of its mod.json's
+// name, its files as they were; a name taken refused, unless it is replaced; a zip that
+// isn't a mod, or would write outside its folder, refused.
+@(test)
+unpacked :: proc(t: ^testing.T) {
+	dir := scratch(t, "unpacked")
+	defer os.remove_all(dir)
+	mods := utils.temp_path(dir, "mods")
+	zip :: proc(path: string, files: []struct{name, data: string}) {
+		w: utils.Zip_Writer
+		utils.zip_write_begin(&w, path)
+		for f in files do utils.zip_write_add(&w, f.name, transmute([]byte)f.data)
+		utils.zip_write_end(&w)
+	}
+	shared := utils.temp_path(dir, "shared.zip")
+	zip(shared, {{"Neat Mod/mod.json", info("Neat", `"soldier"`)}, {"Neat Mod/soldier/Klata.png", "chest"}, {"Neat Mod/soldier/team2/klata.png", "red chest"}})
+	name, problem := res.mod_unpack(shared, mods, allocator = context.temp_allocator)
+	testing.expectf(t, problem == "" && name == "Neat", "unpacked as Neat (%s)", problem)
+	testing.expect(t, string(utils.read_file(utils.temp_path(mods, "Neat", "soldier", "Klata.png"), context.temp_allocator) or_else nil) == "chest", "its files, their names' case kept")
+	testing.expect(t, utils.file_exists(utils.temp_path(mods, "Neat", "soldier", "team2", "klata.png")), "its folders")
+	testing.expect(t, !os.exists(utils.temp_path(mods, ".Neat.part")), "nothing left half written")
+
+	_, taken := res.mod_unpack(shared, mods, allocator = context.temp_allocator)
+	testing.expect(t, strings.contains(taken, "already"), "its name taken")
+	newer := utils.temp_path(dir, "newer.srmod")
+	zip(newer, {{"mod.json", info("Neat", `"sounds"`, version = "1.1.0")}, {"sounds/shot.wav", "bang"}})
+	_, replaced := res.mod_unpack(newer, mods, replace = true, allocator = context.temp_allocator)
+	testing.expect(t, replaced == "" && utils.file_exists(utils.temp_path(mods, "Neat", "sounds", "shot.wav")) && !os.exists(utils.temp_path(mods, "Neat", "soldier")), "replaced whole")
+	testing.expect_value(t, res.mod_version(mods, "Neat"), "1.1.0")
+
+	loose := utils.temp_path(dir, "loose.zip")
+	zip(loose, {{"readme.txt", "hi"}})
+	_, not_mod := res.mod_unpack(loose, mods, allocator = context.temp_allocator)
+	testing.expect(t, strings.contains(not_mod, "mod.json"), "a zip of no mod refused")
+	escaping := utils.temp_path(dir, "escaping.zip")
+	zip(escaping, {{"mod.json", info("Escape", "")}, {"../outside.txt", "oops"}})
+	_, unsafe := res.mod_unpack(escaping, mods, allocator = context.temp_allocator)
+	testing.expect(t, unsafe != "" && !os.exists(utils.temp_path(dir, "outside.txt")) && !os.exists(utils.temp_path(mods, "Escape")), "nothing written outside, nor the mod")
+}
+
+// mods/ tidied as the game starts: a .srmod and a .zip there unpacked, each put aside in
+// .old/; one whose name a folder has already, put aside, the folder kept; a zip of no mod
+// left where it is; each said.
+@(test)
+tidied :: proc(t: ^testing.T) {
+	dir := scratch(t, "tidied")
+	defer os.remove_all(dir)
+	zip :: proc(path, name: string) {
+		w: utils.Zip_Writer
+		utils.zip_write_begin(&w, path)
+		utils.zip_write_add(&w, "mod.json", transmute([]byte)info(name, ""))
+		utils.zip_write_end(&w)
+	}
+	zip(utils.temp_path(dir, "One.srmod"), "One")
+	zip(utils.temp_path(dir, "two.zip"), "Two")
+	zip(utils.temp_path(dir, "Kept.srmod"), "Kept")
+	write(utils.temp_path(dir, "Kept", "mod.json"), info("Kept", "", version = "3.0.0"))
+	write(utils.temp_path(dir, "junk.zip"), "not a zip")
+	logger := context.logger
+	context.logger.lowest_level = .Fatal // junk.zip's error is expected
+	notes := res.mods_tidy(dir)
+	context.logger = logger
+	testing.expect_value(t, len(notes), 4)
+	testing.expect(t, slice.equal(res.srmods_list(dir), []string{"Kept", "One", "Two"}), "One and Two unpacked, Kept kept")
+	testing.expect_value(t, res.mod_version(dir, "Kept"), "3.0.0")
+	for kept in ([]string{"One.srmod", "two.zip", "Kept.srmod"}) {
+		testing.expectf(t, utils.file_exists(utils.temp_path(dir, ".old", kept)) && !os.exists(utils.temp_path(dir, kept)), "%s put aside", kept)
+	}
+	testing.expect(t, utils.file_exists(utils.temp_path(dir, "junk.zip")), "a zip of no mod left be")
 }
 
 // Classic, and two mods: the soldier and the weapons from one, the sounds from another
@@ -255,7 +324,7 @@ hud_saved :: proc(t: ^testing.T) {
 	layout.alpha = 120
 	layout.health.icon.at = {50, 300}
 	testing.expect(t, res.hud_mod_write(dir, "My_HUD", "My HUD", "Made in the HUD editor, from Neo's HUD.", layout, pictures), "written")
-	mine, mwhy, mok := res.srmod_open(utils.temp_path(dir, "My_HUD.srmod"))
+	mine, mwhy, mok := res.srmod_open(utils.temp_path(dir, "My_HUD"))
 	defer res.srmod_close(&mine)
 	if !testing.expectf(t, mok, "My_HUD opened (%s)", mwhy) do return
 	testing.expect(t, mine.parts == {.Hud} && mine.info.title == "My HUD", "a hud alone")
@@ -267,13 +336,13 @@ hud_saved :: proc(t: ^testing.T) {
 
 	layout.alpha = 200
 	testing.expect(t, res.hud_mod_write(dir, "My_HUD", "My HUD", mine_description(dir), layout, again), "saved over itself")
-	over, _, _ := res.srmod_open(utils.temp_path(dir, "My_HUD.srmod"))
+	over, _, _ := res.srmod_open(utils.temp_path(dir, "My_HUD"))
 	defer res.srmod_close(&over)
 	testing.expect(t, strings.has_prefix(over.info.description, res.HUD_EDITOR_MADE) && strings.contains(over.info.description, "Neo"), "the editor's, from Neo's still")
 
 	mine_description :: proc(dir: string) -> string {
-		m, _, _ := res.srmod_open(utils.temp_path(dir, "My_HUD.srmod"))
-		defer res.srmod_close(&m) // a .srmod open is a file open, which can't be written over
+		m, _, _ := res.srmod_open(utils.temp_path(dir, "My_HUD"))
+		defer res.srmod_close(&m) // let go of before it is written over
 		return strings.clone(m.info.description, context.temp_allocator)
 	}
 }

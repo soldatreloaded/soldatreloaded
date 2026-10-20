@@ -217,17 +217,13 @@ install_do :: proc(i: ^Install) -> string {
 	for name in entries {
 		if !entry_name_ok(name) do return fmt.tprintf("its zip has a file it may not: %s", name)
 	}
-	// written out of sight, as a file the Mods page passes over, then moved in whole
+	// written out of sight, as a file the Mods page passes over, then unpacked into its
+	// folder, over the version installed
 	os.make_directory_all(i.mods_dir)
-	part := utils.temp_path(i.mods_dir, fmt.tprintf(".%s.part", m.name))
-	defer os.remove(part)
-	if os.write_entire_file(part, zip) != nil do return "it couldn't be written: is the disk full?"
-	packed := utils.temp_path(i.mods_dir, strings.concatenate({m.name, res.MOD_EXTENSION}))
-	if os.exists(packed) && os.remove(packed) != nil do return "the version installed couldn't be replaced: is the game using it elsewhere?"
-	if os.rename(part, packed) != nil do return "it couldn't be put in its place"
-	// an install of before, unpacked into a folder, which would hide the .smod
-	unpacked := utils.temp_path(i.mods_dir, m.name)
-	if os.exists(utils.temp_path(unpacked, "about.json")) do os.remove_all(unpacked)
+	download := utils.temp_path(i.mods_dir, fmt.tprintf(".%s.download", m.name))
+	defer os.remove(download)
+	if os.write_entire_file(download, zip) != nil do return "it couldn't be written: is the disk full?"
+	if _, problem := res.mod_unpack(download, i.mods_dir, replace = true, allocator = context.temp_allocator); problem != "" do return problem
 	return ""
 }
 
@@ -245,11 +241,7 @@ catalog_name_ok :: proc(name: string) -> bool {
 // A zip's file a mod may have: a path inside its folder, never out of it.
 @(private = "file")
 entry_name_ok :: proc(name: string) -> bool {
-	if name == "" || strings.has_prefix(name, "/") || strings.contains(name, ":") do return false
-	for part in strings.split(name, "/", context.temp_allocator) {
-		if part == "" || part == "." || part == ".." do return false
-	}
-	return true
+	return res.zip_name_safe(name)
 }
 
 @(private = "file")

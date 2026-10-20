@@ -43,6 +43,22 @@ write_zip :: proc(path: string, files: []struct {
 	utils.zip_write_end(&w)
 }
 
+// Every file below `dir`, by its path from it with forward slashes, sorted.
+files_in :: proc(dir: string) -> []string {
+	files := make([dynamic]string, context.temp_allocator)
+	walk :: proc(files: ^[dynamic]string, dir, below: string) {
+		entries, _ := os.read_all_directory_by_path(utils.temp_path(dir, below) if below != "" else dir, context.temp_allocator)
+		for entry in entries {
+			path := strings.concatenate({below, "/", entry.name}, context.temp_allocator) if below != "" else entry.name
+			if entry.type == .Directory do walk(files, dir, path)
+			else do append(files, path)
+		}
+	}
+	walk(&files, dir, "")
+	slice.sort(files[:])
+	return files[:]
+}
+
 read :: proc(file: res.Mod_File) -> string {
 	data, _ := res.mod_read(file, context.temp_allocator)
 	return string(data)
@@ -71,8 +87,8 @@ listed :: proc(t: ^testing.T) {
 	testing.expect_value(t, res.mod_version(dir, "Art"), "1.2.0")
 	testing.expect(t, listings[0].title == "Art and More" && listings[2].title == "Sounds", "shown by its about.json's title, else its name")
 
-	testing.expect(t, res.mod_name_problem(dir, "art") != "", "a name taken, in any case, by an .smod")
-	testing.expect(t, res.mod_delete(dir, "Art") && !os.exists(utils.temp_path(dir, "Art.smod")), "an .smod deleted")
+	testing.expect(t, res.mod_name_problem(dir, "sounds") != "", "a name taken, in any case, by a folder")
+	testing.expect(t, res.mod_delete(dir, "Sounds") && !os.exists(utils.temp_path(dir, "Sounds")), "a mod's folder deleted")
 }
 
 // A mod made from a Soldat install: only what differs from Classic goes in, an image by
@@ -104,13 +120,8 @@ imported :: proc(t: ^testing.T) {
 	testing.expect_value(t, result.problem, "")
 	testing.expect_value(t, result.changed, 3) // its head, its shotgun, and its head's pivot
 
-	z, opened := utils.zip_open(utils.temp_path(mods_dir, "Mine.srmod"))
-	testing.expect(t, opened, "a .srmod made")
-	names := make([dynamic]string, context.temp_allocator)
-	for name in z.entries do append(&names, name)
-	utils.zip_close(&z)
-	slice.sort(names[:])
-	testing.expect(t, slice.equal(names[:], []string{"mod.json", "soldier/morda.png", "soldier/pivots.json", "sounds/spas12-fire.wav"}), "what differs, by part")
+	testing.expect(t, os.is_dir(utils.temp_path(mods_dir, "Mine")), "a mod's folder made")
+	testing.expect(t, slice.equal(files_in(utils.temp_path(mods_dir, "Mine")), []string{"mod.json", "soldier/morda.png", "soldier/pivots.json", "sounds/spas12-fire.wav"}), "what differs, by part")
 
 	// worn: its head a PNG 4.5 times its size (it had no mod.ini's scale, so 1), its green
 	// see-through; its shotgun; its head pinned where its mod.ini said, the half it didn't
@@ -166,11 +177,10 @@ soldat_sources :: proc(t: ^testing.T) {
 	result := res.mod_import({sources[0].dir, sources[1].dir}, utils.temp_path(dir, "made"), "Loud", classic)
 	testing.expect_value(t, result.problem, "")
 	testing.expect_value(t, result.changed, 3)
-	z, opened := utils.zip_open(utils.temp_path(dir, "made", "Loud.srmod"))
-	defer utils.zip_close(&z)
-	shot, _ := utils.zip_read(&z, z.entries["sounds/spas12-fire.wav"], context.temp_allocator)
-	_, chest := z.entries["soldier/klata.png"]
-	testing.expect(t, opened && string(shot) == "loud shotgun" && chest, "the mod's own over its own folders', and theirs under it")
+	loud := utils.temp_path(dir, "made", "Loud")
+	shot, _ := utils.read_file(utils.temp_path(loud, "sounds", "spas12-fire.wav"), context.temp_allocator)
+	chest := utils.file_exists(utils.temp_path(loud, "soldier", "klata.png"))
+	testing.expect(t, string(shot) == "loud shotgun" && chest, "the mod's own over its own folders', and theirs under it")
 }
 
 // A .png of `w` by `h`: a block of colour `shade` in the middle, see-through about it.
