@@ -69,6 +69,10 @@ String_Id :: enum {
 	Left_Charlie,
 	Left_Delta,
 	Left_Spectators,
+	Voted_Out,
+	Kicked_From_Console,
+	Kicked_For_Flooding,
+	No_Map_Voted,
 	// the HUD
 	Respawn_In,
 	Game_Paused,
@@ -191,6 +195,10 @@ STRINGS := [String_Id]String_Line {
 	.Left_Charlie          = {"left_charlie", "%s has left charlie team", "{243}"},
 	.Left_Delta            = {"left_delta", "%s has left delta team", "{244}"},
 	.Left_Spectators       = {"left_spectators", "%s has left spectators", "{617}"},
+	.Voted_Out             = {"voted_out", "%s has been voted to leave the game", "{281}"},
+	.Kicked_From_Console   = {"kicked_from_console", "%s has been kicked from console", "{277}"},
+	.Kicked_For_Flooding   = {"kicked_for_flooding", "%s has been kicked for flooding", ""},
+	.No_Map_Voted          = {"no_map_voted", "No map has been voted", "{310}"},
 	.Respawn_In            = {"respawn_in", "Respawn in... %s", "{71}"},
 	.Game_Paused           = {"game_paused", "Game paused", "{61}"},
 	.Following             = {"following", "Following %s", "{77} %s"},
@@ -280,7 +288,7 @@ strings_destroy :: proc(s: ^Strings, allocator := context.allocator) {
 // The line `id`, its placeholders filled with `args`, with the temp allocator.
 strings_text :: proc(s: ^Strings, id: String_Id, args: ..any) -> string {
 	line := s.lines[id] if s.lines[id] != "" else STRINGS[id].english
-	if len(args) == 0 && !strings.contains_rune(line, '%') do return line
+	if !strings.contains_rune(line, '%') do return line // no placeholder: what it is given goes nowhere
 	return fmt.tprintf(line, ..args)
 }
 

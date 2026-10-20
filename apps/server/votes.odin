@@ -67,7 +67,7 @@ player_named :: proc(sv: ^Server, name: string) -> (game.Soldier_Id, bool) {
 // Over (StopVote): the original says nothing of a kick that ran out, and of a map vote
 // that did, that no map was voted; a pass shows as the kick or the next map.
 vote_end :: proc(sv: ^Server, passed: bool) {
-	if sv.vote.kind == .Map && !passed do announce(sv, .Vote, "No map has been voted")
+	if sv.vote.kind == .Map && !passed do announce_line(sv, .Vote, .No_Map_Voted, "")
 	sv.vote = {starter = nil}
 	tell_vote(sv, nil)
 }

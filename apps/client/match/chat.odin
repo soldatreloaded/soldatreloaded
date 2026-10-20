@@ -277,6 +277,8 @@ line_heard :: proc(match: ^Match, m: ^network.Msg_Chat) {
 		chat_heard(match, slot, m.team, m.taunt, text, utils.short_string_text(&m.name))
 		return
 	}
+	// one of the game's lines: in the words of the text part worn
+	if id, known := network.chat_line_of(m); known do text = hud.text(id, utils.short_string_text(&m.arg))
 	feed := &match.hud.feed
 	color: rl.Color
 	switch m.kind {

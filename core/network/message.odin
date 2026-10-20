@@ -1,5 +1,8 @@
 package network
 
+import "core:fmt"
+import "core:strings"
+
 import "../game"
 import res "../resources"
 import "../utils"
@@ -10,7 +13,7 @@ import "../utils"
 // sent over and over, unreliably, a lost one replaced by the next; news goes once, in
 // order. The two streams' messages are stream.odin's.
 
-VERSION :: 16 // of the wire: a client of another can't join
+VERSION :: 17 // of the wire: a client of another can't join
 DEFAULT_PORT :: 23073
 
 Name :: utils.Short_String(24)     // a player's
@@ -124,12 +127,15 @@ Msg_Chat :: struct {
 	taunt: bool,                   // a player's said by a bind (a taunt, a radio call), not typed: a mute lets it through
 	kind:  Chat_Kind,              // the server's; nothing for a player's
 	color: utils.Rgba,             // a script line's own colour, carried for Script alone; alpha 0 for the script colour
-	text:  Text,
+	text:  Text,                   // the line as said, in English for the server's own (line)
+	line:  u16,                    // the server's own, the game's line it is (res.String_Id, plus 1), for each client to say in its text part's words; 0 for none
+	arg:   Name,                   // and the name that goes in its placeholder, with line
 }
 
 msg_chat :: proc(b: ^Buffer, m: ^Msg_Chat) {
 	net_maybe_slot(b, &m.slot)
-	if _, player := m.slot.?; player do net_string(b, &m.name) // a player's line brings the sender's name
+	_, player := m.slot.?
+	if player do net_string(b, &m.name) // a player's line brings the sender's name
 	net_bool(b, &m.team)
 	net_bool(b, &m.taunt)
 	net_enum(b, &m.kind)
@@ -137,6 +143,23 @@ msg_chat :: proc(b: ^Buffer, m: ^Msg_Chat) {
 		for &channel in m.color do net_u8(b, &channel)
 	}
 	net_string(b, &m.text)
+	if player do return
+	net_u16(b, &m.line)
+	if m.line != 0 do net_string(b, &m.arg)
+}
+
+// The game's line `id` as the server's own chat: in English, and by its id with `arg` its
+// name, for each client to say as its text part does.
+chat_line :: proc(m: ^Msg_Chat, id: res.String_Id, arg: string) {
+	utils.short_string_set(&m.text, fmt.tprintf(res.STRINGS[id].english, arg) if strings.contains_rune(res.STRINGS[id].english, '%') else res.STRINGS[id].english)
+	m.line = u16(id) + 1
+	utils.short_string_set(&m.arg, arg)
+}
+
+// The game's line a server's chat is, if it is one this game has.
+chat_line_of :: proc(m: ^Msg_Chat) -> (id: res.String_Id, ok: bool) {
+	if m.line == 0 || int(m.line) - 1 > int(max(res.String_Id)) do return
+	return res.String_Id(m.line - 1), true
 }
 
 // The map to play and the round it begins, for a client to make its world anew; the

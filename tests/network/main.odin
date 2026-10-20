@@ -301,6 +301,23 @@ messages :: proc(t: ^testing.T) {
 	testing.expect(t, net.buffer_done(&b))
 	testing.expect_value(t, heard_chat, chat)
 
+	// one of the game's lines, by its id and its name, and in English besides
+	joined := net.Msg_Chat{kind = .Alpha}
+	net.chat_line(&joined, .Joined_Alpha, "100%Pro")
+	testing.expect_value(t, utils.short_string_text(&joined.text), "100%Pro has joined alpha team")
+	bytes = net.build(buf[:], .Chat, net.msg_chat, &joined)
+	b = net.buffer_reader(bytes)
+	heard_line: net.Msg_Chat
+	net.msg_kind(&b, &kind)
+	net.msg_chat(&b, &heard_line)
+	testing.expect(t, net.buffer_done(&b))
+	testing.expect_value(t, heard_line, joined)
+	id, known := net.chat_line_of(&heard_line)
+	testing.expect(t, known && id == .Joined_Alpha && utils.short_string_text(&heard_line.arg) == "100%Pro", "its line and its name")
+	unknown := net.Msg_Chat{line = 60000}
+	_, said := net.chat_line_of(&unknown)
+	testing.expect(t, !said, "a line this game hasn't: its English shown")
+
 	// a script's texts: in the world, and on the screen with a clock
 	texts := [2]net.Msg_Text {
 		{place = .World, layer = 255, text = utils.short_string(64, "Finish"), pos = {-1234.5, 678.25}, color = {0, 255, 0, 255}, scale = 0.3, seconds = 90},

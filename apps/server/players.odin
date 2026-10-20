@@ -144,6 +144,14 @@ announce :: proc(sv: ^Server, kind: net.Chat_Kind, text: string) {
 	if !chat_held(sv, &m) do broadcast(sv, .Chat, net.msg_chat, &m)
 }
 
+// The game's line `id` said to everyone, `name` in it: by its id, which each client says
+// in its own text part's words, and in English besides.
+announce_line :: proc(sv: ^Server, kind: net.Chat_Kind, id: res.String_Id, name: string) {
+	m := net.Msg_Chat{kind = kind}
+	net.chat_line(&m, id, name)
+	if !chat_held(sv, &m) do broadcast(sv, .Chat, net.msg_chat, &m)
+}
+
 // A line from the server to one player: an answer to its command. Nothing to a bot.
 tell :: proc(sv: ^Server, slot: game.Soldier_Id, text: string) {
 	player := &sv.players[slot]
@@ -189,23 +197,23 @@ say_as :: proc(sv: ^Server, slot: game.Soldier_Id, text: string) {
 announce_join :: proc(sv: ^Server, slot: game.Soldier_Id) {
 	name := utils.short_string_text(&sv.players[slot].name)
 	#partial switch sv.game.world.soldiers[slot].team {
-	case .Alpha:     announce(sv, .Alpha, fmt.tprintf("%s has joined alpha team", name))
-	case .Bravo:     announce(sv, .Bravo, fmt.tprintf("%s has joined bravo team", name))
-	case .Spectator: announce(sv, .Spectator, fmt.tprintf("%s has joined as spectator", name))
-	case:            announce(sv, .Enter, fmt.tprintf("%s has joined the game", name))
+	case .Alpha:     announce_line(sv, .Alpha, .Joined_Alpha, name)
+	case .Bravo:     announce_line(sv, .Bravo, .Joined_Bravo, name)
+	case .Spectator: announce_line(sv, .Spectator, .Joined_Spectators, name)
+	case:            announce_line(sv, .Enter, .Joined_Game, name)
 	}
 }
 
 @(private = "file")
 announce_leave :: proc(sv: ^Server, name: string, team: res.Team, why: Kick_Why) {
 	switch {
-	case why == .Voted:    announce(sv, .Client, fmt.tprintf("%s has been voted to leave the game", name))
-	case why == .Console:  announce(sv, .Client, fmt.tprintf("%s has been kicked from console", name))
-	case why == .Flooding: announce(sv, .Client, fmt.tprintf("%s has been kicked for flooding", name))
-	case team == .Alpha:   announce(sv, .Alpha, fmt.tprintf("%s has left alpha team", name))
-	case team == .Bravo:   announce(sv, .Bravo, fmt.tprintf("%s has left bravo team", name))
-	case team == .Spectator: announce(sv, .Spectator, fmt.tprintf("%s has left spectators", name))
-	case:                  announce(sv, .Enter, fmt.tprintf("%s has left the game", name))
+	case why == .Voted:    announce_line(sv, .Client, .Voted_Out, name)
+	case why == .Console:  announce_line(sv, .Client, .Kicked_From_Console, name)
+	case why == .Flooding: announce_line(sv, .Client, .Kicked_For_Flooding, name)
+	case team == .Alpha:   announce_line(sv, .Alpha, .Left_Alpha, name)
+	case team == .Bravo:   announce_line(sv, .Bravo, .Left_Bravo, name)
+	case team == .Spectator: announce_line(sv, .Spectator, .Left_Spectators, name)
+	case:                  announce_line(sv, .Enter, .Left_Game, name)
 	}
 }
 
