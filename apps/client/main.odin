@@ -37,6 +37,7 @@ import sim "../../core/game"
 import network "../../core/network"
 import res "../../core/resources"
 import "../../core/utils"
+import "hud"
 import "match"
 import "menu"
 import "input"
@@ -104,6 +105,7 @@ main :: proc() {
 	if !online.line_init(&client.line) do log.error("ENet wouldn't start: there is no playing online")
 	window_open(&client.window, &client.config.graphics)
 	ui.ui_init(&client.ui, client.mod) // first: the loading screen is written in its faces
+	hud.texts_wear(client.mod)
 	for step, i in START_STEPS {
 		loading_show(&client, step.doing, f32(i) / len(START_STEPS))
 		step.run(&client)
@@ -149,6 +151,7 @@ main :: proc() {
 	rl.CloseWindow()
 	config_save(client.config)
 	delete(client.last_map)
+	hud.texts_forget()
 	res.mod_destroy(&client.mod)
 	res.client_config_destroy(client.config)
 }
@@ -331,6 +334,7 @@ mod_use :: proc(client: ^Client, parts: [res.Part]string) {
 	client.mod = res.mod_make(res.MODS_DIR, res.part_choices(choice^))
 	ui.ui_destroy(&client.ui)
 	ui.ui_init(&client.ui, client.mod)
+	hud.texts_wear(client.mod)
 	sound.sound_destroy(&client.sound)
 	sound.sound_init(&client.sound, client.mod)
 	if m, is_menu := client.screen.(^menu.Menu); is_menu do menu.menu_mods_changed(m, client.mod)

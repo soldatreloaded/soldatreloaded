@@ -408,9 +408,20 @@ import_file :: proc(f: Packed) -> (dest: string, data: []byte, scale: f32, ok: b
 		// txt/font.ini: the fonts' own, which the fonts part holds; no other of txt/
 		if part != .Fonts || !strings.equal_fold(file, "font.ini") do return
 		return utils.temp_path(base, file), bytes, 0, true
+	case ".txt":
+		// txt/default.txt: what the game says, as its text's strings.json, those lines
+		// that differ from the game's English; nothing if none do
+		if part != .Text || in_part != "" || !strings.equal_fold(file, SOLDAT_STRINGS_FILE) do return
+		lines := strings_from_soldat(bytes)
+		if lines == {} do return
+		return utils.temp_path(base, STRINGS_FILE), transmute([]byte)strings_json(lines), 0, true
 	}
 	return
 }
+
+// Soldat 1's lines of what it says, by number, in its txt/: the player's, if they changed
+// it, or a mod's.
+SOLDAT_STRINGS_FILE :: "default.txt"
 
 // What the game keys out of the Soldat 1 image at `path`: black for the smoke, the spawn's
 // spark and the parachute's rope; nothing for a map's polygon texture; green for the rest.
@@ -518,7 +529,8 @@ changed_of :: proc(files: []Packed) -> (n: int) {
 	for f in files {
 		slash := strings.last_index_byte(f.name, '/')
 		top := strings.to_lower(f.name[:max(strings.index_byte(f.name, '/'), 0)], context.temp_allocator)
-		if top == "" || top == "txt" || top == "fonts" do continue
+		if top == "" || top == "fonts" do continue
+		if top == "txt" && !strings.equal_fold(f.name, "txt/" + SOLDAT_STRINGS_FILE) do continue
 		part, _, ok := mod_part_of(f.name[:max(slash, 0)], f.name[slash + 1:])
 		if ok && part in MOD_PARTS do n += 1 // not the scenery, Classic's alone
 	}
@@ -552,6 +564,10 @@ differs :: proc(classic: Mod, mine: []byte, file: string, listings: ^utils.Dir_L
 	found: bool
 	image := extension == ".png" || extension == ".bmp" || extension == ".jpg" || extension == ".gif" || extension == ".tga"
 	switch {
+	case strings.equal_fold(file, "txt/" + SOLDAT_STRINGS_FILE):
+		// Classic says it in its own way (text/strings.json): this differs if a line of it
+		// differs from the game's English
+		return strings_from_soldat(mine) != {}
 	case image:
 		theirs, found = mod_image(classic, dir, name, listings)
 	case strings.has_prefix(strings.to_lower(file, context.temp_allocator), "sfx/") && (extension == ".wav" || extension == ".ogg" || extension == ".mp3"):

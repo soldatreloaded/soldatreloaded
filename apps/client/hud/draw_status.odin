@@ -77,17 +77,17 @@ readout :: proc(u: ^ui.Ui, text: string, y: ^f32, color: rl.Color) {
 
 // Watching: the free camera, or the player followed, redder while they are dead.
 draw_watching :: proc(u: ^ui.Ui, data: ^Hud_Data) {
-	text: string
+	words: string
 	color := rl.Color{205, 205, 205, 255}
 	if data.free_camera {
-		text = "Free Camera"
+		words = text(.Free_Camera)
 	} else if followed, following := data.follow.?; following && followed != data.me {
 		player := &data.players[followed]
-		text = fmt.tprintf("Following %s", player.name)
+		words = text(.Following, player.name)
 		if player.dead do color = {205, 100, 100, 255}
 	}
-	if text == "" do return
-	write(u, text, {(u.width - text_width(u, text, SMALL_FONT)) / 2, 430}, SMALL_FONT, color)
+	if words == "" do return
+	write(u, words, {(u.width - text_width(u, words, SMALL_FONT)) / 2, 430}, SMALL_FONT, color)
 }
 
 // The time left in the round, M:SS, in the middle at the top: under the respawn box, and

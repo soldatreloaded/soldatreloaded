@@ -80,13 +80,13 @@ draw_vote_box :: proc(u: ^ui.Ui, art: ^Art, data: ^Hud_Data) {
 draw_vote :: proc(u: ^ui.Ui, data: ^Hud_Data) {
 	if vote := &data.vote; vote.kind != .None {
 		x, y := 45 * wide(u), f32(400)
-		write(u, "Kick" if vote.kind == .Kick else "Map", {x + 30, y}, WEAPONS_FONT, {254, 104, 104, 225})
+		write(u, text(.Vote_Kick if vote.kind == .Kick else .Vote_Map), {x + 30, y}, WEAPONS_FONT, {254, 104, 104, 225})
 		write(u, vote.target, {x + 65, y}, WEAPONS_FONT, {244, 244, 244, 225})
-		write(u, fmt.tprintf("Voter: %s", vote.starter), {x + 10, y + 11}, WEAPONS_FONT, {224, 218, 244, 205})
-		write(u, fmt.tprintf("Reason:%s", vote.reason), {x + 10, y + 20}, WEAPONS_FONT, {224, 218, 244, 205})
-		write(u, "F12 - Yes   F11 - No", {x + 50, y + 31}, WEAPONS_FONT, {234, 234, 114, 205})
+		write(u, text(.Vote_Voter, vote.starter), {x + 10, y + 11}, WEAPONS_FONT, {224, 218, 244, 205})
+		write(u, text(.Vote_Reason, vote.reason), {x + 10, y + 20}, WEAPONS_FONT, {224, 218, 244, 205})
+		write(u, text(.Vote_Keys), {x + 50, y + 31}, WEAPONS_FONT, {234, 234, 114, 205})
 	}
-	if data.prompt.reason do write(u, "Type reason for vote:", {5, 390}, SMALL_FONT, {254, 124, 124, 255})
+	if data.prompt.reason do write(u, text(.Vote_Reason_Prompt), {5, 390}, SMALL_FONT, {254, 124, 124, 255})
 }
 
 // The radio menu: the calls, and the places of the one chosen; faint behind the

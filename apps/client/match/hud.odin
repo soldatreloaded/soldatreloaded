@@ -298,7 +298,7 @@ weapons_menu_key :: proc(match: ^Match) {
 		hud.menus_show(menus, .Weapons, false)
 		match.limbo.locked = !match.limbo.locked
 	}
-	hud.console_say(&match.hud.feed, hud.GAME_COLOR, "Weapons menu disabled" if match.limbo.locked else "Weapons menu active")
+	hud.console_add(&match.hud.feed, hud.GAME_COLOR, hud.text(.Weapons_Menu_Disabled if match.limbo.locked else .Weapons_Menu_Active))
 }
 
 // After each tick: the weapons menu up at my first life and a second after I die, while

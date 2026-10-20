@@ -254,7 +254,7 @@ picture :: proc(shade: u8, w := 6, h := 4) -> string {
 // Classic laid out as a .srmod folder: its mod.json, of every part, and `files` by their
 // paths in it.
 write_classic :: proc(mods_dir: string, files: [][2]string) {
-	write(utils.temp_path(mods_dir, "classic", "mod.json"), `{"format": 1, "name": "classic", "version": "1.0.0", "parts": ["soldier", "weapons", "effects", "objects", "hud", "icons", "sounds", "textures", "scenery", "fonts"]}`)
+	write(utils.temp_path(mods_dir, "classic", "mod.json"), `{"format": 1, "name": "classic", "version": "1.0.0", "parts": ["soldier", "weapons", "effects", "objects", "hud", "icons", "sounds", "textures", "scenery", "fonts", "text"]}`)
 	for f in files do write(utils.temp_path(mods_dir, "classic", f[0]), f[1])
 }
 

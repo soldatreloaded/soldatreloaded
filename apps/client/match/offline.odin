@@ -279,7 +279,7 @@ offline_addbot :: proc(match: ^Match, word, name: string) {
 	ai.bots_attach(&match.bots, slot, profile, world.rng.state + u64(slot))
 	match.bot_teams[slot] = team
 	bot_spawn(match, slot, team)
-	hud.console_say(feed, hud.GAME_COLOR, "%s has joined %s team.", utils.short_string_text(&profile.name), "alpha" if team == .Alpha else "bravo")
+	hud.console_add(feed, hud.GAME_COLOR, hud.text(.Joined_Alpha if team == .Alpha else .Joined_Bravo, utils.short_string_text(&profile.name)))
 }
 
 // The side with fewer on it, alpha on a tie.
@@ -341,7 +341,7 @@ offline_kick :: proc(match: ^Match, arg: string) {
 	gone := strings.clone(names[slot], context.temp_allocator) // its brain's, which goes below
 	ai.bots_detach(&match.bots, sim.Soldier_Id(slot))
 	match.bot_teams[slot] = .None
-	hud.console_say(feed, hud.GAME_COLOR, "%s has left the game.", gone)
+	hud.console_add(feed, hud.GAME_COLOR, hud.text(.Left_Game, gone))
 }
 
 // /map <name>: that map of data/maps (any case) played now, a new round; the rotation

@@ -35,13 +35,14 @@ Part :: enum {
 	Sounds,
 	Textures, // the maps' polygon textures, and their edges'
 	Scenery,  // the maps' props: Classic's alone, as Soldat 1's, no mod's (MOD_PARTS)
-	Fonts,    // the HUD's fonts, and fonts.json
+	Fonts,    // the HUD's fonts, and font.ini
+	Text,     // what the game says in a match: strings.json
 }
 Parts :: bit_set[Part]
 
 // The parts a mod may have: all but the scenery, which is Classic's alone, as the maps'
 // art Soldat 1 never let a mod change.
-MOD_PARTS :: Parts{.Soldier, .Weapons, .Effects, .Objects, .Hud, .Icons, .Sounds, .Textures, .Fonts}
+MOD_PARTS :: Parts{.Soldier, .Weapons, .Effects, .Objects, .Hud, .Icons, .Sounds, .Textures, .Fonts, .Text}
 
 // Each part's folder, and its name in mod.json and the config.
 @(rodata)
@@ -56,6 +57,7 @@ PART_NAMES := [Part]string {
 	.Textures = "textures",
 	.Scenery  = "scenery",
 	.Fonts    = "fonts",
+	.Text     = "text",
 }
 
 // The mod each part is worn from, by its name, "" for Classic's: the client config's
@@ -70,6 +72,7 @@ Part_Choice :: struct {
 	sounds:   string,
 	textures: string,
 	fonts:    string,
+	text:     string,
 }
 
 // The choice's mod for `part`; nil for one no mod may have (MOD_PARTS).
@@ -85,6 +88,7 @@ part_choice_of :: proc(choice: ^Part_Choice, part: Part) -> ^string {
 	case .Textures: return &choice.textures
 	case .Scenery:  return nil // Classic's alone
 	case .Fonts:    return &choice.fonts
+	case .Text:     return &choice.text
 	}
 	return nil
 }

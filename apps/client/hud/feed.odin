@@ -115,14 +115,6 @@ WARNING_COLOR :: rl.Color{0xE3, 0x69, 0x52, 0xEE} // the line lost, a thing that
 VOTE_COLOR :: rl.Color{0xDD, 0xEE, 0x99, 0xEE}
 SCRIPT_COLOR :: rl.Color{0x7F, 0xD6, 0xFF, 0xF9} // a server script's, when it picks no colour of its own
 
-// The original's multikill words, from the second kill in a row.
-@(private = "file", rodata)
-MULTIKILLS := [?]string {
-	"DOUBLE KILL", "TRIPLE KILL", "MULTI KILL", "MULTI KILL X2", "SERIAL KILL", "INSANE KILLS", "GIMME MORE!",
-	"MASTA KILLA!", "MASTA KILLA!", "MASTA KILLA!", "STOP IT!!!!", "MERCY!!!!!!!!!!", "CHEATER!!!!!!!!",
-	"Phased-plasma rifle in the forty watt range", "Hey, just what you see, pal", "just what you see, pal...",
-}
-
 // After each tick: the feeds scroll, the clock is told, and what the tick decided and
 // did is said. `names` are everyone's; the big words about myself go to `me`.
 feed_tick :: proc(feed: ^Feed, game: ^sim.Game, names: ^[sim.MAX_PLAYERS]string, me: sim.Soldier_Id) {
@@ -143,9 +135,9 @@ feed_tick :: proc(feed: ^Feed, game: ^sim.Game, names: ^[sim.MAX_PLAYERS]string,
 		case:                   due = t % (300 * SECOND) == 0
 		}
 		if due && t <= 60 * SECOND {
-			console_say(feed, GAME_COLOR, "Time Left: %d seconds", t / SECOND)
+			console_add(feed, GAME_COLOR, text(.Time_Left_Seconds, t / SECOND))
 		} else if due {
-			console_say(feed, GAME_COLOR, "Time Left: %d minutes", t / (60 * SECOND))
+			console_add(feed, GAME_COLOR, text(.Time_Left_Minutes, t / (60 * SECOND)))
 		}
 	}
 
@@ -155,9 +147,9 @@ feed_tick :: proc(feed: ^Feed, game: ^sim.Game, names: ^[sim.MAX_PLAYERS]string,
 			if e.shot.owner == me && !e.shot.harmless do feed.stats[stat_weapon(e.shot.weapon)].shots += 1
 		case sim.Flag_Drop:
 			flag := world.things[e.flag].kind
-			console_say(feed, flag_color(flag), "%s dropped the %s Flag", names[e.soldier], flag_name(flag))
+			console_add(feed, flag_color(flag), text(.Dropped_Flag, names[e.soldier], flag_name(flag)))
 			if world.soldiers[e.soldier].team == world.soldiers[me].team {
-				big_say(feed, PICKUP_COLOR, CAPTURE_MESSAGE_TICKS, "%s Flag dropped!", flag_name(flag))
+				big_add(feed, PICKUP_COLOR, CAPTURE_MESSAGE_TICKS, text(.Flag_Dropped, flag_name(flag)))
 			}
 		}
 	}
@@ -174,22 +166,22 @@ feed_tick :: proc(feed: ^Feed, game: ^sim.Game, names: ^[sim.MAX_PLAYERS]string,
 			flag := world.things[r.flag].kind
 			taker := world.soldiers[r.soldier].team
 			if r.soldier == me {
-				big_say(feed, team_color(taker), CAPTURE_MESSAGE_TICKS, "You got the %s Flag!", flag_name(flag))
+				big_add(feed, team_color(taker), CAPTURE_MESSAGE_TICKS, text(.You_Got_Red_Flag if flag == .Alpha_Flag else .You_Got_Blue_Flag))
 			} else {
-				big_say(feed, team_color(taker), CAPTURE_MESSAGE_TICKS, "%s Flag captured!", flag_name(flag))
+				big_add(feed, team_color(taker), CAPTURE_MESSAGE_TICKS, text(.Red_Flag_Captured if flag == .Alpha_Flag else .Blue_Flag_Captured))
 			}
-			console_say(feed, team_color(taker), "%s captured the %s Flag", names[r.soldier], flag_name(flag))
+			console_add(feed, team_color(taker), text(.Captured_Red_Flag if flag == .Alpha_Flag else .Captured_Blue_Flag, names[r.soldier]))
 		case sim.Flag_Return:
 			// by a player: said; by the clock: nothing, as the original
 			returner := r.returner.? or_continue
 			flag := world.things[r.flag].kind
-			big_say(feed, flag_color(flag), CAPTURE_MESSAGE_TICKS, "%s Flag returned!", flag_name(flag))
-			console_say(feed, flag_color(flag), "%s returned the %s Flag", names[returner], flag_name(flag))
+			big_add(feed, flag_color(flag), CAPTURE_MESSAGE_TICKS, text(.Red_Flag_Returned if flag == .Alpha_Flag else .Blue_Flag_Returned))
+			console_add(feed, flag_color(flag), text(.Returned_Red_Flag if flag == .Alpha_Flag else .Returned_Blue_Flag, names[returner]))
 		case sim.Flag_Capture:
 			// the team that scores is the one whose flag it isn't
 			scoring: res.Team = .Bravo if flag_team(world.things[r.flag].kind) == .Alpha else .Alpha
-			big_say(feed, team_color(scoring), SCORE_MESSAGE_TICKS, "%s Team Scores!", team_name(scoring))
-			console_say(feed, team_color(scoring), "%s scores for %s Team", names[r.soldier], team_name(scoring))
+			big_add(feed, team_color(scoring), SCORE_MESSAGE_TICKS, text(.Alpha_Scores if scoring == .Alpha else .Bravo_Scores))
+			console_add(feed, team_color(scoring), text(.Scores_For_Alpha if scoring == .Alpha else .Scores_For_Bravo, names[r.soldier]))
 		}
 	}
 
@@ -277,7 +269,7 @@ kill_said :: proc(feed: ^Feed, world: ^sim.World, names: ^[sim.MAX_PLAYERS]strin
 
 	switch {
 	case kill.killer == me && kill.target == me:
-		big_say(feed, DIED_COLOR, KILL_MESSAGE_TICKS, "You killed yourself")
+		big_add(feed, DIED_COLOR, KILL_MESSAGE_TICKS, text(.You_Killed_Yourself))
 	case kill.killer == me:
 		stat := &feed.stats[stat_weapon(kill.weapon)]
 		stat.kills += 1
@@ -289,12 +281,12 @@ kill_said :: proc(feed: ^Feed, world: ^sim.World, names: ^[sim.MAX_PLAYERS]strin
 		feed.multi_kills += 1
 		if feed.multi_kills > 1 {
 			word := int(feed.multi_kills) - 2 if feed.multi_kills < 18 else 7
-			big_say(feed, KILLED_COLOR, KILL_MESSAGE_TICKS, "%s", MULTIKILLS[word])
+			big_add(feed, KILLED_COLOR, KILL_MESSAGE_TICKS, text(res.String_Id(int(res.String_Id.Multikill_2) + word)))
 		} else {
-			big_say(feed, KILLED_COLOR, KILL_MESSAGE_TICKS, "You killed %s", names[kill.target])
+			big_add(feed, KILLED_COLOR, KILL_MESSAGE_TICKS, text(.You_Killed, names[kill.target]))
 		}
 	case kill.target == me:
-		big_say(feed, DIED_COLOR, KILL_MESSAGE_TICKS, "Killed by %s", names[kill.killer])
+		big_add(feed, DIED_COLOR, KILL_MESSAGE_TICKS, text(.Killed_By, names[kill.killer]))
 	}
 }
 
@@ -302,9 +294,9 @@ kill_said :: proc(feed: ^Feed, world: ^sim.World, names: ^[sim.MAX_PLAYERS]strin
 @(private = "file")
 round_end_said :: proc(feed: ^Feed, winner: res.Team) {
 	if winner == .None {
-		big_say(feed, TIE_COLOR, CAPTURE_MESSAGE_TICKS, "It's a tie")
+		big_add(feed, TIE_COLOR, CAPTURE_MESSAGE_TICKS, text(.Tie))
 	} else {
-		big_say(feed, team_color(winner), CAPTURE_MESSAGE_TICKS, "%s Team Wins!", team_name(winner))
+		big_add(feed, team_color(winner), CAPTURE_MESSAGE_TICKS, text(.Alpha_Team_Wins if winner == .Alpha else .Bravo_Team_Wins))
 	}
 }
 
@@ -327,6 +319,12 @@ kill_scroll :: proc(feed: ^Feed) {
 // The big words in the middle, for `ticks`.
 big_say :: proc(feed: ^Feed, color: rl.Color, ticks: i32, format: string, args: ..any) {
 	feed.big = {text = line_text(format, ..args), color = color, ticks = ticks}
+}
+
+// The big words `words`, as they are (a name in them with a % sign is no placeholder), for
+// `ticks`.
+big_add :: proc(feed: ^Feed, color: rl.Color, ticks: i32, words: string) {
+	feed.big = {text = utils.short_string(LINE_TEXT, words), color = color, ticks = ticks}
 }
 
 @(private = "file")
@@ -411,10 +409,10 @@ flag_team :: proc(flag: sim.Thing_Kind) -> res.Team {
 	return .None
 }
 
-// The original's names: alpha's flag is red, bravo's blue.
+// The original's names: alpha's flag is red, bravo's blue, in the text part's words.
 @(private = "file")
 flag_name :: proc(flag: sim.Thing_Kind) -> string {
-	return "Red" if flag == .Alpha_Flag else "Blue"
+	return text(.Red if flag == .Alpha_Flag else .Blue)
 }
 
 @(private = "file")

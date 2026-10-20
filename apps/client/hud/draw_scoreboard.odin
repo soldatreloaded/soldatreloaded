@@ -147,13 +147,13 @@ draw_scoreboard :: proc(u: ^ui.Ui, data: ^Hud_Data, bottom: f32) {
 	groups := sa.slice(&grouped)
 
 	for g in groups do line(u, {x + 35, g.top + 15}, 565, group_color(g.team))
-	write(u, "Points:", {x + 280, 40}, MENU_FONT, HEADING_COLOR)
-	write(u, "Deaths:", {x + 390, 40}, MENU_FONT, HEADING_COLOR)
-	write(u, "Ping:", {x + 530, 40}, MENU_FONT, HEADING_COLOR)
+	write(u, text(.Board_Points), {x + 280, 40}, MENU_FONT, HEADING_COLOR)
+	write(u, text(.Board_Deaths), {x + 390, 40}, MENU_FONT, HEADING_COLOR)
+	write(u, text(.Board_Ping), {x + 530, 40}, MENU_FONT, HEADING_COLOR)
 	write(u, data.hostname, {x + 30, 15}, SMALL_FONT, HOST_COLOR)
-	write(u, fmt.tprintf("Time %02d:%02d", data.time_left / 60, data.time_left % 60), {x + 485, 15}, SMALL_FONT, CLOCK_COLOR)
+	write(u, text(.Board_Time, fmt.tprintf("%02d:%02d", data.time_left / 60, data.time_left % 60)), {x + 485, 15}, SMALL_FONT, CLOCK_COLOR)
 	write(u, data.time_of_day, {x + 485, 30}, SMALL_FONT, CLOCK_COLOR)
-	write(u, "Players", {x + 330, 15}, SMALL_FONT, COUNT_COLOR)
+	write(u, text(.Board_Players), {x + 330, 15}, SMALL_FONT, COUNT_COLOR)
 	for team, i in ([2]res.Team{.Alpha, .Bravo}) {
 		count := 0
 		for id in ranks do count += int(data.players[id].team == team)
@@ -196,15 +196,15 @@ draw_round_end :: proc(u: ^ui.Ui, data: ^Hud_Data, bottom: f32) {
 	x := board_x(u)
 	alpha, bravo := data.captures[.Alpha], data.captures[.Bravo]
 	switch {
-	case alpha == bravo: write(u, "It's a tie", {x + 137, bottom}, MENU_FONT, {245, 245, 245, 255}, vertical = .Bottom)
-	case alpha > bravo:  write(u, "Alpha team wins", {x + 50, bottom}, MENU_FONT, {210, 15, 5, 255}, vertical = .Bottom)
-	case:                write(u, "Bravo team wins", {x + 50, bottom}, MENU_FONT, {5, 15, 205, 255}, vertical = .Bottom)
+	case alpha == bravo: write(u, text(.Tie), {x + 137, bottom}, MENU_FONT, {245, 245, 245, 255}, vertical = .Bottom)
+	case alpha > bravo:  write(u, text(.Alpha_Wins), {x + 50, bottom}, MENU_FONT, {210, 15, 5, 255}, vertical = .Bottom)
+	case:                write(u, text(.Bravo_Wins), {x + 50, bottom}, MENU_FONT, {5, 15, 205, 255}, vertical = .Bottom)
 	}
 }
 
 // "Game paused", along the board's top.
 draw_paused :: proc(u: ^ui.Ui) {
-	write(u, "Game paused", {board_x(u) + 197, 24}, MENU_FONT, {185, 250, 138, 255})
+	write(u, text(.Game_Paused), {board_x(u) + 197, 24}, MENU_FONT, {185, 250, 138, 255})
 }
 
 // My weapon stats: for each weapon I have fired, its shots, hits, accuracy and kills.

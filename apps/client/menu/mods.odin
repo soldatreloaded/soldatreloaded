@@ -205,6 +205,7 @@ PART_TITLES := [res.Part]string {
 	.Textures = "Textures",
 	.Scenery  = "Scenery",
 	.Fonts    = "Fonts",
+	.Text     = "Text",
 }
 
 // What a mod is, beside its name: "v1.0.0  -  by Calp"; or why it can't be worn, or that
@@ -233,8 +234,8 @@ row_button :: proc(k: ^ui.Kit, right, y: f32, caption: string, disabled: bool, p
 // folder opened, to put them there.
 @(private = "file", rodata)
 MAKING_LINES := [?]string {
-	"Put soldier/, weapons/, effects/, objects/, hud/, icons/, sounds/, textures/,",
-	"scenery/ or fonts/ in its folder, laid out as Classic's (mods/classic/). What a",
+	"Put soldier/, weapons/, effects/, objects/, hud/, icons/, sounds/, textures/, fonts/",
+	"or text/ in its folder, laid out as Classic's (mods/classic/). What a",
 	"part hasn't comes from Classic's. Wearing the part again shows what you changed.",
 }
 

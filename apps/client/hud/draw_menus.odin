@@ -42,11 +42,11 @@ TEAM_COLORS := #partial [res.Team][2]rl.Color {
 	.Spectator = {{210, 210, 105, 255}, {210, 210, 105, 250}},
 }
 
-// What the windows' buttons say, by their Window_Button.
+// What the windows' buttons say, by their Window_Button, in the text part's words.
 @(private = "file", rodata)
-WINDOW_CAPTIONS := #partial [Menu][Window_Button]string {
-	.Kick = {.Back = "<<<<", .On = ">>>>", .Choose = "Kick", .Ban = "Ban"},
-	.Map  = {.Back = "<<<<", .On = ">>>>", .Choose = "Select", .Ban = ""},
+WINDOW_CAPTIONS := #partial [Menu][Window_Button]Maybe(res.String_Id) {
+	.Kick = {.Back = .Menu_Back, .On = .Menu_On, .Choose = .Menu_Kick, .Ban = .Menu_Ban},
+	.Map  = {.Back = .Menu_Back, .On = .Menu_On, .Choose = .Menu_Select, .Ban = nil},
 }
 
 @(private = "file") CAPTION_COLOR :: rl.Color{255, 255, 255, 230}
@@ -78,8 +78,8 @@ draw_menus :: proc(u: ^ui.Ui, art: ^Art, menus: ^Menus, data: ^Hud_Data, dim: bo
 	hovered :: proc(menu, hot_menu: Menu, i, hot: int) -> bool {return menu == hot_menu && i == hot}
 
 	if .Weapons in menus.open {
-		write(u, "Primary Weapon:", {65, 142}, SMALL_FONT, {234, 234, 234, 255})
-		write(u, "Secondary Weapon:", {65, 349}, SMALL_FONT, {214, 214, 214, 255}, vertical = .Baseline)
+		write(u, text(.Primary_Weapon), {65, 142}, SMALL_FONT, {234, 234, 234, 255})
+		write(u, text(.Secondary_Weapon), {65, 349}, SMALL_FONT, {214, 214, 214, 255}, vertical = .Baseline)
 		buttons := menu_buttons(menus, .Weapons)
 		for b, i in sa.slice(&buttons) {
 			if !b.shown do continue
@@ -101,7 +101,7 @@ draw_menus :: proc(u: ^ui.Ui, art: ^Art, menus: ^Menus, data: ^Hud_Data, dim: bo
 	if .Escape in menus.open {
 		r := menu_box(menus, .Escape)
 		box(u, art, r)
-		write(u, "ESC - return to game", {r.x + 20, r.y + r.height - 45}, SMALL_FONT, {250, 245, 255, 240})
+		write(u, text(.Escape_To_Game), {r.x + 20, r.y + r.height - 45}, SMALL_FONT, {250, 245, 255, 240})
 		name := "Soldat Reloaded " + VERSION
 		write(u, name, {r.x + r.width - 2 - text_width(u, name, SMALL_FONT), r.y + r.height}, SMALL_FONT, {230, 235, 255, 190}, vertical = .Bottom)
 		buttons := menu_buttons(menus, .Escape)
@@ -115,7 +115,7 @@ draw_menus :: proc(u: ^ui.Ui, art: ^Art, menus: ^Menus, data: ^Hud_Data, dim: bo
 
 	if .Team in menus.open {
 		alpha := 80 if dim else 255
-		write(u, "Select Team:", {55, 165}, MENU_FONT, with_alpha({234, 234, 234, 255}, alpha))
+		write(u, text(.Select_Team), {55, 165}, MENU_FONT, with_alpha({234, 234, 234, 255}, alpha))
 		buttons := menu_buttons(menus, .Team)
 		for b, i in sa.slice(&buttons) {
 			if !b.shown do continue
@@ -156,7 +156,7 @@ draw_windows :: proc(u: ^ui.Ui, art: ^Art, menus: ^Menus, data: ^Hud_Data) {
 			if !b.shown do continue
 			h := f32(int(window == hot_menu && i == hot))
 			at := [2]f32{b.rect.x + 10 + h, b.rect.y - h + (b.rect.height - line_height(u, MENU_FONT)) / 2}
-			write(u, WINDOW_CAPTIONS[window][Window_Button(i)], at, MENU_FONT, {255, 255, 255, 250})
+			if caption, has := WINDOW_CAPTIONS[window][Window_Button(i)].?; has do write(u, text(caption), at, MENU_FONT, {255, 255, 255, 250})
 		}
 	}
 }

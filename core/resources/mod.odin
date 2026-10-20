@@ -85,7 +85,7 @@ MOD_PATHS := [?]Mod_Path {
 	{"scenery-gfx", .Scenery, ""},
 	{"sfx", .Sounds, ""},
 	{"fonts", .Fonts, ""},
-	{"txt", .Fonts, ""}, // font.ini, as Soldat 1's txt/font.ini
+	{"txt", .Text, ""}, // but font.ini, the fonts' (mod_part_of), as Soldat 1's txt/font.ini
 }
 
 // The pictures of interface-gfx that the HUD's layout places: the hud part's. The rest
@@ -114,6 +114,7 @@ mod_part_of :: proc(dir, name: string) -> (part: Part, in_part: string, ok: bool
 		stem := strings.to_lower(filepath.stem(name), context.temp_allocator)
 		if slice.contains(HUD_PICTURES[:], stem) do part = .Hud
 	}
+	if part == .Text && rest == "" && strings.equal_fold(name, "font.ini") do part = .Fonts
 	return part, in_part, true
 }
 

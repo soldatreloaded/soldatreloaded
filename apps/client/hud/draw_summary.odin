@@ -55,9 +55,9 @@ summary_header :: proc(u: ^ui.Ui, data: ^Hud_Data, panel: rl.Rectangle) -> f32 {
 	title: string
 	color: rl.Color
 	switch {
-	case alpha == bravo: title, color = "IT'S A TIE", {245, 245, 245, 255}
-	case alpha > bravo:  title, color = "ALPHA TEAM WINS", team_text_color(.Alpha)
-	case:                title, color = "BRAVO TEAM WINS", team_text_color(.Bravo)
+	case alpha == bravo: title, color = text(.Summary_Tie), {245, 245, 245, 255}
+	case alpha > bravo:  title, color = text(.Summary_Alpha_Wins), team_text_color(.Alpha)
+	case:                title, color = text(.Summary_Bravo_Wins), team_text_color(.Bravo)
 	}
 	write(u, title, {cx - text_width(u, title, TITLE_FONT) / 2, panel.y + 10}, TITLE_FONT, color)
 
@@ -105,13 +105,13 @@ summary_table :: proc(u: ^ui.Ui, data: ^Hud_Data, r: rl.Rectangle) {
 	cStrk := r.x + w - 2
 
 	y := r.y
-	write(u, "PLAYER", {r.x + 2, y}, SMALL_FONT, DIM_COLOR)
-	right(u, "K", cK, y, DIM_COLOR)
-	right(u, "D", cD, y, DIM_COLOR)
-	right(u, "CAP", cCap, y, DIM_COLOR)
-	right(u, "ACC", cAcc, y, DIM_COLOR)
-	right(u, "HS", cHS, y, DIM_COLOR)
-	right(u, "STRK", cStrk, y, DIM_COLOR)
+	write(u, text(.Summary_Player), {r.x + 2, y}, SMALL_FONT, DIM_COLOR)
+	right(u, text(.Summary_Kills), cK, y, DIM_COLOR)
+	right(u, text(.Summary_Deaths), cD, y, DIM_COLOR)
+	right(u, text(.Summary_Captures), cCap, y, DIM_COLOR)
+	right(u, text(.Summary_Accuracy), cAcc, y, DIM_COLOR)
+	right(u, text(.Summary_Headshots), cHS, y, DIM_COLOR)
+	right(u, text(.Summary_Streak), cStrk, y, DIM_COLOR)
 	y += 4
 	fill(u, {r.x, y + ROW_H - 3, w, 1}, {255, 255, 255, 30})
 
@@ -147,17 +147,17 @@ summary_table :: proc(u: ^ui.Ui, data: ^Hud_Data, r: rl.Rectangle) {
 @(private = "file")
 summary_awards :: proc(u: ^ui.Ui, data: ^Hud_Data, r: rl.Rectangle) {
 	y := r.y
-	award_group(u, "COMBAT", &y, r.x, r.width)
-	award(u, data, "Top Fragger", score_kills, {r.x, r.width}, &y, proc(p: ^Player) -> string {return fmt.tprintf("%d", p.kills)})
-	award(u, data, "Best Accuracy", score_accuracy, {r.x, r.width}, &y, proc(p: ^Player) -> string {return fmt.tprintf("%d%%", i32(math.round(f32(p.hits) * 100 / f32(p.shots))))})
-	award(u, data, "Most Headshots", score_headshots, {r.x, r.width}, &y, proc(p: ^Player) -> string {return fmt.tprintf("%d", p.headshots)})
-	award(u, data, "Deadliest Aim", score_hs_rate, {r.x, r.width}, &y, proc(p: ^Player) -> string {return fmt.tprintf("%d%% HS", i32(math.round(f32(p.headshots) * 100 / f32(p.kills))))})
-	award(u, data, "Longest Streak", score_streak, {r.x, r.width}, &y, proc(p: ^Player) -> string {return fmt.tprintf("%d", p.streak)})
+	award_group(u, text(.Summary_Combat), &y, r.x, r.width)
+	award(u, data, text(.Award_Top_Fragger), score_kills, {r.x, r.width}, &y, proc(p: ^Player) -> string {return fmt.tprintf("%d", p.kills)})
+	award(u, data, text(.Award_Best_Accuracy), score_accuracy, {r.x, r.width}, &y, proc(p: ^Player) -> string {return fmt.tprintf("%d%%", i32(math.round(f32(p.hits) * 100 / f32(p.shots))))})
+	award(u, data, text(.Award_Most_Headshots), score_headshots, {r.x, r.width}, &y, proc(p: ^Player) -> string {return fmt.tprintf("%d", p.headshots)})
+	award(u, data, text(.Award_Deadliest_Aim), score_hs_rate, {r.x, r.width}, &y, proc(p: ^Player) -> string {return fmt.tprintf("%d%% HS", i32(math.round(f32(p.headshots) * 100 / f32(p.kills))))})
+	award(u, data, text(.Award_Longest_Streak), score_streak, {r.x, r.width}, &y, proc(p: ^Player) -> string {return fmt.tprintf("%d", p.streak)})
 	y += 6
-	award_group(u, "FLAGS", &y, r.x, r.width)
-	award(u, data, "Most Captures", score_caps, {r.x, r.width}, &y, proc(p: ^Player) -> string {return fmt.tprintf("%d", p.flags)})
-	award(u, data, "Longest Carry", score_carry, {r.x, r.width}, &y, proc(p: ^Player) -> string {return carry_time(p.carry_ticks)})
-	award(u, data, "Fastest Capture", score_fastest, {r.x, r.width}, &y, proc(p: ^Player) -> string {return fmt.tprintf("%.1fs", f32(p.fastest_cap) / f32(sim.TICK_RATE))})
+	award_group(u, text(.Summary_Flags), &y, r.x, r.width)
+	award(u, data, text(.Award_Most_Captures), score_caps, {r.x, r.width}, &y, proc(p: ^Player) -> string {return fmt.tprintf("%d", p.flags)})
+	award(u, data, text(.Award_Longest_Carry), score_carry, {r.x, r.width}, &y, proc(p: ^Player) -> string {return carry_time(p.carry_ticks)})
+	award(u, data, text(.Award_Fastest_Capture), score_fastest, {r.x, r.width}, &y, proc(p: ^Player) -> string {return fmt.tprintf("%.1fs", f32(p.fastest_cap) / f32(sim.TICK_RATE))})
 }
 
 @(private = "file")

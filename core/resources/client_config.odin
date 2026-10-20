@@ -110,7 +110,7 @@ SENSITIVITY_LOWEST :: 0.1
 SENSITIVITY_HIGHEST :: 5.0
 
 Graphics_Settings :: struct {
-	parts:             Part_Choice `jsoncomment:"the mod each part of the game is worn from (the soldier, the weapons, the effects, the objects, the hud, the icons, the sounds, the textures, the scenery, the fonts), by its name in mods/; empty for Classic's. Chosen on the Mods page, which wears them at once."`,
+	parts:             Part_Choice `jsoncomment:"the mod each part of the game is worn from (the soldier, the weapons, the effects, the objects, the hud, the icons, the sounds, the textures, the fonts, the text), by its name in mods/; empty for Classic's. Chosen on the Mods page, which wears them at once."`,
 	screen_width:      i32 `jsoncomment:"the resolution's width: windowed, the window's; fullscreen, the world is drawn at it and scaled to the screen"`,
 	screen_height:     i32 `jsoncomment:"the resolution's height"`,
 	window_mode:       Window_Mode `jsoncomment:"windowed, or fullscreen: a window without borders over the whole screen"`,

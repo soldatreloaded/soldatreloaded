@@ -110,7 +110,7 @@ draw_respawn :: proc(u: ^ui.Ui, art: ^Art, mine: ^Mine) {
 	if !mine.dead do return
 	box(u, art, {180 * wide(u), 1, 300, 22})
 	if mine.respawn > 0 {
-		write(u, fmt.tprintf("Respawn in... %.1f", f32(mine.respawn) / 60), {200 * wide(u), 4}, MENU_FONT, {255, 65, 55, 255})
+		write(u, text(.Respawn_In, fmt.tprintf("%.1f", f32(mine.respawn) / 60)), {200 * wide(u), 4}, MENU_FONT, {255, 65, 55, 255})
 	}
 }
 
@@ -119,9 +119,9 @@ draw_shot :: proc(u: ^ui.Ui, feed: ^Feed, seconds: f64) {
 	shot := &feed.shot
 	if shot.ticks <= 0 do return
 	color := rl.Color{230, 65, 60, u8(150 + abs(math.sin(5.1 * seconds)) * 100)}
-	write(u, fmt.tprintf("DISTANCE: %.2fm", shot.distance), {390 * wide(u), 431}, SMALL_FONT, color)
-	write(u, fmt.tprintf("AIRTIME: %.2fs", shot.airtime), {228 * wide(u), 431}, SMALL_FONT, color)
-	if shot.ricochets > 0 do write(u, fmt.tprintf("RICOCHETS: %d", shot.ricochets), {62 * wide(u), 431}, SMALL_FONT, color)
+	write(u, text(.Shot_Distance, fmt.tprintf("%.2f", shot.distance)), {390 * wide(u), 431}, SMALL_FONT, color)
+	write(u, text(.Shot_Airtime, fmt.tprintf("%.2f", shot.airtime)), {228 * wide(u), 431}, SMALL_FONT, color)
+	if shot.ricochets > 0 do write(u, text(.Shot_Ricochets, shot.ricochets), {62 * wide(u), 431}, SMALL_FONT, color)
 }
 
 @(private = "file")
