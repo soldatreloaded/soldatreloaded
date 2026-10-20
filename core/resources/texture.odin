@@ -87,14 +87,15 @@ map_texture_load :: proc(mod: Mod, m: ^Poly_Map, map_dirs: []string = nil, alloc
 // The texture a map's polygons' outer edges are drawn with (the original's smooth
 // edges): its texture's own in textures/edges/ (the mod's, the map's own, Classic's), else
 // edges/default, green keyed out. False, logged, if neither is there.
-map_edge_texture_load :: proc(mod: Mod, m: ^Poly_Map, map_dirs: []string = nil, allocator := context.allocator) -> (texture: Texture, ok: bool) {
+map_edge_texture_load :: proc(mod: Mod, m: ^Poly_Map, map_dirs: []string = nil, allocator := context.allocator) -> (texture: Texture, scale: f32, ok: bool) {
 	file, found := map_image(mod, map_dirs, "textures/edges", m.texture)
 	if !found do file, found = mod_image(mod, "textures/edges", "default.bmp")
 	if !found {
 		log.warn("no edge texture in textures/edges, nor its default; drawing no edges")
 		return
 	}
-	return texture_load_file(file, COLOR_KEY, allocator)
+	texture, ok = texture_load_file(file, COLOR_KEY, allocator)
+	return texture, mod_file_scale(file), ok
 }
 
 // A texture for each of a map's scenery names, from scenery-gfx/ (the mod's, the map's

@@ -123,7 +123,7 @@ imported :: proc(t: ^testing.T) {
 	testing.expect(t, os.is_dir(utils.temp_path(mods_dir, "Mine")), "a mod's folder made")
 	testing.expect(t, slice.equal(files_in(utils.temp_path(mods_dir, "Mine")), []string{"mod.json", "soldier/morda.png", "soldier/pivots.json", "sounds/spas12-fire.wav"}), "what differs, by part")
 
-	// worn: its head a PNG 4.5 times its size (it had no mod.ini's scale, so 1), its green
+	// worn: its head a PNG as it was, at 1 (it had no mod.ini's scale), its green
 	// see-through; its shotgun; its head pinned where its mod.ini said, the half it didn't
 	// say Classic's
 	choice: [res.Part]string
@@ -133,8 +133,9 @@ imported :: proc(t: ^testing.T) {
 	head, found := res.mod_image(worn, "gostek-gfx", "morda.png")
 	data, _ := res.mod_read(head, context.temp_allocator)
 	image, decoded := res.texture_decode(data, nil, context.temp_allocator)
-	testing.expect(t, found && decoded && image.width == 27 && image.height == 18, "its head, at 4.5")
-	testing.expect(t, decoded && image.pixels[0].a == 0 && image.pixels[9 * 27 + 13] == {60, 100, 200, 255}, "see-through where it was green, its colour where it wasn't")
+	testing.expect(t, found && decoded && image.width == 6 && image.height == 4, "its head, its pixels as they were")
+	testing.expect_value(t, head.scale, 1) // its install had no mod.ini: Soldat 1 drew it at 1, and so does its mod
+	testing.expect(t, decoded && image.pixels[0].a == 0 && image.pixels[2 * 6 + 2] == {60, 100, 200, 255}, "see-through where it was green, its colour where it wasn't")
 	shot, _ := res.sound_file(worn, "spas12-fire.wav")
 	testing.expect_value(t, read(shot), "my shotgun")
 	testing.expect_value(t, res.worn_pivot(worn.worn, .Soldier, "Head", {}), [2]f32{0.6, 0.5})

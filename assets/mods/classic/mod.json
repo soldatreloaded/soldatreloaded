@@ -7,5 +7,6 @@
   "description": "The game's own look and sound, which every part falls back to.",
   "licence": "CC BY 4.0, and the fonts the SIL Open Font License: see NOTICE.md",
   "source": "https://github.com/soldatreloaded/soldatreloaded-odin",
-  "parts": ["soldier", "weapons", "effects", "objects", "hud", "icons", "sounds", "textures", "scenery", "fonts"]
+  "parts": ["soldier", "weapons", "effects", "objects", "hud", "icons", "sounds", "textures", "scenery", "fonts"],
+  "scale": 4.5
 }

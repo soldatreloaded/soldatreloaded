@@ -16,7 +16,7 @@ import "../ui"
 // by a click or from the panel's list, dragged or nudged with the arrows, and in the
 // panel shown or hidden, its bar's style and fill, its text's alignment, what it is kept
 // beside as the view widens, how it is turned; and the whole HUD's opacity. Saved, it is
-// a mod of its own, a .srmod of a hud alone with the pictures of the HUD it began from
+// a mod of its own, a hud alone with the pictures of the HUD it began from
 // (res.hud_mod_write), and worn: "My HUD", or the mod the editor made that it was opened
 // on, saved over. A .srmod worn is a file open, so one saved over is let go of first.
 
@@ -27,6 +27,7 @@ Hud_Editor :: struct {
 	target:   string, // the mod it saves into: the editor's own, opened on or saved once; "" until then
 	art:      hud.Art,
 	pictures: map[string][]byte, // the hud part's files of the mod it began from, saved with the layout
+	scales:   map[string]f32,    // and each one's pixels to a unit, as that mod says
 	layout:   res.Hud_Layout,
 	saved:    res.Hud_Layout, // as it was opened or last saved: unsaved while they differ, and Reset's
 	undo:     [dynamic]res.Hud_Layout,
@@ -65,6 +66,7 @@ hud_editor_open :: proc(menu: ^Menu, name: string) {
 	if name != "" && mod.worn != nil {
 		source := res.worn_mod(mod.worn, .Hud)
 		e.pictures = res.srmod_part_files(source, .Hud)
+		e.scales = res.hud_picture_scales(source, e.pictures)
 		delete(e.from)
 		e.from = strings.clone(source.info.title)
 		if strings.has_prefix(source.info.description, res.HUD_EDITOR_MADE) {
@@ -93,6 +95,8 @@ hud_editor_close :: proc(menu: ^Menu) {
 		delete(data)
 	}
 	delete(e.pictures)
+	for path in e.scales do delete(path)
+	delete(e.scales)
 	delete(e.undo)
 	delete(e.from)
 	delete(e.target)
@@ -402,7 +406,7 @@ editor_save :: proc(menu: ^Menu) {
 		e.saving = .None
 		title := EDITOR_TITLE
 		if e.target != EDITOR_NAME do title = strings.concatenate({EDITOR_TITLE, " ", strings.trim_prefix(e.target, EDITOR_NAME + "_")}, context.temp_allocator)
-		if !res.hud_mod_write(res.MODS_DIR, e.target, title, e.description, e.layout, e.pictures) {
+		if !res.hud_mod_write(res.MODS_DIR, e.target, title, e.description, e.layout, e.pictures, e.scales) {
 			editor_note(e, "It couldn't be saved: is the disk full, or the mod open elsewhere?", true)
 			return
 		}

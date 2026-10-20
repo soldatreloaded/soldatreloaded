@@ -100,6 +100,54 @@ refused :: proc(t: ^testing.T) {
 	}
 }
 
+// An image's scale: the longest of its mod's scales that is it or holds it, in any case
+// and whatever its extension, else the mod's; SRMOD_SCALE if it says none; a mod of a
+// scale out of reason refused. The scales a mod is written with, as few as say them.
+@(test)
+scaled :: proc(t: ^testing.T) {
+	dir := scratch(t, "scaled")
+	defer os.remove_all(dir)
+	folder := utils.temp_path(dir, "Old")
+	write(utils.temp_path(folder, "mod.json"), `{"format": 1, "name": "Old", "version": "1.0.0", "parts": ["soldier", "weapons"], "scale": 1, "scales": {"Weapons": 4.5, "weapons/icons": 2, "soldier/ranny/krew.png": 3}}`)
+	write(utils.temp_path(folder, "soldier", "klata.png"), "chest")
+	write(utils.temp_path(folder, "weapons", "ak74.png"), "gun")
+	mod, why, ok := res.srmod_open(folder)
+	defer res.srmod_close(&mod)
+	if !testing.expectf(t, ok, "opened (%s)", why) do return
+	testing.expect_value(t, res.srmod_scale(&mod, "soldier/klata.png"), 1)
+	testing.expect_value(t, res.srmod_scale(&mod, "weapons/ak74.png"), 4.5)
+	testing.expect_value(t, res.srmod_scale(&mod, "WEAPONS/Icons/1.png"), 2)
+	testing.expect_value(t, res.srmod_scale(&mod, "soldier/ranny/krew.bmp"), 3)
+	testing.expect_value(t, res.srmod_scale(&mod, "weaponsplus/x.png"), 1) // not in weapons/
+	file, _ := res.srmod_file(&mod, .Weapons, "AK74.png")
+	testing.expect_value(t, file.scale, 4.5)
+
+	write(utils.temp_path(dir, "Plain", "mod.json"), info("Plain", ""))
+	plain, _, _ := res.srmod_open(utils.temp_path(dir, "Plain"))
+	testing.expect_value(t, res.srmod_scale(&plain, "soldier/klata.png"), res.SRMOD_SCALE)
+	res.srmod_close(&plain)
+	write(utils.temp_path(dir, "Huge", "mod.json"), `{"format": 1, "name": "Huge", "version": "1.0.0", "scale": 1000}`)
+	huge, huge_why, huge_ok := res.srmod_open(utils.temp_path(dir, "Huge"))
+	testing.expect(t, !huge_ok && strings.contains(huge_why, "scale"), "a scale out of reason refused")
+	res.srmod_close(&huge)
+
+	per_file := make(map[string]f32, context.temp_allocator)
+	per_file["soldier/klata.png"] = 1
+	per_file["soldier/morda.png"] = 1
+	per_file["soldier/ranny/krew.png"] = 4.5
+	per_file["weapons/ak74.png"] = 2
+	per_file["weapons/m79.png"] = 2
+	per_file["weapons/icons/1.png"] = 1
+	per_file["hud/health.png"] = 1
+	scale, scales := res.scales_compact(per_file)
+	testing.expect_value(t, scale, 1)
+	testing.expect_value(t, len(scales), 3)
+	testing.expect(t, scales["soldier/ranny"] == 4.5 && scales["weapons"] == 2, "a folder of one scale said once")
+	testing.expect_value(t, scales["weapons/icons/1.png"], 1) // within weapons/, which says 2
+	said := res.Srmod{info = {scale = scale, scales = scales}}
+	for path, s in per_file do testing.expectf(t, res.srmod_scale(&said, path) == s, "%s at %v", path, s)
+}
+
 // The mods in a folder: each folder with a mod.json; not a zip, Classic, a folder that is
 // no mod, nor a hidden one (being written, or put aside in .old/).
 @(test)

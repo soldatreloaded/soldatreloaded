@@ -12,8 +12,9 @@ import "../../../core/utils"
 // A sprite: one of the mod's images with its size in the world, drawn as a turned,
 // scaled quad. The soldiers, the bullets, the things and the sparks are all sprites,
 // their images packed into one atlas as they load (atlas.odin), so they draw in one go.
-// An image is its pixels over res.SRMOD_SCALE in the world, every mod's alike. From the
-// C client's render/sprite.c.
+// An image is its pixels over its mod's scale in the world (res.mod_file_scale), so a
+// mod's art is drawn as big as Classic's at whatever resolution it was made. From the C
+// client's render/sprite.c.
 
 WHITE :: utils.Rgba{255, 255, 255, 255}
 
@@ -157,7 +158,7 @@ draw_turned :: proc(image: Atlas_Image, size, at, center, scale: [2]f32, angle: 
 
 @(private = "file")
 sprite_from :: proc(source: Source, file: res.Mod_File, path: string, key: Maybe(utils.Rgba), flat: bool) -> Sprite {
-	return sprite_sized(source, file, res.SRMOD_SCALE, key, flat)
+	return sprite_sized(source, file, res.mod_file_scale(file), key, flat)
 }
 
 // The image of `file`, `scale` pixels to a unit.

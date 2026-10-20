@@ -18,15 +18,16 @@ import "../utils"
 // The game asks for a file by the path Soldat 1 gives it ("gostek-gfx/klata.png",
 // "sfx/radio/efcup.wav"), and finds it in the part that holds it ("soldier/klata.png",
 // "sounds/radio/efcup.wav"): MOD_PATHS. Names are matched without regard to case; an
-// image is a .png of the name before the name itself, as Soldat's are. Every image is
-// SRMOD_SCALE pixels to a unit. What the game plays by (the maps, animations, skeletons)
+// image is a .png of the name before the name itself, as Soldat's are. An image is drawn
+// at its mod's scale (srmod_scale), SRMOD_SCALE pixels to a unit where it says none, as
+// Classic's are. What the game plays by (the maps, animations, skeletons)
 // is not a mod's but data/'s, the same for everyone.
 
 MOD_CLASSIC :: "classic"
 MODS_DIR :: "mods" // where the mods are, from the client's working directory
 MOD_EXTENSION :: ".smod" // the mods of before, which the game no longer wears
 MOD_NAME_MAX :: 32
-SRMOD_SCALE :: 4.5 // every image's pixels to a unit
+SRMOD_SCALE :: 4.5 // an image's pixels to a unit where its mod says none: Classic's
 
 // What is at a Soldat 1 mod's root, by which its root is known: its folders and its
 // mod.ini.
@@ -60,6 +61,7 @@ Mod_File :: struct {
 	layer:   int,          // the Part it is of; -1 for a map's own folder of art
 	archive: ^Mod_Archive, // its zip; nil for a file on disk
 	path:    string,       // on disk, or the zip's name for it; with the temp allocator
+	scale:   f32,          // an image's pixels to a unit, as its mod says; 0 where none says (a map's own art: SRMOD_SCALE)
 }
 
 Mod_Path :: struct {
@@ -220,7 +222,14 @@ map_image :: proc(mod: Mod, map_dirs: []string, dir, name: string) -> (file: Mod
 pack_image :: proc(pack: ^Srmod, part: Part, in_part, name: string, listings: ^utils.Dir_Listings = nil) -> (file: Mod_File, found: bool) {
 	if part not_in pack.parts do return
 	dir := utils.temp_path(PART_NAMES[part], in_part) if in_part != "" else PART_NAMES[part]
-	return layer_find(&pack.pack, int(part), dir, name, ".png", listings)
+	file = layer_find(&pack.pack, int(part), dir, name, ".png", listings) or_return
+	file.scale = srmod_scale(pack, strings.concatenate({dir, "/", name}, context.temp_allocator))
+	return file, true
+}
+
+// An image's pixels to a unit, as its mod says: SRMOD_SCALE where none says.
+mod_file_scale :: proc(file: Mod_File) -> f32 {
+	return file.scale if file.scale > 0 else SRMOD_SCALE
 }
 
 // A file found in a mod, its bytes allocated with `allocator`. False, logged, if it

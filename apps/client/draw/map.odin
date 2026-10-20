@@ -91,12 +91,12 @@ EDGE_SEE_THROUGH :: bit_set[res.Polygon_Type]{.Only_Bullets, .Only_Player, .Does
 // than half opaque (the original's LoadMapGraphics).
 @(private = "package")
 edges_load :: proc(art: ^Art, mod: res.Mod, polymap: ^res.Poly_Map, map_dirs: []string) {
-	image, found := res.map_edge_texture_load(mod, polymap, map_dirs, context.temp_allocator)
+	image, scale, found := res.map_edge_texture_load(mod, polymap, map_dirs, context.temp_allocator)
 	if !found do return
 	art.edge_texture = texture_upload(image)
 	rl.GenTextureMipmaps(&art.edge_texture)
 	rl.SetTextureFilter(art.edge_texture, .TRILINEAR)
-	size := [2]f32{f32(image.width), f32(image.height)} / res.SRMOD_SCALE // in units, as every image
+	size := [2]f32{f32(image.width), f32(image.height)} / scale // in units, at its mod's scale as every image
 
 	edges: [Polygon_Layer][dynamic]Map_Edge
 	for &polygon, i in polymap.polygons {

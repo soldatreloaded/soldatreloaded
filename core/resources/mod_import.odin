@@ -18,12 +18,12 @@ import stbi "vendor:stb/image"
 import "../utils"
 
 // A mod made from a Soldat 1.7.1 install, as its player has it: the art and sounds they
-// put over the game's own, or in a mod of its mods/, made mods/<name>.srmod
+// put over the game's own, or in a mod of its mods/, made the folder mods/<name>/
 // (docs/srmod.md, "Bringing mods in"). What goes in is what they changed: a file of
 // Classic's names that is neither 1.7.1's own as it came (SOLDAT_STOCK, by its size and
 // CRC-32: Classic's art is redrawn, and the original's would replace it) nor the same as
 // Classic's (an image by its pixels as the game draws it, so the same picture as a .bmp
-// is the same), each laid out by part and its images brought to SRMOD_SCALE; and the
+// is the same), each laid out by part, its images at the scale Soldat 1 drew them at; and the
 // pivots its mod.ini changes. The rest is Classic's already. Its custom interfaces are
 // made mods of their own (interface_install).
 //
@@ -193,14 +193,14 @@ soldat_sources_destroy :: proc(sources: []Soldat_Source, allocator := context.al
 	delete(sources, allocator)
 }
 
-// The mod `name` (titled `title`, else its name) made in `mods_dir`, a .srmod, from the
+// The mod `name` (titled `title`, else its name) made in `mods_dir`, a folder, from the
 // folders `dirs` of an original Soldat install, each over the last as Soldat wears a mod
 // over its own folders: the install itself first, looked through for its own folders
 // alone, not its mods/ or maps/; then a mod of its mods/. Each file of their art and
 // sounds that is one of Classic's, neither 1.7.1's own as it came nor the same as
 // Classic's, laid out by part (MOD_PATHS), each image keyed as the game keys it, its
-// see-through made alpha, and brought from the scale Soldat 1 drew it at to SRMOD_SCALE
-// (import_image); and the soldier's and the weapons' pivots, from their mod.inis'
+// see-through made alpha, its pixels as they were and its mod.json saying the scale
+// Soldat 1 drew it at (import_file); and the soldier's and the weapons' pivots, from their mod.inis'
 // [GOSTEK], where they differ from Classic's.
 mod_import :: proc(dirs: []string, mods_dir, name: string, classic: Mod, title := "") -> (result: Import_Result) {
 	if problem := mod_name_problem(mods_dir, name); problem != "" do return {problem = problem}
@@ -224,7 +224,8 @@ mod_import :: proc(dirs: []string, mods_dir, name: string, classic: Mod, title :
 	packed := make([dynamic]Packed, 0, len(merged), context.temp_allocator)
 	for _, f in merged do append(&packed, f)
 	entries: map[string][]byte
-	entries, result.changed = entries_of(packed[:], MOD_PARTS)
+	scales := make(map[string]f32, context.temp_allocator)
+	entries, result.changed = entries_of(packed[:], MOD_PARTS, &scales)
 
 	// the pivots that differ from Classic's
 	for part in ([]Part{.Soldier, .Weapons}) {
@@ -254,7 +255,7 @@ mod_import :: proc(dirs: []string, mods_dir, name: string, classic: Mod, title :
 	if result.changed == 0 {
 		return {problem = "Nothing there differs from the game as it came. Put your art and sounds in its folders first."}
 	}
-	if !srmod_write(mods_dir, name, title if title != "" else name, fmt.tprintf("Made from %s, in Soldat 1.7.1.", strings.join(dirs, " and ", context.temp_allocator)), entries) {
+	if !srmod_write(mods_dir, name, title if title != "" else name, fmt.tprintf("Made from %s, in Soldat 1.7.1.", strings.join(dirs, " and ", context.temp_allocator)), entries, scales) {
 		return {problem = "The mod couldn't be written into mods/: is the disk full?"}
 	}
 	log.infof("made the mod %s from %v: %d files that differ from the game's", name, dirs, result.changed)
@@ -339,14 +340,14 @@ pivot_part :: proc(id: string) -> Part {
 	return .Soldier
 }
 
-// A Soldat 1 file of a mod as it goes in a .srmod: where (by part), and its bytes. An
-// image keyed as the game keys it, its see-through made alpha, a PNG, and as big as it
-// should be at SRMOD_SCALE: an image whose size is its own from the scale Soldat 1 drew
-// it at; an edge's texture from 1, as Soldat 1 drew those; the rest, whose size the map
-// sets, as it is. A sound as it is. False for anything no part a mod may have holds (the
-// scenery is Classic's alone).
+// A Soldat 1 file of a mod as it goes in a mod: where (by part), its bytes, and an
+// image's pixels to a unit. An image keyed as the game keys it, its see-through made
+// alpha, a PNG, its pixels as they were: at the scale Soldat 1 drew it at, which its mod
+// then says (srmod_write); an edge's texture at 1, as Soldat 1 drew those; the rest, whose
+// size the map sets, at none (0). A sound as it is. False for anything no part a mod may
+// have holds (the scenery is Classic's alone).
 @(private = "file")
-import_file :: proc(f: Packed) -> (dest: string, data: []byte, ok: bool) {
+import_file :: proc(f: Packed) -> (dest: string, data: []byte, scale: f32, ok: bool) {
 	slash := strings.last_index_byte(f.name, '/')
 	dir, file := f.name[:max(slash, 0)], f.name[slash + 1:]
 	part, in_part := mod_part_of(dir, file) or_return
@@ -357,19 +358,17 @@ import_file :: proc(f: Packed) -> (dest: string, data: []byte, ok: bool) {
 	switch extension {
 	case ".png", ".bmp", ".jpg", ".gif", ".tga":
 		texture := texture_decode(bytes, image_key(f.name), context.temp_allocator) or_return
-		by: f32 = 1
 		switch {
 		case part == .Textures && strings.has_prefix(strings.to_lower(in_part, context.temp_allocator), "edges"):
-			by = SRMOD_SCALE
+			scale = 1
 		case part == .Textures, part == .Scenery, part == .Objects && in_part == "textures":
 		case:
-			by = SRMOD_SCALE / f.scale
+			scale = f.scale
 		}
-		texture = texture_rescale(texture, by)
-		return utils.temp_path(base, strings.concatenate({filepath.stem(file), ".png"}, context.temp_allocator)), texture_png(texture), true
+		return utils.temp_path(base, strings.concatenate({filepath.stem(file), ".png"}, context.temp_allocator)), texture_png(texture), scale, true
 	case ".wav", ".ogg", ".mp3":
 		if part != .Sounds do return
-		return utils.temp_path(base, file), bytes, true
+		return utils.temp_path(base, file), bytes, 0, true
 	}
 	return
 }
@@ -390,10 +389,11 @@ image_key :: proc(path: string) -> Maybe(utils.Rgba) {
 }
 
 // A mod written, the folder `mods_dir`/`name`: its mod.json, of the parts `entries` have
-// (by their paths in it), and them. Written into a hidden folder first, which the game
-// passes over, then moved into its place whole, over a mod of its name already there (the
-// HUD editor saving over its own). False, logged, if it can't be.
-srmod_write :: proc(mods_dir, name, title, description: string, entries: map[string][]byte) -> bool {
+// (by their paths in it), and them; its images at `scales`, each by its path, as few as
+// say them (scales_compact), SRMOD_SCALE those it hasn't. Written into a hidden folder
+// first, which the game passes over, then moved into its place whole, over a mod of its
+// name already there (the HUD editor saving over its own). False, logged, if it can't be.
+srmod_write :: proc(mods_dir, name, title, description: string, entries: map[string][]byte, scales: map[string]f32 = nil) -> bool {
 	parts := make([dynamic]string, context.temp_allocator)
 	for part in Part {
 		for dest in entries {
@@ -403,7 +403,19 @@ srmod_write :: proc(mods_dir, name, title, description: string, entries: map[str
 			}
 		}
 	}
-	info := Srmod_Info{format = SRMOD_FORMAT, name = name, title = title, version = "1.0.0", author = "", description = description, parts = parts[:]}
+	// every image's scale, SRMOD_SCALE where none is given, so the most of them is the mod's
+	per_image := make(map[string]f32, context.temp_allocator)
+	for dest in entries {
+		lower := strings.to_lower(dest, context.temp_allocator)
+		// the maps' polygon textures and the flags' cloth: their size the map's, no scale's
+		if (strings.has_prefix(lower, "textures/") && !strings.has_prefix(lower, "textures/edges/")) || strings.has_prefix(lower, "objects/textures/") do continue
+		switch filepath.ext(lower) {
+		case ".png", ".bmp", ".jpg", ".gif", ".tga":
+			per_image[dest] = scales[dest] or_else SRMOD_SCALE
+		}
+	}
+	scale, compact := scales_compact(per_image)
+	info := Srmod_Info{format = SRMOD_FORMAT, name = name, title = title, version = "1.0.0", author = "", description = description, parts = parts[:], scale = scale, scales = compact}
 	options := json.Marshal_Options{spec = .JSON, pretty = true, use_spaces = true, spaces = 2}
 	text, err := json.marshal(info, options, context.temp_allocator)
 	if err != nil do return false
@@ -646,14 +658,15 @@ steam_soldats :: proc(candidates: ^[dynamic]string, library: string) {
 }
 
 // The Soldat 1 files `files` as a mod's entries, by where each goes in it (import_file),
-// those of `parts` alone: a .png before a .bmp of its name, as Soldat 1 takes it. And
-// how many there are. With the temp allocator.
+// those of `parts` alone: a .png before a .bmp of its name, as Soldat 1 takes it; each
+// image's scale, by the same path, put in `scales`. And how many there are. With the temp
+// allocator.
 @(private = "file")
-entries_of :: proc(files: []Packed, parts: Parts) -> (entries: map[string][]byte, count: int) {
+entries_of :: proc(files: []Packed, parts: Parts, scales: ^map[string]f32) -> (entries: map[string][]byte, count: int) {
 	entries = make(map[string][]byte, 256, context.temp_allocator)
 	from_png := make(map[string]bool, 256, context.temp_allocator)
 	for f in files {
-		dest, data, ok := import_file(f)
+		dest, data, scale, ok := import_file(f)
 		if !ok do continue
 		part, _ := part_named(dest[:max(strings.index_byte(dest, '/'), 0)])
 		if part not_in parts do continue
@@ -662,6 +675,8 @@ entries_of :: proc(files: []Packed, parts: Parts) -> (entries: map[string][]byte
 		if dest not_in entries do count += 1
 		entries[dest] = data
 		from_png[dest] = png
+		if scale > 0 do scales[dest] = scale
+		else do delete_key(scales, dest)
 	}
 	return
 }
@@ -676,9 +691,10 @@ interface_install :: proc(root, from, title, mods_dir: string, classic: Mod) -> 
 	if mod_exists(mods_dir, name) do return name, "There is a mod by that name already."
 	stock := stock_load()
 	own, _ := scan(root, root, classic, &stock, own = true)
-	entries, _ := entries_of(own, {.Hud, .Icons})
-	if !interface_entries(from, title, &entries) do return name, "That interface has no setup.sif to read."
-	if !srmod_write(mods_dir, name, fmt.tprintf("%s interface", title), fmt.tprintf("Soldat 1's custom interface %s, its HUD's layout and pictures.", title), entries) {
+	scales := make(map[string]f32, context.temp_allocator)
+	entries, _ := entries_of(own, {.Hud, .Icons}, &scales)
+	if !interface_entries(from, title, &entries, &scales) do return name, "That interface has no setup.sif to read."
+	if !srmod_write(mods_dir, name, fmt.tprintf("%s interface", title), fmt.tprintf("Soldat 1's custom interface %s, its HUD's layout and pictures.", title), entries, scales) {
 		return name, "The mod couldn't be written into mods/: is the disk full?"
 	}
 	return name, ""

@@ -13,10 +13,10 @@ import "../utils"
 // Soldat Reloaded's mods (docs/srmod.md): a mod is a folder, mods/<name>/; zipped, a
 // .srmod or a .zip, is how one is handed over, unpacked as it comes in (mod_tidy.odin).
 // At its root, mod.json says what it is; each of its parts is a folder there (soldier/,
-// weapons/, hud/, ...). The
-// player wears each part from a mod of its own (Worn): a file the chosen mod's part
-// hasn't is Classic's, which has them all. Every image is 4.5 pixels to a unit: there
-// is no mod.ini.
+// weapons/, hud/, ...). The player wears each part from a mod of its own (Worn): a file
+// the chosen mod's part hasn't is Classic's, which has them all. An image is drawn at its
+// mod's scale, its pixels to a unit, which mod.json says (srmod_scale): Classic's are 4.5,
+// a mod from Soldat 1 most often 1, kept as it was made.
 
 SRMOD_EXTENSION :: ".srmod"
 SRMOD_INFO_FILE :: "mod.json"
@@ -115,7 +115,14 @@ Srmod_Info :: struct {
 	licence:     string,
 	source:      string,
 	parts:       []string, // what it changes, by PART_NAMES
+	scale:       f32,      // its images' pixels to a unit; SRMOD_SCALE if it says none
+	scales:      map[string]f32, // a folder's or a file's own ("weapons", "soldier/ranny", "hud/health.png"), the longest that holds it winning
 }
+
+// The most pixels to a unit an image may be drawn at, and the fewest: a mod saying more
+// or less is mistaken.
+SRMOD_SCALE_MIN :: 0.25
+SRMOD_SCALE_MAX :: 32
 
 // A mod open: what it says, the parts it has, and its files.
 Srmod :: struct {
@@ -155,6 +162,11 @@ srmod_open :: proc(path: string, allocator := context.allocator, classic := fals
 	}
 	if utf8.rune_count(info.title) > SRMOD_TITLE_MAX do return mod, "its title is longer than 48 letters", false
 	if !version_ok(info.version) do return mod, "its version isn't three numbers, as 1.0.0", false
+	if info.scale == 0 do info.scale = SRMOD_SCALE
+	if !scale_ok(info.scale) do return mod, fmt.tprintf("its scale is %v: from %v to %v pixels to a unit", info.scale, SRMOD_SCALE_MIN, SRMOD_SCALE_MAX), false
+	for within, scale in info.scales {
+		if !scale_ok(scale) do return mod, fmt.tprintf("its scale for %s is %v: from %v to %v pixels to a unit", within, scale, SRMOD_SCALE_MIN, SRMOD_SCALE_MAX), false
+	}
 
 	// its parts are its folders; what mod.json says of them, checked against them
 	problems := make([dynamic]string)
@@ -197,16 +209,87 @@ srmod_close :: proc(mod: ^Srmod, allocator := context.allocator) {
 	delete(info.source)
 	for name in info.parts do delete(name)
 	delete(info.parts)
+	for path in info.scales do delete(path)
+	delete(info.scales)
 	for p in mod.problems do delete(p)
 	delete(mod.problems)
 	layer_close(&mod.pack)
 	mod^ = {}
 }
 
-// The file at `path` in the mod's `part` ("klata.png", "team2/klata.png"), in any case.
+// The file at `path` in the mod's `part` ("klata.png", "team2/klata.png"), in any case,
+// with its scale.
 srmod_file :: proc(mod: ^Srmod, part: Part, path: string) -> (file: Mod_File, found: bool) {
 	if part not_in mod.parts do return
-	return layer_file(&mod.pack, 0, strings.concatenate({PART_NAMES[part], "/", path}, context.temp_allocator))
+	within := strings.concatenate({PART_NAMES[part], "/", path}, context.temp_allocator)
+	file = layer_file(&mod.pack, 0, within) or_return
+	file.scale = srmod_scale(mod, within)
+	return file, true
+}
+
+// How many pixels to a unit the image at `path` within the mod ("weapons/ak74.png") is
+// drawn at: the scale of the longest of its `scales` that is it or a folder holding it,
+// in any case, a file's extension aside; else the mod's own.
+srmod_scale :: proc(mod: ^Srmod, path: string) -> f32 {
+	scale := mod.info.scale if mod.info.scale > 0 else SRMOD_SCALE
+	if len(mod.info.scales) == 0 do return scale
+	want := scale_key(path)
+	best := -1
+	for key, value in mod.info.scales {
+		k := scale_key(key)
+		if len(k) <= best || !strings.has_prefix(want, k) do continue
+		if len(want) != len(k) && want[len(k)] != '/' do continue
+		best, scale = len(k), value
+	}
+	return scale
+}
+
+// A path within a mod as its scales are matched: lower case, forward slashes, no
+// extension, no slash at either end. With the temp allocator.
+@(private = "file")
+scale_key :: proc(path: string) -> string {
+	key, _ := strings.replace_all(strings.to_lower(path, context.temp_allocator), "\\", "/", context.temp_allocator)
+	key = strings.trim(key, "/")
+	slash := strings.last_index_byte(key, '/')
+	if dot := strings.last_index_byte(key, '.'); dot > slash do key = key[:dot]
+	return key
+}
+
+@(private = "file")
+scale_ok :: proc(scale: f32) -> bool {
+	return scale >= SRMOD_SCALE_MIN && scale <= SRMOD_SCALE_MAX
+}
+
+// The scales of a mod's images, each by its path within it, as a mod.json says them: the
+// scale most of them have, and each folder's (all its images alike) or file's that differs
+// from it. With the temp allocator.
+scales_compact :: proc(per_file: map[string]f32) -> (scale: f32, scales: map[string]f32) {
+	scales = make(map[string]f32, context.temp_allocator)
+	if len(per_file) == 0 do return SRMOD_SCALE, scales
+	counts := make(map[f32]int, context.temp_allocator)
+	for _, s in per_file do counts[s] += 1
+	most := 0
+	for s, n in counts {
+		if n > most || (n == most && s == SRMOD_SCALE) do scale, most = s, n
+	}
+	// a folder whose images are all of one scale, not the mod's, says it once
+	folders := make(map[string]f32, context.temp_allocator)
+	mixed := make(map[string]bool, context.temp_allocator)
+	for path, s in per_file {
+		dir := path[:max(strings.last_index_byte(path, '/'), 0)]
+		if had, has := folders[dir]; has && had != s do mixed[dir] = true
+		folders[dir] = s
+	}
+	for dir, s in folders {
+		if dir != "" && !mixed[dir] && s != scale do scales[dir] = s
+	}
+	// and each file the folders say wrongly (a folder of another scale within one said),
+	// its own
+	said := Srmod{info = {scale = scale, scales = scales}}
+	for path, s in per_file {
+		if srmod_scale(&said, path) != s do scales[path] = s
+	}
+	return
 }
 
 // Every file of the mod's `part`, read: by its path in the part ("health.png",

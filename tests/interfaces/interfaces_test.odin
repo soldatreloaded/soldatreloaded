@@ -151,7 +151,7 @@ anchors :: proc(t: ^testing.T) {
 
 // A Soldat 1 install's custom interfaces, and its mods', each offered (soldat_sources) and
 // made a .srmod (interface_install): its hud, its setup.sif as layout.json and its HUD's
-// pictures; its icons, the rest of them; each picture brought to 4.5 from its own scale (1,
+// pictures; its icons, the rest of them; each picture as it was, at its own scale (1,
 // without a mod.ini), see-through where it was green; and under them the HUD's art the
 // player changed in the install's own folders. Named as it was but for what a name can't
 // have; not over a mod by that name; the original's Default, and one without a setup.sif,
@@ -213,7 +213,9 @@ imported :: proc(t: ^testing.T) {
 	health, has := res.srmod_file(&neo, .Hud, "health.png")
 	pixels, _ := res.mod_read(health, context.temp_allocator)
 	image, decoded := res.texture_decode(pixels, nil, context.temp_allocator)
-	testing.expect(t, has && decoded && image.width == 9 && image.height == 9 && image.pixels[0].a == 0, "its health, not the player's, at 4.5, its green see-through")
+	testing.expect(t, has && decoded && image.width == 2 && image.height == 2 && image.pixels[0].a == 0, "its health, not the player's, its pixels as they were, its green see-through")
+	testing.expect_value(t, health.scale, 1) // it has no mod.ini: Soldat 1 drew it at 1, and so does its mod
+	testing.expect_value(t, neo.info.scale, 1)
 	_, ammo := res.srmod_file(&neo, .Hud, "ammo.png")
 	testing.expect(t, ammo, "the player's ammo under it")
 	_, cursor := res.srmod_file(&neo, .Icons, "cursor.png")

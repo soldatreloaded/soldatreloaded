@@ -432,9 +432,9 @@ interface_layer :: proc(dir, name: string) -> (layer: Mod_Layer, found: bool) {
 // The Soldat 1 custom interface `title` of `from` (its custom-interfaces/), a folder or
 // a .sint, as a mod's entries, put over `entries`: its setup.sif as hud/layout.json (its
 // anchors and alignment as Soldat 1 works them out, written down), and its pictures, the
-// HUD's in hud/ and the rest in icons/, each brought from its scale to SRMOD_SCALE,
-// see-through where it was green. False if it has no setup.sif to read.
-interface_entries :: proc(from, title: string, entries: ^map[string][]byte) -> bool {
+// HUD's in hud/ and the rest in icons/, each at its own scale (put in `scales`, by its path
+// in the mod), see-through where it was green. False if it has no setup.sif to read.
+interface_entries :: proc(from, title: string, entries: ^map[string][]byte, scales: ^map[string]f32) -> bool {
 	iface := interface_open(from, title, context.temp_allocator)
 	defer interface_close(&iface, context.temp_allocator)
 	if !iface.custom do return false
@@ -445,9 +445,10 @@ interface_entries :: proc(from, title: string, entries: ^map[string][]byte) -> b
 		if !found do continue
 		data := mod_read(file, context.temp_allocator) or_continue
 		texture := texture_decode(data, COLOR_KEY, context.temp_allocator) or_continue
-		texture = texture_rescale(texture, SRMOD_SCALE / scale)
 		part := Part.Hud if slice.contains(HUD_PICTURES[:], stem) else .Icons
-		entries[strings.concatenate({PART_NAMES[part], "/", stem, ".png"}, context.temp_allocator)] = texture_png(texture)
+		dest := strings.concatenate({PART_NAMES[part], "/", stem, ".png"}, context.temp_allocator)
+		entries[dest] = texture_png(texture)
+		scales[dest] = scale
 	}
 	return true
 }
