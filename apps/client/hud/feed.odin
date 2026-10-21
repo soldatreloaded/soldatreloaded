@@ -51,6 +51,7 @@ Feed :: struct {
 	// while playing (kill_recolor): watching a demo or spectating keeps the team colours, as
 	// the relation to a watched player is not the viewer's. All set each tick
 	kill_recolor:   bool,
+	kill_hide_mine: bool, // my own kills and deaths kept out of it (interface.kill_log_hide_mine), only while playing as kill_recolor is
 	kill_mine:      Maybe(rl.Color),
 	kill_team:      Maybe(rl.Color),
 	kill_enemy:     Maybe(rl.Color),
@@ -252,14 +253,16 @@ feed_scroll :: proc(feed: ^Feed) {
 
 // A kill (NetworkClientSprite.pas): the killer with its tally beside its weapon's icon,
 // the victim under; a suicide is the one line, in gold, without an icon when nothing
-// did it. And the big words about me: whom I killed, and how many in a row, or who
-// killed me.
+// did it; none of mine, with kill_hide_mine. And the big words about me: whom I killed,
+// and how many in a row, or who killed me.
 @(private = "file")
 kill_said :: proc(feed: ^Feed, world: ^sim.World, names: ^[sim.MAX_PLAYERS]string, kill: sim.Kill, me: sim.Soldier_Id) {
 	killer, victim := &world.soldiers[kill.killer], &world.soldiers[kill.target]
 	my_team := world.soldiers[me].team // whom the lines are coloured relative to
 	tallied := fmt.tprintf("%s (%d)", names[kill.killer], kill.kills) // the server's count, which the ruling carries
-	if kill.killer != kill.target {
+	if feed.kill_hide_mine && (kill.killer == me || kill.target == me) {
+		// not in the kill log: the big words below still say it
+	} else if kill.killer != kill.target {
 		kill_line(feed, tallied, kill_log_color(feed, kill.killer, me, killer.team, my_team, killer_color(killer.team)), kill.weapon, true)
 		kill_line(feed, names[kill.target], kill_log_color(feed, kill.target, me, victim.team, my_team, victim_color(victim.team)), kill.weapon, false)
 	} else {

@@ -74,6 +74,7 @@ tab_interface :: proc(menu: ^Menu) {
 	ui.section(k, "KILL LOG")
 	ui.slider(k, "Kill log length", &config.interface.kill_log_length, 0, 50, 2, "%d lines")
 	ui.enum_select(k, "Kill log position", &config.interface.kill_log_position, KILL_LOG_PLACES[:])
+	ui.toggle(k, "Hide your kills and deaths", &config.interface.kill_log_hide_mine)
 	// each empty keeps the team's own colour, as the kill log has always coloured it
 	ui.color_row(k, "Your kills and deaths", &config.interface.kill_color_mine)
 	ui.color_row(k, "Your teammates", &config.interface.kill_color_team)
