@@ -301,6 +301,57 @@ demo_round_trip :: proc(t: ^testing.T) {
 	testing.expect(t, present, "my soldier is in it")
 }
 
+// The captures in a recorded demo, found as it opens, for its timeline: alpha's then
+// bravo's, each when its snapshot came; the scores the recording began with not taken
+// for captures.
+@(test)
+demo_caps_found :: proc(t: ^testing.T) {
+	PATH :: "test_demos/caps.srdm"
+	defer os.remove_all("test_demos")
+	s := new(Session)
+	defer free(s)
+	testing.expect(t, session_open(s))
+	defer session_close(s)
+	testing.expect(t, until(s, joined))
+	s.sv.game.round.captures[.Alpha] = 2 // a round under way: not captures of the demo's
+	for _ in 0 ..< 30 do pump(s) // heard before the recording begins, in the snapshots it joins with
+
+	recorder := new(demo.Recorder)
+	defer free(recorder)
+	header := demo.Header{date = 1234, slot = u8(s.n.slot), map_name = s.n.map_name}
+	testing.expect(t, demo.recorder_open(recorder, PATH, header), "the demo is written")
+	demo.recorder_join(recorder, &s.n)
+	s.recorder = recorder
+	s.n.tap = proc(user: rawptr, data: []u8, kind: network.Msg_Kind) {
+		if kind != .Map && kind != .Map_Part do demo.recorder_packet((^demo.Recorder)(user), data)
+	}
+	s.n.tap_user = recorder
+	for _ in 0 ..< 60 do pump(s)
+	alpha_at := recorder.ticks
+	s.sv.game.round.captures[.Alpha] += 1
+	for _ in 0 ..< 60 do pump(s)
+	bravo_at := recorder.ticks
+	s.sv.game.round.captures[.Bravo] += 1
+	for _ in 0 ..< 60 do pump(s)
+	s.n.tap = nil
+	s.recorder = nil
+	demo.recorder_close(recorder)
+
+	player := new(demo.Player)
+	defer free(player)
+	why, opened := demo.player_open(player, PATH)
+	testing.expectf(t, opened, "the demo opens: %s", why)
+	defer demo.player_close(player)
+	caps := demo.player_caps(player)
+	defer delete(caps)
+	testing.expectf(t, len(caps) == 2, "two captures, not the two it began with: %v", caps)
+	if len(caps) != 2 do return
+	testing.expect_value(t, caps[0].team, res.Team.Alpha)
+	testing.expect_value(t, caps[1].team, res.Team.Bravo)
+	testing.expectf(t, caps[0].tick >= alpha_at && caps[0].tick < bravo_at, "alpha's when it came: %d, scored at %d", caps[0].tick, alpha_at)
+	testing.expectf(t, caps[1].tick >= bravo_at && caps[1].tick < bravo_at + 30, "bravo's when it came: %d, scored at %d", caps[1].tick, bravo_at)
+}
+
 // The browser's queries: a server on the list asked what it plays, and answering.
 @(test)
 browser_asks :: proc(t: ^testing.T) {

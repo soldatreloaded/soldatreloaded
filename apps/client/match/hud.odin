@@ -128,6 +128,7 @@ hud_data :: proc(match: ^Match, config: ^res.Client_Config) -> (data: hud.Hud_Da
 	data.view = match.seen.view
 	data.zoom = draw.camera_zoom(match.seen)
 	data.cursor = cursor_shown(match)
+	data.mouse = match.input.cursor
 	data.under_cursor, data.friend = under_cursor(match, &names)
 	data.follow = match.watch.follow
 	data.free_camera = match.watch.free
@@ -167,7 +168,9 @@ hud_data :: proc(match: ^Match, config: ^res.Client_Config) -> (data: hud.Hud_Da
 	data.demo_name = match.recorder.name
 	if match.mode == .Demo {
 		p := &match.playback
-		data.demo = hud.Demo_Line{at = demo_at(match), length = p.player.header.ticks, paused = p.paused, seeking = p.seeking, speed = p.speed}
+		caps := make([]hud.Demo_Cap, len(p.caps), context.temp_allocator)
+		for cap, i in p.caps do caps[i] = {cap.tick, cap.team}
+		data.demo = hud.Demo_Line{at = demo_at(match), length = p.player.header.ticks, paused = p.paused, seeking = p.seeking, seek_to = p.seek_to, speed = p.speed, caps = caps}
 	}
 
 	interface := &config.interface

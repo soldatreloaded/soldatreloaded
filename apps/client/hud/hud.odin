@@ -49,6 +49,8 @@ Hud :: struct {
 	scoreboard: bool, // the frags menu: F1, and up while a round's scores stand
 	stats:      bool, // my weapon stats: F2
 	mute:       Maybe(Mute_Target), // a click on the open scoreboard asking to mute; the match takes and clears it
+	demo_bar:   Demo_Bar, // a demo's player bar
+	demo_ask:   Demo_Ask, // what it asked this frame; the match takes and clears it
 }
 
 hud_init :: proc(hud: ^Hud, mod: res.Mod) {
@@ -91,6 +93,10 @@ hud_draw :: proc(u: ^ui.Ui, hud: ^Hud, data: ^Hud_Data, minimap: ^draw.Minimap) 
 	escape, team := .Escape in menus.open, .Team in menus.open
 	typing := data.prompt.mode != .None
 	mute_board := hud.scoreboard && data.scoreboard_mute // the scoreboard open, its mute signs to click
+	// the crosshair is the recorder's own in a demo, at its cursor as recorded: only while
+	// the camera follows the recorder, not another player or the free camera, where it
+	// would stand at my mouse
+	aiming := !demoing || (data.follow == nil && !data.free_camera)
 	defer rl.EndBlendMode()
 
 	draw_world_texts(u, data) // of the world, under the rest
@@ -98,7 +104,7 @@ hud_draw :: proc(u: ^ui.Ui, hud: ^Hud, data: ^Hud_Data, minimap: ^draw.Minimap) 
 	draw_screen_texts(u, data)
 	if show_bars do draw_bars(u, art, mine)
 	if playing {
-		if !menus_any_open(menus) && !mine.dead && !data.ended && !mute_board do draw_crosshair(u, art, data) // gone as the round ends, as the original's; the scoreboard shows the pointer instead, to click its mute signs
+		if !menus_any_open(menus) && !mine.dead && !data.ended && !mute_board && aiming do draw_crosshair(u, art, data) // gone as the round ends, as the original's; the scoreboard shows the pointer instead, to click its mute signs
 		draw_my_arrow(u, art, data)
 	}
 	draw_kill_icons(u, art, feed, data.kill_log, kill_feed_top(data), hud.scoreboard)
@@ -127,16 +133,17 @@ hud_draw :: proc(u: ^ui.Ui, hud: ^Hud, data: ^Hud_Data, minimap: ^draw.Minimap) 
 		draw_said(u, data)
 		if data.player_names do draw_names(u, data)
 	}
-	if !mine.dead && !team && !escape do draw_under_cursor(u, data)
+	if !mine.dead && !team && !escape && aiming do draw_under_cursor(u, data)
 	draw_watching(u, data)
 	if data.clock && !hud.scoreboard && !hud.stats do draw_time_left(u, data, minimap)
 	draw_readouts(u, data)
 	draw_clocks(u, data)
-	draw_demo_marks(u, data)
 	draw_shot(u, feed, data.seconds)
 
 	draw_menus(u, art, menus, data, hud.scoreboard || hud.stats)
+	draw_demo_bar(u, hud, data) // a demo's player bar, under the pointer
 	if menus_any_open(menus) || mine.dead || mute_board do draw_pointer(u, art, data) // the scoreboard's mute signs are clicked
+	else if demo_bar_shown(hud) do pointer_draw(u, art, data.mouse, data.pointer.color, data.pointer.scale) // the bar's, at the mouse
 	if mute_board && !summary && !menus_any_open(menus) do scoreboard_mute_input(hud, u, data)
 }
 

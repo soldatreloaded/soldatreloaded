@@ -34,6 +34,7 @@ Hud_Data :: struct {
 	view:         [2]f32, // its size, in the HUD's units
 	zoom:         f32,    // the HUD's units to a world unit: 1, but more where a wide screen is filled; 0 as 1
 	cursor:       [2]f32, // the game's cursor, in units from the view's top-left
+	mouse:        [2]f32, // the mouse's own, where a demo's recorder's cursor stands for the cursor: the demo bar's
 	under_cursor: string, // the player the cursor is on, a teammate with its health
 	friend:       bool,   // and on my side
 	follow:       Maybe(sim.Soldier_Id), // the player the camera follows while I watch, nil for me
@@ -181,7 +182,9 @@ Demo_Line :: struct {
 	at, length: u32, // ticks
 	paused:     bool,
 	seeking:    bool,
+	seek_to:    u32, // where a seek goes
 	speed:      f32,
+	caps:       []Demo_Cap, // the captures in it, for the timeline's flags
 }
 
 // The emote wheel, up: where the mouse points from its middle, and the emote it picks.

@@ -32,6 +32,7 @@ Playback :: struct {
 	speed:   f32,          // times its own
 	seeking: bool,         // running on, unseen and unheard, to `seek_to`
 	seek_to: u32,
+	caps:    [dynamic]demo.Cap, // the captures in it, found as it opened, for the bar's timeline
 }
 
 // What `record` asked, and whether this round has a demo begun.
@@ -73,6 +74,7 @@ match_play_demo :: proc(match: ^Match, n: ^online.Line, name: string, config: ^r
 		online.line_disconnect(n)
 		return fmt.tprintf("The demo's map %s couldn't be loaded.", map_name), false
 	}
+	match.playback.caps = demo.player_caps(player)
 	seconds := header.ticks / sim.TICK_RATE
 	client_say(match, "Playing demo %s: %s on %s, %d:%02d", player.name, utils.short_string_text(&header.name), map_name, seconds / 60, seconds % 60)
 	return "", true
@@ -156,6 +158,17 @@ demo_seek :: proc(match: ^Match, to: i64) {
 	}
 	p.seek_to = to
 	p.seeking = p.seek_to > demo_at(match)
+}
+
+// What the demo bar asked last frame (hud.Demo_Ask): a seek, held or let go, a speed.
+demo_bar_take :: proc(match: ^Match) {
+	ask := &match.hud.demo_ask
+	defer ask^ = {}
+	if match.mode != .Demo do return
+	p := &match.playback
+	if ask.pause do p.paused = !p.paused
+	if speed, set := ask.speed.?; set do p.speed = speed
+	if to, asked := ask.seek.?; asked do demo_seek(match, i64(to))
 }
 
 // A slice of the frame's time spent running the seek's ticks; it ends where it was

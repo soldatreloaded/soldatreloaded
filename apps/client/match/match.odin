@@ -204,6 +204,7 @@ match_end :: proc(match: ^Match) {
 		demo.player_close(player)
 		free(player)
 	}
+	delete(match.playback.caps)
 	input.input_stop(&match.input)
 	draw.minimap_destroy(&match.minimap)
 	draw.canvas_destroy(&match.canvas)
@@ -335,6 +336,7 @@ view_open :: proc(match: ^Match, sounds: ^sound.Sound) {
 @(private = "file")
 keys :: proc(match: ^Match, config: ^res.Client_Config, sounds: ^sound.Sound) {
 	scoreboard_mute_take(match) // a mute a scoreboard click asked for last frame
+	demo_bar_take(match) // and what the demo bar asked
 	typing := prompt_up(match)
 	if typing do typing = chat_keys(match, config) // false once a click closed it, which the game takes
 	menu := hud.menus_any_open(&match.hud.menus)
@@ -346,7 +348,8 @@ keys :: proc(match: ^Match, config: ^res.Client_Config, sounds: ^sound.Sound) {
 	before := match.input.cursor // the aim, held while the emote wheel is up
 	actions := input.input_poll(&match.input, config, match.camera.view, menu, RADIO_CALLS if radio else 0, typing, controls)
 	// the open scoreboard owns the left button, for muting a player or a team: no firing
-	if match.hud.scoreboard {
+	// and a demo's bar, under the pointer or dragged: its clicks go round no players
+	if match.hud.scoreboard || match.hud.demo_bar.hot || match.hud.demo_bar.dragging {
 		match.input.held -= {.Fire}
 		match.input.pressed -= {.Fire}
 	}

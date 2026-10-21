@@ -102,19 +102,3 @@ draw_time_left :: proc(u: ^ui.Ui, data: ^Hud_Data, minimap: ^draw.Minimap) {
 	text := fmt.tprintf("%d:%02d", data.time_left / 60, data.time_left % 60)
 	write(u, text, {(u.width - text_width(u, text, MENU_FONT)) / 2, y}, MENU_FONT, data.time_color)
 }
-
-// A demo playing: how far through it is, where the original puts it, and whether it is
-// held or hurried.
-draw_demo_marks :: proc(u: ^ui.Ui, data: ^Hud_Data) {
-	demo, playing := data.demo.?
-	if !playing do return
-	pace := ""
-	switch {
-	case demo.seeking:     pace = "  seeking..."
-	case demo.paused:      pace = "  paused"
-	case demo.speed != 1:  pace = fmt.tprintf("  x%v", demo.speed)
-	}
-	at, of := demo.at / 60, demo.length / 60
-	line := fmt.tprintf("Demo: %02d:%02d / %02d:%02d%s", at / 60, at % 60, of / 60, of % 60, pace)
-	write(u, line, {460 * wide(u), 80}, SMALL_FONT, {239, 170, 200, 255})
-}
