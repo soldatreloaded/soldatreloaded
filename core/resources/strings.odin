@@ -126,6 +126,11 @@ String_Id :: enum {
 	Award_Most_Captures,
 	Award_Longest_Carry,
 	Award_Fastest_Capture,
+	Summary_Final,
+	Summary_Limit,
+	Summary_Awards,
+	Summary_Total,
+	Summary_More,
 }
 
 // A line the game says: its key in strings.json, its English (Classic's), and where it is
@@ -248,6 +253,11 @@ STRINGS := [String_Id]String_Line {
 	.Award_Most_Captures   = {"award_most_captures", "Most Captures", ""},
 	.Award_Longest_Carry   = {"award_longest_carry", "Longest Carry", ""},
 	.Award_Fastest_Capture = {"award_fastest_capture", "Fastest Capture", ""},
+	.Summary_Final         = {"summary_final", "FINAL", ""},
+	.Summary_Limit         = {"summary_limit", "FIRST TO %d", ""},
+	.Summary_Awards        = {"summary_awards", "ROUND AWARDS", ""},
+	.Summary_Total         = {"summary_total", "TOTAL", ""},
+	.Summary_More          = {"summary_more", "+%d MORE", ""},
 }
 
 // The lines worn, each the chosen mod's, else Classic's, else its English; with the

@@ -89,7 +89,7 @@ hud_draw :: proc(u: ^ui.Ui, hud: ^Hud, data: ^Hud_Data, minimap: ^draw.Minimap) 
 	// a soldier I control, so neither shows in a demo
 	viewed := &data.players[data.viewed]
 	_, demoing := data.demo.?
-	show_bars := playing || (demoing && viewed.active && viewed.team != .Spectator)
+	show_bars := (playing || (demoing && viewed.active && viewed.team != .Spectator)) && !data.ended // the end screen covers the field: nothing of the field over it
 	escape, team := .Escape in menus.open, .Team in menus.open
 	typing := data.prompt.mode != .None
 	mute_board := hud.scoreboard && data.scoreboard_mute // the scoreboard open, its mute signs to click
@@ -99,42 +99,42 @@ hud_draw :: proc(u: ^ui.Ui, hud: ^Hud, data: ^Hud_Data, minimap: ^draw.Minimap) 
 	aiming := !demoing || (data.follow == nil && !data.free_camera)
 	defer rl.EndBlendMode()
 
-	draw_world_texts(u, data) // of the world, under the rest
-	draw_big_message(u, feed)
+	if !data.ended do draw_world_texts(u, data) // of the world, under the rest
+	if !data.ended do draw_big_message(u, feed) // the end screen says who won
 	draw_screen_texts(u, data)
 	if show_bars do draw_bars(u, art, mine)
 	if playing {
 		if !menus_any_open(menus) && !mine.dead && !data.ended && !mute_board && aiming do draw_crosshair(u, art, data) // gone as the round ends, as the original's; the scoreboard shows the pointer instead, to click its mute signs
-		draw_my_arrow(u, art, data)
+		if !data.ended do draw_my_arrow(u, art, data)
 	}
-	draw_kill_icons(u, art, feed, data.kill_log, kill_feed_top(data), hud.scoreboard)
-	if data.minimap do draw_minimap(u, art, minimap, data)
-	summary := data.ended && players(data) > 1 // the end screen replaces the plain scoreboard
+	summary := data.ended && players(data) > 1 // the end screen replaces the plain scoreboard, and the field's HUD goes under it
+	if !summary do draw_kill_icons(u, art, feed, data.kill_log, kill_feed_top(data), hud.scoreboard)
+	if data.minimap && !data.ended do draw_minimap(u, art, minimap, data)
 	board_bottom: f32
 	if hud.scoreboard && !summary do board_bottom = draw_scoreboard_box(u, art, data)
+	if summary do draw_round_summary(u, data) // the end screen, under the menus
 	draw_menu_boxes(u, art, menus, data)
 	draw_vote_box(u, art, data)
-	draw_team_box(u, art, data)
+	if !summary do draw_team_box(u, art, data)
 
-	if me.active do draw_bar_texts(u, art, data)
-	draw_team_scores(u, art, data)
-	if summary do draw_round_summary(u, art, data)
+	if me.active && !data.ended do draw_bar_texts(u, art, data)
+	if !summary do draw_team_scores(u, art, data) // the end screen shows the score itself
 	if data.paused do draw_paused(u)
 	if hud.stats && !summary do draw_stats(u, art, feed, data, hud.scoreboard)
 	if hud.scoreboard && !summary do draw_scoreboard(u, data, board_bottom)
 	draw_console(u, feed, hud.scoreboard || hud.stats || team || (typing && .Weapons in menus.open), typing, data.prompt.scroll)
-	if playing do draw_respawn(u, art, mine)
+	if playing && !data.ended do draw_respawn(u, art, mine)
 	draw_vote(u, data)
 	if data.radio.open && !escape do draw_radio(u, art, data, hud.scoreboard || hud.stats)
 	if data.emotes.open && !escape do draw_emote_wheel(u, art, data)
 	draw_prompt(u, data)
-	draw_kill_feed(u, art, feed, data.kill_log, kill_feed_top(data), hud.scoreboard, typing)
-	if me.active {
+	if !summary do draw_kill_feed(u, art, feed, data.kill_log, kill_feed_top(data), hud.scoreboard, typing)
+	if me.active && !data.ended {
 		draw_said(u, data)
 		if data.player_names do draw_names(u, data)
 	}
-	if !mine.dead && !team && !escape && aiming do draw_under_cursor(u, data)
-	draw_watching(u, data)
+	if !mine.dead && !team && !escape && aiming && !data.ended do draw_under_cursor(u, data)
+	if !data.ended do draw_watching(u, data)
 	if data.clock && !hud.scoreboard && !hud.stats do draw_time_left(u, data, minimap)
 	draw_readouts(u, data)
 	draw_clocks(u, data)

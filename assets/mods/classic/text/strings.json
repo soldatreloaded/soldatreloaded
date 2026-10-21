@@ -107,5 +107,10 @@
   "award_longest_streak": "Longest Streak",
   "award_most_captures": "Most Captures",
   "award_longest_carry": "Longest Carry",
-  "award_fastest_capture": "Fastest Capture"
+  "award_fastest_capture": "Fastest Capture",
+  "summary_final": "FINAL",
+  "summary_limit": "FIRST TO %d",
+  "summary_awards": "ROUND AWARDS",
+  "summary_total": "TOTAL",
+  "summary_more": "+%d MORE"
 }

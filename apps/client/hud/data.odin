@@ -19,6 +19,7 @@ Hud_Data :: struct {
 	flags_home:   [res.Team]bool, // each team's flag at its base, and nobody's
 	paused:       bool,
 	ended:        bool, // over, its scores standing until the next
+	ended_fade:   f32,  // how far the end screen has come in over the field, 0 to 1 (draw.victory_fade)
 	hostname:     string, // the server's, over the scoreboard
 
 	// everyone, me among them

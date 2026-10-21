@@ -82,6 +82,7 @@ hud_data :: proc(match: ^Match, config: ^res.Client_Config) -> (data: hud.Hud_Da
 	}
 	_, data.paused = round.phase.(sim.Paused)
 	_, data.ended = round.phase.(sim.Ended)
+	data.ended_fade = draw.victory_fade(game)
 	data.hostname = "Soldat Reloaded"
 	if match.mode != .Offline && match.line.hostname.length > 0 do data.hostname = utils.short_string_text(&match.line.hostname)
 
