@@ -55,7 +55,8 @@ Feed :: struct {
 	kill_team:      Maybe(rl.Color),
 	kill_enemy:     Maybe(rl.Color),
 	kill_self:      Maybe(rl.Color),
-	big:            Big_Message,
+	var_color:      rl.Color, // a taunt's variables, as filled in, in the console; set each tick
+	big:           Big_Message,
 	stats:          [res.Weapon]Weapon_Stat, // my shots, hits and kills, by weapon
 	shot:           Shot_Readout,            // my last kill's shot, while it is shown
 	multi_kills:    i32, // my kills in quick succession, for the big words

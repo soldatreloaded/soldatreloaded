@@ -70,6 +70,7 @@ tab_interface :: proc(menu: ^Menu) {
 	ui.color_row(k, "Flag carrier name colour", &config.interface.carrier_color)
 	ui.enum_select(k, "Typing indicator", &config.interface.typing, TYPING_NAMES[:])
 	ui.slider(k, "Typing indicator size", &config.interface.typing_size, 50, 200, 10, "%d%%")
+	ui.color_row(k, "Taunt variable colour", &config.interface.taunt_var_color)
 	ui.section(k, "KILL LOG")
 	ui.slider(k, "Kill log length", &config.interface.kill_log_length, 0, 50, 2, "%d lines")
 	ui.enum_select(k, "Kill log position", &config.interface.kill_log_position, KILL_LOG_PLACES[:])
