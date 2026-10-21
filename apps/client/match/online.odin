@@ -35,6 +35,7 @@ Line_Seen :: struct {
 	netstats: bool, // a line a second on the console of how the line is doing
 	newest, arrived: u32, // the stream's, as of the last second
 	stats:    online.Stream_Stats, // and its counters
+	eats:     online.Eat_Stats,    // and my hits' and eats' (network.eats_tick)
 }
 
 // The round on the server's map: the world and its picture made anew for it, nobody in
@@ -178,24 +179,30 @@ line_second :: proc(match: ^Match, dt: f32) {
 	live := match.mode == .Online
 	l.loss = i32((ticks - came) * 100 / ticks) if live && ticks > came else 0
 	l.jitter = i32(online.line_jitter(n)) if live else 0
-	if l.netstats && live do netstats_say(match, &stats)
+	eats := online.line_eats(n)
+	if eats.hits < l.eats.hits do l.eats = {} // a new round's count
+	if l.netstats && live do netstats_say(match, &stats, &eats)
 	l.newest, l.arrived = newest, stats.arrived
 	l.stats = stats
+	l.eats = eats
 }
 
 // How the line did over the last second (cl_netstats): the ping, how many frames the
 // view had in hand, the snapshots that came too late or not at all, the view clock's
-// nudges, and how far the snapshots moved the others from where stepping had them.
+// nudges, how far the snapshots moved the others from where stepping had them, and my
+// hits on my screen the server's word came of, or didn't (the eats).
 @(private = "file")
-netstats_say :: proc(match: ^Match, now: ^online.Stream_Stats) {
+netstats_say :: proc(match: ^Match, now: ^online.Stream_Stats, eats: ^online.Eat_Stats) {
 	was := &match.quality.stats
 	n := match.line
 	applies := now.applies - was.applies
 	corrected := (now.correction - was.correction) / f32(applies) if applies > 0 else 0
 	in_hand := i32(n.stream.newest) - i32(match.game.world.tick)
-	client_say(match, "net: ping %d ms, %d frames in hand (interp %d), late %d, missed %d, held %d, skipped %d, resync %d, corrected %.2f units a frame",
+	eats_was := &match.quality.eats
+	client_say(match, "net: ping %d ms, %d frames in hand (interp %d), late %d, missed %d, held %d, skipped %d, resync %d, corrected %.2f units a frame, hits %d, eaten %d",
 		match.game.world.soldiers[match.me].player.ping, in_hand, n.stream.interp, now.late - was.late, now.misses - was.misses,
-		now.held - was.held, now.skipped - was.skipped, now.resyncs - was.resyncs, corrected)
+		now.held - was.held, now.skipped - was.skipped, now.resyncs - was.resyncs, corrected,
+		eats.hits - eats_was.hits, online.eats_total(eats^) - online.eats_total(eats_was^))
 }
 
 @(private = "file")

@@ -16,7 +16,7 @@ Word :: union {
 }
 
 MAX_HEARD :: 256
-CATCH_UP_MAX :: 30 // ticks a heard shot is run forward at most: half a second
+CATCH_UP_MAX :: HISTORY_TICKS // ticks a heard shot is run forward at most: as far back as the referee keeps the soldiers, about a second
 
 Hearing :: struct {
 	word:     Word,
