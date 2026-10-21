@@ -90,7 +90,7 @@ sparks_event :: proc(sparks: ^Sparks, game: ^sim.Game, event: sim.Event) {
 		#partial switch e.polygon {
 		case .Lava, .Explodes:
 			for _ in 0 ..< 3 do spark_add(sparks, .Fire_Chip, e.pos, {spread(sparks, 0.8), -0.5 - random(sparks)}, 35)
-		case .Regenerates: spark_add(sparks, .Smoke, e.pos, {0, -0.4}, 50)
+		case .Regenerates: // its sound alone, as OpenSoldat's (Sprites.pas HandleSpecialPolyTypes)
 		case .Bouncy: // its thud is the sound's
 		case:          spark_add(sparks, .Little_Blood, e.pos, {0, -0.2}, 45)
 		}
