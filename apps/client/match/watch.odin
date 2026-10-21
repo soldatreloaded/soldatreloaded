@@ -157,7 +157,8 @@ camera_tick :: proc(match: ^Match) {
 		// still with the cursor in the middle: 10 either way, wider with a wider view
 		ratio := camera.view.x / 640
 		middle := cursor.x > 310 * ratio && cursor.x < 330 * ratio && cursor.y > 230 && cursor.y < 250
-		if !middle do camera.pos += (cursor - camera.view / 2) / SPECTATOR_AIM_DIST / draw.camera_zoom(camera^)
+		// nor with the pointer on a demo's bar, its controls being used
+		if !middle && !match.hud.demo_bar.hot do camera.pos += (cursor - camera.view / 2) / SPECTATOR_AIM_DIST / draw.camera_zoom(camera^)
 		return
 	}
 	soldier := &match.game.world.soldiers[followed]
