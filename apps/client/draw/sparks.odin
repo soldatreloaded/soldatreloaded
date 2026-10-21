@@ -34,6 +34,7 @@ Sparks :: struct {
 	last_reload: [sim.MAX_PLAYERS]i32, // each soldier's reload count a tick ago: the clip drops as it passes the clip-out time
 	last_pump:   [sim.MAX_PLAYERS]i32, // each soldier's frame of the shotgun's pump a tick ago, 0 when not pumping
 	noises:      sa.Small_Array(MAX_SPARK_NOISES, Spark_Noise), // the last tick's, in order
+	shift:       [sim.MAX_PLAYERS]sim.Joints, // this tick's, each soldier's points as drawn less the game's (soldier_shift): what comes off a soldier comes off it as drawn
 }
 
 // What a spark sounded like, and where.
@@ -210,9 +211,11 @@ sparks_init :: proc(sparks: ^Sparks) {
 // After each tick: the sparks it made, then every spark on by a step, and the noises
 // they made. A standing round's sparks, paused or ended, hang where they are, silent,
 // and none are made, a held jet's flames among them (UpdateFrame's MapChangeCounter).
-sparks_tick :: proc(sparks: ^Sparks, game: ^sim.Game) {
+// Those made off a soldier come off it as `art` draws it, moved by `offsets` online.
+sparks_tick :: proc(sparks: ^Sparks, game: ^sim.Game, art: ^Art = nil, offsets: ^[sim.MAX_PLAYERS]utils.Vec2 = nil) {
 	sa.clear(&sparks.noises)
 	if sim.round_standing(&game.round) do return
+	for id in 0 ..< sim.MAX_PLAYERS do sparks.shift[id] = soldier_shift(art, game, id, offsets[id] if offsets != nil else {})
 	sparks_burst(sparks, game)
 	for &spark in sparks.pool {
 		if spark.kind != .None do spark_step(sparks, &spark, game.world.polymap)

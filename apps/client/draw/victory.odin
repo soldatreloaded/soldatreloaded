@@ -103,6 +103,7 @@ victory_pose :: proc(animations: ^res.Animations, soldier: ^sim.Soldier, seconds
 victory_figure :: proc(animations: ^res.Animations, skeleton: ^res.Skeleton, soldier: ^sim.Soldier) -> (figure: Figure) {
 	joints := sim.soldier_pose(animations, soldier, {0, 0})
 	copy(figure.points[:], joints[:])
+	figure.clip = true // a full gun
 	swing := figure.points[len(joints):]
 	swing[0] = joints[8]
 	swing[2] = joints[8] + (joints[11] - joints[8]) * 50

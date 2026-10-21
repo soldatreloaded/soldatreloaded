@@ -86,14 +86,21 @@ things_load :: proc(source: Source) -> (art: Thing_Art) {
 }
 
 // One pass over the things, each `alpha` of the way from its last tick to its latest.
-// `seconds` pulses the flags' glow.
+// `seconds` pulses the flags' glow. A carried flag and a parachute are drawn on their
+// soldier as `figures` has it: moved by the shift of the point the game pins them to,
+// the flag's 8 and the lines' 12 (the head), as the hair is moved by its neck's.
 @(private = "package")
-draw_things :: proc(art: ^Thing_Art, game: ^sim.Game, pass: Thing_Pass, alpha: f32, seconds: f64) {
+draw_things :: proc(art: ^Thing_Art, game: ^sim.Game, figures: ^[sim.MAX_PLAYERS]Figure, pass: Thing_Pass, alpha: f32, seconds: f64) {
 	for &thing in game.world.things {
 		if thing.kind == .None || blinked_out(&thing) do continue
+		shift: utils.Vec2
+		if holder, held := thing.holder.?; held {
+			if sim.thing_is_flag(thing.kind) do shift = figures[holder].shift[8 - 1]
+			else if thing.kind == .Parachute do shift = figures[holder].shift[12 - 1]
+		}
 		p: [4]utils.Vec2
 		for &point, k in p {
-			point = between(thing.old_points[k], thing.points[k], alpha)
+			point = between(thing.old_points[k], thing.points[k], alpha) + shift
 		}
 		switch pass {
 		case .Quads:
