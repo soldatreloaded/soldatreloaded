@@ -162,10 +162,12 @@ hit_damage :: proc(world: ^World, hit: Hit) -> f32 {
 HEAD_PART :: 12 // the skeleton's head: a kill there is a headshot (the client's HEAD_PART)
 
 // The wound of a hit, and the death of a soldier it leaves below 1. A corpse is wounded
-// too, which is what tears it apart, but dies once.
+// too, which is what tears it apart, but dies once. A wound of less than none heals: a
+// regenerating polygon's, as the original's HealthHit takes its -2 (soldier_hurt keeps
+// the health at its fullest).
 @(private = "file")
 judge_hit :: proc(world: ^World, resources: ^Resources, hit: Hit, out: ^Tick_Output) {
-	if hit.amount <= 0 || !wounds(world, hit) do return
+	if hit.amount == 0 || !wounds(world, hit) do return
 	target := &world.soldiers[hit.target]
 	damage := Damage {
 		attacker      = hit.shooter,
