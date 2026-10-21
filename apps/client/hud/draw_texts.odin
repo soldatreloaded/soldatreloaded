@@ -11,8 +11,16 @@ draw_world_texts :: proc(u: ^ui.Ui, data: ^Hud_Data) {
 	for &text in data.world_texts do draw_text(u, &text, in_view(data, text.pos), text.scale * zoom)
 }
 
+// Each about its place, unscaled (zoom.odin), as the interface's are; a world text is the
+// world's, and grows with it.
 draw_screen_texts :: proc(u: ^ui.Ui, data: ^Hud_Data) {
-	for &text in data.screen_texts do draw_text(u, &text, {text.pos.x * wide(u), text.pos.y}, text.scale)
+	by := shrink_of(u, data)
+	for &text in data.screen_texts {
+		at := [2]f32{text.pos.x * wide(u), text.pos.y}
+		z := zoom_around(u, at, by)
+		draw_text(u, &text, at, text.scale)
+		zoom_end(z)
+	}
 }
 
 @(private = "file")

@@ -277,7 +277,7 @@ scoreboard_mute_input :: proc(hud: ^Hud, u: ^ui.Ui, data: ^Hud_Data) {
 // are placed as draw_scoreboard_box places them, `sign` big.
 @(private = "file")
 scoreboard_at :: proc(u: ^ui.Ui, data: ^Hud_Data, sign: [2]f32) -> (Mute_Target, bool) {
-	at := data.cursor
+	at := unzoomed({board_anchor(u), shrink_of(u, data)}, data.cursor) // where it falls on the board as laid out, drawn unscaled or not
 	x := board_x(u)
 	ranked := rank_players(data)
 	ranks := sa.slice(&ranked)

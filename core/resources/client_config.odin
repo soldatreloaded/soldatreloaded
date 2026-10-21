@@ -194,6 +194,7 @@ Interface_Settings :: struct {
 	kill_log_position:  Kill_Log_Position `jsoncomment:"where the kill log is: top_right (the original's), lower_right, or top_left, under the chat"`,
 	kill_log_hide_mine: bool `jsoncomment:"your own kills and deaths kept out of the kill log while you play; the big words about them still show"`,
 	console_lines:      i32 `jsoncomment:"how many console lines the HUD shows"`,
+	scale_interface:    bool `jsoncomment:"the HUD as big at any window size, as Soldat's Scale_Interface (on, the default); off, each part at the size it has in a 640 by 480 window, kept where it would be"`,
 	discord:            bool `jsoncomment:"Playing Soldat Reloaded on your Discord profile, with the map and the server, while the Discord app runs here"`,
 }
 
@@ -422,6 +423,7 @@ DEFAULT_CLIENT_CONFIG := Client_Config {
 		typing_size     = 100,
 		kill_log_length = 15,
 		console_lines   = 6,
+		scale_interface = true,
 		discord         = true,
 	},
 	sound = {volume = 50, levels = SOUND_LEVELS_DEFAULT},

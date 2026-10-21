@@ -208,6 +208,7 @@ hud_data :: proc(match: ^Match, config: ^res.Client_Config) -> (data: hud.Hud_Da
 	data.typing = interface.typing
 	data.typing_size = f32(clamp(interface.typing_size, 50, 200)) / 100
 	data.kill_log = interface.kill_log_position
+	data.unscaled = !interface.scale_interface
 	data.crosshair = {rl.Color(graphics.crosshair_color), f32(clamp(graphics.crosshair_size, 50, 200)) / 100}
 	data.pointer = {rl.Color(graphics.cursor_color), f32(clamp(graphics.cursor_size, 50, 200)) / 100}
 	data.fps = rl.GetFPS()

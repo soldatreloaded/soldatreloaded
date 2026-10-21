@@ -31,6 +31,7 @@ Menus :: struct {
 	weapons_back: bool,   // the weapons menu was open as the escape menu opened, and comes back as it closes
 	cursor:       [2]f32, // where the game's cursor is, in units
 	width:        f32,    // the view's width, in units
+	by:           f32,    // how much bigger than laid out the menus are drawn, as the HUD's parts (zoom.odin); 0 or 1 scaled
 	online:       bool,   // on a server: the windows and spectating are offered
 	// what the windows page through, as the match keeps it: who is on (the kick window
 	// passes over empty slots, as GameMenus.pas does), which is me (whom it will not
@@ -199,13 +200,28 @@ menu_box :: proc(menus: ^Menus, menu: Menu) -> rl.Rectangle {
 	return {}
 }
 
+// How a menu is drawn, unscaled (Menus.by): the escape menu about its middle, as the
+// original centres it on the window at its own size; the others about their box's corner.
+menu_zoom :: proc(menus: ^Menus, menu: Menu) -> Zoom {
+	box := menu_box(menus, menu)
+	at := [2]f32{box.x, box.y}
+	if menu == .Escape do at += {box.width / 2, box.height / 2}
+	return {at, menus.by if menus.by > 0 else 1}
+}
+
+// What is drawn of `menu` until zoom_end drawn as its zoom has it.
+menu_zoom_begin :: proc(u: ^ui.Ui, menus: ^Menus, menu: Menu) -> Zoom {
+	z := menu_zoom(menus, menu)
+	return zoom_around(u, z.at, z.by)
+}
+
 // The open menu's button the cursor is on, if any.
 menus_hovered :: proc(menus: ^Menus) -> (menu: Menu, button: int, ok: bool) {
 	for m in menus.open {
 		buttons := menu_buttons(menus, m)
+		c := unzoomed(menu_zoom(menus, m), menus.cursor)
 		for b, i in sa.slice(&buttons) {
 			r := b.rect
-			c := menus.cursor
 			if b.shown && c.x > r.x && c.x < r.x + r.width && c.y > r.y && c.y < r.y + r.height do return m, i, true
 		}
 	}

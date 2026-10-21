@@ -76,6 +76,7 @@ Hud_Data :: struct {
 	typing:       res.Typing_Style, // over a player typing
 	typing_size:  f32, // the indicator's size, 1 the small font's own
 	kill_log:     res.Kill_Log_Position,
+	unscaled:     bool, // each part at its size in a 640 by 480 window, not grown with it: interface.scale_interface off (zoom.odin)
 	crosshair:    Pointer_Look,
 	pointer:      Pointer_Look, // the menus' cursor
 	fps:          i32,
