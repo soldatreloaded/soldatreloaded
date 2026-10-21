@@ -80,6 +80,7 @@ tab_interface :: proc(menu: ^Menu) {
 	ui.color_row(k, "Self-kills", &config.interface.kill_color_self)
 	ui.section(k, "HUD")
 	ui.toggle(k, "Minimap", &config.interface.minimap)
+	ui.toggle(k, "Mute from scoreboard", &config.interface.scoreboard_mute)
 	ui.enum_select(k, "Show time left", &config.interface.time_left_position, TIME_LEFT_PLACES[:])
 	ui.toggle(k, "Show local time", &config.interface.local_time)
 	ui.color_row(k, "Time colour", &config.interface.time_color)

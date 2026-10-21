@@ -90,6 +90,7 @@ hud_draw :: proc(u: ^ui.Ui, hud: ^Hud, data: ^Hud_Data, minimap: ^draw.Minimap) 
 	show_bars := playing || (demoing && viewed.active && viewed.team != .Spectator)
 	escape, team := .Escape in menus.open, .Team in menus.open
 	typing := data.prompt.mode != .None
+	mute_board := hud.scoreboard && data.scoreboard_mute // the scoreboard open, its mute signs to click
 	defer rl.EndBlendMode()
 
 	draw_world_texts(u, data) // of the world, under the rest
@@ -97,7 +98,7 @@ hud_draw :: proc(u: ^ui.Ui, hud: ^Hud, data: ^Hud_Data, minimap: ^draw.Minimap) 
 	draw_screen_texts(u, data)
 	if show_bars do draw_bars(u, art, mine)
 	if playing {
-		if !menus_any_open(menus) && !mine.dead && !data.ended && !hud.scoreboard do draw_crosshair(u, art, data) // gone as the round ends, as the original's; the scoreboard shows the pointer instead
+		if !menus_any_open(menus) && !mine.dead && !data.ended && !mute_board do draw_crosshair(u, art, data) // gone as the round ends, as the original's; the scoreboard shows the pointer instead, to click its mute signs
 		draw_my_arrow(u, art, data)
 	}
 	draw_kill_icons(u, art, feed, data.kill_log, kill_feed_top(data), hud.scoreboard)
@@ -135,8 +136,8 @@ hud_draw :: proc(u: ^ui.Ui, hud: ^Hud, data: ^Hud_Data, minimap: ^draw.Minimap) 
 	draw_shot(u, feed, data.seconds)
 
 	draw_menus(u, art, menus, data, hud.scoreboard || hud.stats)
-	if menus_any_open(menus) || mine.dead || hud.scoreboard do draw_pointer(u, art, data) // the scoreboard is clicked to mute
-	if hud.scoreboard && !summary && !menus_any_open(menus) do scoreboard_mute_input(hud, u, data)
+	if menus_any_open(menus) || mine.dead || mute_board do draw_pointer(u, art, data) // the scoreboard's mute signs are clicked
+	if mute_board && !summary && !menus_any_open(menus) do scoreboard_mute_input(hud, u, data)
 }
 
 // How many are in the game.

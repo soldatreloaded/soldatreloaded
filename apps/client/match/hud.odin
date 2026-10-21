@@ -186,6 +186,7 @@ hud_data :: proc(match: ^Match, config: ^res.Client_Config) -> (data: hud.Hud_Da
 	data.team_names = interface.team_names
 	data.name_color = rl.Color(interface.name_color)
 	data.carrier_color = rl.Color(interface.carrier_color)
+	data.scoreboard_mute = interface.scoreboard_mute
 	// each team's kind-mute state, mirroring mute_hides, for the scoreboard's mute signs
 	mutes := &config.mutes
 	my_team := world.soldiers[match.me].team
