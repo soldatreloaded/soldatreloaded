@@ -62,15 +62,18 @@ A server and its clients must agree on it.
 
 **`mods/` is each player's own.** `mods/classic/` is the game's look and sound, which
 ships with it and is kept by the launcher. Beside it, a player's own mods, each a
-`.srmod` (a zip, read only) or a folder (a mod being made), which no update touches. A
-mod is made of parts, each a folder of it: the soldier, the weapons, the effects, the
-objects, the HUD, the icons, the sounds, the textures, the scenery, the fonts. A player
-wears each part from a mod of their choosing (the client config's `graphics.parts`, on
-the Mods page), and a file that mod's part hasn't is Classic's, so a mod holds only what
-it changes: one gun's art, or one sound. Every image is 4.5 pixels to a unit; the
-soldier's and the weapons' parts say where their images are pinned (`pivots.json`), and
-the HUD's where its bars and texts go (`layout.json`). [srmod.md](srmod.md) is the
-format, and [soldat1-mods.md](soldat1-mods.md) Soldat 1's, which a player's Soldat
+folder, which no update touches; a zip of one (a `.srmod`, a `.zip`, an old `.smod`) is
+unpacked into its folder as it comes in, or as the game starts (`mods_tidy`), what it was
+made from put aside in `mods/.old/`. A mod is made of parts, each a folder of it: the
+soldier, the weapons, the effects, the objects, the HUD, the icons, the sounds, the
+textures, the scenery, the fonts, the text. A player wears each part from a mod of their
+choosing (the client config's `graphics.parts`, on the Mods page), and a file that mod's
+part hasn't is Classic's, so a mod holds only what it changes: one gun's art, one sound,
+one line of what the game says. Its `mod.json` says its images' scale, pixels to a unit
+(Classic's 4.5), so art is kept as it was made; the soldier's and the weapons' parts say
+where their images are pinned (`pivots.json`), the HUD's where its bars and texts go
+(`layout.json`), the text's what the game says (`strings.json`). [srmod.md](srmod.md) is
+the format, and [soldat1-mods.md](soldat1-mods.md) Soldat 1's, which a player's Soldat
 1.7.1 is made a mod from (`data/soldat-1.7.1.txt` lists the files it came with, which
 are left out).
 

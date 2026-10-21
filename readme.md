@@ -124,17 +124,20 @@ and how the programs sit on it.
 
 ## Modding
 
-`assets/mods/classic/` is how the game looks and sounds, and ships with it. A mod is one
-file, a `.srmod`, or while it is being made a folder in `mods/` laid out the same: its
-`mod.json`, and its parts, each a folder of it (`soldier/`, `weapons/`, `hud/`,
-`sounds/`, ...), laid out as Classic's are and holding only what they change. On the Mods
-page each part is worn from the mod chosen for it, and what that mod hasn't of it is
-Classic's: the soldier from one mod, the sounds from another. Every image is 4.5 pixels to
-a unit, so a mod's art is the size it should be; its parts' `pivots.json` say where the
-soldier's images are pinned, and `hud/layout.json` where the HUD's bars and texts go.
-[docs/srmod.md](docs/srmod.md) is the format. Players' mods are shared at
-[soldatreloaded-mods](https://github.com/soldatreloaded/soldatreloaded-mods), which says
-how to add one.
+`assets/mods/classic/` is how the game looks, sounds and speaks, and ships with it. A mod
+is a folder in `mods/`: its `mod.json`, and its parts, each a folder of it (`soldier/`,
+`weapons/`, `hud/`, `sounds/`, `text/`, ...), laid out as Classic's are and holding only
+what they change. On the Mods page each part is worn from the mod chosen for it, and what
+that mod hasn't of it is Classic's: the soldier from one mod, the sounds from another. A
+mod's `mod.json` says how many pixels of its images make a unit (Classic's 4.5, most of
+Soldat 1's 1), so its art is drawn as big as it should be however it was made; its parts'
+`pivots.json` say where the soldier's images are pinned, `hud/layout.json` where the HUD's
+bars and texts go, and `text/strings.json` what the game says in a match. A mod is shared
+as a zip of its folder, which the Mods page takes in (picked, or dropped on the window), as
+it does a zipped Soldat 1 mod; it makes mods from a Soldat 1 install too, and has editors
+for a mod's HUD and its words. [docs/srmod.md](docs/srmod.md) is the format. Players' mods
+are shared at [soldatreloaded-mods](https://github.com/soldatreloaded/soldatreloaded-mods),
+which says how to add one.
 
 A server is scripted in Lua: [docs/scripting.md](docs/scripting.md) is the API, and a
 script is a `.lua` in the server's `scripts/`. None ship with it; examples, and the

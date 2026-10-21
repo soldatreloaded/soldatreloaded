@@ -1,9 +1,10 @@
 # .srmod: Soldat Reloaded's mods
 
-Being built: the format, Classic laid out as one, wearing mods by part and bringing them
-in from Soldat 1, and the HUD editor, are done (steps 1 to 4 and 6, below). It replaces the mods of before (folders
-and `.smod`s laid out as Soldat 1's, stacked). How Soldat 1 does it, which this is
-measured against and imports from, is [soldat1-mods.md](soldat1-mods.md).
+Being built: the format, Classic laid out as one, wearing mods by part, bringing them in
+from Soldat 1 and from a zip, the mods of before converted, the HUD editor and the text
+editor are done (steps 1 to 4, 6 and 7, below). It replaces the mods of before (folders
+and `.smod`s laid out as Soldat 1's, stacked), which the game converts. How Soldat 1 does
+it, which this is measured against and imports from, is [soldat1-mods.md](soldat1-mods.md).
 
 ## Why
 
@@ -20,23 +21,26 @@ one gun's art and one sound is worn whole or not at all.
 
 ## What it is
 
-- **One file**: `<name>.srmod`, a zip, is a mod. Sharing a mod is sharing the file.
+- **A folder**: `mods/<name>/` is a mod, to open and change as any folder. Sharing a mod
+  is zipping its folder: a `.zip` (or `.srmod`, the same) handed over is unpacked into its
+  folder as it comes in.
 - **Parts**: a mod is made of parts, each a folder of it: the soldier, the weapons, the
-  HUD, the sounds, and the rest (below). It has any of them, and says which.
+  HUD, the sounds, the text, and the rest (below). It has any of them, and says which.
 - **Choosing**: the player picks, part by part, which mod it comes from: the soldier from
   one, the weapons from another, the sounds from a third. Each part is Classic's until
   another is picked. There is no order and no stacking.
 - **Falling back**: a file the chosen mod's part hasn't is Classic's. A mod can change
   one gun's art and nothing else, and it is worn for that gun.
-- **One scale**: every image is 4.5 pixels to a unit, Classic's and every mod's. No
-  `mod.ini`, nothing to get wrong: a mod's art is the right size because it is.
-- **Looks and sounds only**: a mod never changes how the game plays. Animations,
+- **Its own scale**: `mod.json` says how many pixels of its images make a unit (Classic's
+  4.5, most of Soldat 1's 1), the whole mod's and any folder's or file's own, so art is
+  kept as it was made and drawn as big as it should be. No `mod.ini`.
+- **Looks, sounds and words only**: a mod never changes how the game plays. Animations,
   skeletons, maps and weapons' numbers are `data/`'s, the same for everyone in a game
   (design.md); a mod hasn't them.
 
-## The file
+## The folder
 
-A zip, stored or deflated, its files at its root:
+`mods/<name>/`, its files at its root:
 
 ```
 mod.json
@@ -45,6 +49,7 @@ soldier/
 weapons/
 hud/
 sounds/
+text/
 ...                any of the parts
 LICENSE.txt, ...   optional: credits and licences, read by nobody but people
 ```
@@ -61,27 +66,31 @@ LICENSE.txt, ...   optional: credits and licences, read by nobody but people
   "description": "Soldat simplified for professional gaming: plain, clean art.",
   "licence": "Free to modify and to share, crediting Calp.",
   "source": "calp@selfkill.com",
-  "parts": ["soldier", "weapons", "effects", "objects"]
+  "parts": ["soldier", "weapons", "effects", "objects"],
+  "scale": 1,
+  "scales": {"weapons/icons": 4.5, "soldier/ranny": 2}
 }
 ```
 
 `format` is this layout's version, for the game to refuse one it doesn't know. `name` is
-the file's name: letters, digits, `-` and `_`, at most 32. `title` is what it is shown as,
-at most 48, `name` if none. `version` is three numbers. `parts` is what it changes; the
+the folder's name: letters, digits, `-` and `_`, at most 32. `title` is what it is shown
+as, at most 48, `name` if none. `version` is three numbers. `parts` is what it changes; the
 game checks it against the folders, and a part listed without its folder, or a folder not
-listed, is the mod's mistake, said on the Mods page. The rest are the catalogue's
-`about.json`'s fields of now, unchanged.
+listed, is the mod's mistake, said on the Mods page. `scale` is its images' pixels to a
+unit, 4.5 if it says none (Images, below); `scales` a part's, a folder's or a file's own,
+by its path in the mod, the longest that holds an image winning. The rest are the
+catalogue's `about.json`'s fields of before, unchanged.
 
-A mod being made is the same, unpacked: a folder in `mods/`, `mods/<name>/mod.json` and its
-parts beside it. The game reads a folder as it reads a `.srmod`; the Mods page packs one
-into the other to share it.
+The Mods page changes what `mod.json` says of a mod (its title, version, author,
+description, licence and source) and its parts' scales, and makes a new mod: its folder,
+and a `mod.json` of no part, to fill.
 
-Which a mod is says whose it is to change, and nothing in `mod.json` does (a flag there
-would travel with the file, and a mod handed on would say it was its new owner's). **A
-folder** is a mod being made: the Mods page edits its `mod.json` (its title, version,
-description and the rest) and packs it. **A `.srmod`** is packed, installed from the
-catalogue or handed over: worn as it is, read only; **Unpack to edit** makes it a folder,
-to change and pack again under a version of its own.
+**Zipped**, a mod is a `.zip` (or `.srmod`, the same) of its folder, stored or deflated,
+`mod.json` at its root or a folder or two down: what is handed over, and what the
+catalogue serves. The game unpacks it into `mods/<name>/` (`mod_unpack`) as it comes in:
+picked on the Mods page, dropped on the window, installed from the catalogue, or found in
+`mods/` as the game starts (`mods_tidy`), which puts the zip aside in `mods/.old/`. A zip
+without a `mod.json`, of a mod laid out as a Soldat 1 mod's, is converted (below).
 
 ## The parts
 
@@ -96,7 +105,8 @@ to change and pack again under a version of its own.
 | `sounds` | `sounds/` | the sounds, `.wav`, `.ogg` or `.mp3`, by the game's names; `radio/` | `sfx/` |
 | `textures` | `textures/` | the maps' polygon textures, by the names maps give them; `edges/` | `textures/` |
 | `scenery` | `scenery/` | the maps' props, by the names maps give them: **Classic's alone**, as Soldat 1 never let a mod change it; a map's own come first | `scenery-gfx/`, left out of an import |
-| `fonts` | `fonts/` | the HUD's two fonts, and `font.ini`: which, their widths and sizes, as now | `txt/font.ini` and its `.ttf`s (ours) |
+| `fonts` | `fonts/` | the HUD's two fonts, and `font.ini`: which, their widths and sizes, as now | `txt/font.ini` and its `fonts/` |
+| `text` | `text/` | `strings.json`: what the game says in a match, by key (The text, below) | `txt/default.txt` |
 
 Within a part, files keep Soldat 1's names (`klata.png`, `ak74-clip.png`, `health-bar.png`):
 every mod made so far, every tutorial and Classic itself use them, and an import is then a
@@ -115,15 +125,18 @@ weapons', so a mod's guns and its icons of them come together.
 - **PNG**, with alpha. Opaque pure green is see-through too, as in Soldat 1 (and black
   for the 15 smoke and spark images keyed so), so its art works as it is: the game keys it
   out as it loads. (An import turns it into alpha once, so a mod made is plain PNGs.)
-- **4.5 pixels to a unit**, for every image whose size is its own: the soldier, the guns,
-  the effects, the objects, the HUD and the icons; the world and the HUD both being laid out
-  in units, a unit one pixel of the original 640 by 480. Classic is already so; nothing of
-  it changed but its crosshair (it was 10), resized once.
+- **At its mod's scale**, for every image whose size is its own: the soldier, the guns,
+  the effects, the objects, the HUD and the icons, and the edges' textures (whose width
+  stands for 90 units of an edge, their height its thickness). An image is its pixels over
+  its scale in units, the world and the HUD both being laid out in units, a unit one pixel
+  of the original 640 by 480: `mod.json`'s `scale`, else the longest of its `scales` that
+  holds the image (`srmod_scale`). Classic's are 4.5; most of Soldat 1's 1, and its edges'
+  always 1. A mod's art is kept as it was made, and the Mods page sets a part's scale, so
+  one made at 2 is drawn as big as Classic's. A file Classic gives a mod's part is drawn at
+  Classic's scale.
 - **Any resolution** for the art whose size the map sets: scenery (each prop's size is in
-  the map), polygon textures and the flags' cloth (their coordinates are). The edges'
-  textures are 4.5 too: their width stands for 90 units of an edge, their height is its
-  thickness. Classic's, which Soldat 1 drew a pixel to a unit, were made 4.5 times as big;
-  one an odd number of pixels thick is a tenth of a unit thicker for it.
+  the map), polygon textures and the flags' cloth (their coordinates are). No scale is
+  theirs.
 - **Limits**, as now: a soldier's part at most 16 by 16 units, a gun's body 64 by 64;
   bigger is shrunk to fit, and the Mods page says so.
 - **Mirrored images** (`klata2.png`) are the same size as their originals.
@@ -169,56 +182,93 @@ it is turned, and the whole HUD's opacity; Undo (Ctrl+Z), Reset, Save, Close (Es
 twice with changes unsaved). There are no pictures to change in it: those of the HUD it
 began from are kept.
 
-Saved, a HUD is a mod of its own, as a `.srmod` is read-only: `My HUD` (`My_HUD`, then
-`My_HUD_2`...), a `hud` part alone, its `layout.json` and the pictures of the HUD it began
-from, and worn at once. Its description begins "Made in the HUD editor": opened on such a
-mod, the editor saves over it, letting go of it first where it is worn (a `.srmod` worn
-is a file open). Writing a `setup.sif` for Soldat 1 from a layout is left for later.
+Saved, a HUD is a mod of its own: `My HUD` (`My_HUD`, then `My_HUD_2`...), a `hud` part
+alone, its `layout.json` and the pictures of the HUD it began from (at their scales), and
+worn at once. Its description begins "Made in the HUD editor": opened on such a mod, the
+editor saves over it. Writing a `setup.sif` for Soldat 1 from a layout is left for later.
+
+## The text
+
+`text/strings.json` is what the game says in a match: the kill messages and the big words,
+the flags', the scores' and the round's end, who came and went, the HUD's, the
+scoreboard's, the votes' and the end screen's words (`res.STRINGS`, about 120). Each by its
+key, a line with the placeholders its English has, in their order (`%s` a name, `%d` a
+number, `%%` a % sign):
+
+```json
+{"killed_by": "Von %s getötet.", "red_flag_returned": "Rote Fahne zurückerobert!"}
+```
+
+A key a mod leaves out is Classic's, and Classic's `strings.json` has them all, the game's
+English. A line whose placeholders aren't its English's is passed over, logged, Classic's
+said: it would print the wrong thing or nothing. The server's own lines (who came and went,
+who was kicked, a map vote that found none) go by their key and the name in them, so each
+client says them in the words it wears; their English goes too, for the server's log.
+
+**The text editor** edits it: **Edit words** on a mod's page, or Classic's. Each line is
+listed by what it is about and found by a search; the one picked is typed into, Classic's
+beside it, and a line that would drop a placeholder isn't taken. **Read a Soldat 1
+file...** brings in a `default.txt` or one of its `languages/*.txt`. Saved, the lines that
+differ from Classic's are the mod's `strings.json`, and its text is worn; Classic's are
+saved as a mod of their own, `My Text` (`My_Text`, then `My_Text_2`...). The fonts are
+Latin-1: a language of other letters (Cyrillic, Greek, Chinese) shows boxes for them.
+
+Soldat 1 says the same in `txt/default.txt`: UTF-16, a line each by number, 821 of them,
+most its own menus' and config's. Each key says which of its lines it is ("{1}", or
+"{96} %d {97}" made of two and what is between), and the importer and the editor read a
+file of Soldat 1's so (`strings_from_soldat`), keeping the lines that differ from the
+game's English.
 
 ## Choosing
 
 The client config's `graphics.parts`, a mod by part; a part not named is Classic's:
 
 ```json
-"parts": {"soldier": "NoNameMod", "weapons": "NoNameMod", "sounds": "RemasteredSounds", "hud": "micro1"}
+"parts": {"soldier": "NoNameMod", "weapons": "NoNameMod", "sounds": "RemasteredSounds", "hud": "micro1", "text": "Deutsch"}
 ```
 
-The Mods page lists each mod with its parts, each part turned on from it or not; turning a
-part on from one mod turns it off from whichever had it. **Use all** turns on every part a
-mod has. A mod on for no part is installed and does nothing.
+The Mods page's **Installed Mods** lists Classic and each mod; beside the one picked, its
+parts, each worn from it with a switch (and so from whichever wore it no longer), **Wear all
+of it** and **Wear none of it**; its art's scale, the whole mod's and part by part; what its
+`mod.json` says of it, changed and saved; and **Edit HUD**, **Edit words** and its folder.
+A mod on for no part is installed and does nothing.
 
 A file is looked for in the chosen mod's part, then in Classic's: by its path within the
-part, in any case. A missing pivot is Classic's; a missing key of `layout.json` or
-`font.ini` is Classic's.
+part, in any case. A missing pivot is Classic's; a missing key of `layout.json`,
+`font.ini` or `strings.json` is Classic's.
 
 ## Classic
 
-The game's own look and sound, `mods/classic/`, laid out as a `.srmod` unpacked: its
+The game's own look, sound and words, `mods/classic/`, laid out as any mod: its
 `mod.json` and every part, whole. It is what every part falls back to, so it has every
-file the game draws or plays. It can't be removed or chosen against itself.
+file the game draws, plays or says. It can't be removed, changed, or chosen against itself.
 
 ## Bringing mods in
 
-**From Soldat 1** (the Mods page's **From your Soldat 1** tab), making `.srmod`s, which
-are then mods like any other. Soldat 1.7.1 never used `.smod`s (OpenSoldat's), so there is
-no importer of them.
+On the Mods page's **Add Mods**:
 
-The install is found where it is usually put: `C:\Soldat`, Program Files, Steam's
+- **From a file**: a `.zip` or `.srmod` picked in the system's dialog, or dropped on the
+  game's window, unpacked into its folder (The folder, above); a zip of a Soldat 1 mod,
+  without a `mod.json`, converted as a mod of before is (below).
+- **A new mod**: a name, and an empty mod made, its folder opened to fill.
+- **From your Soldat 1**, making mods like any other.
+
+The Soldat 1 install is found where it is usually put: `C:\Soldat`, Program Files, Steam's
 libraries (its registry, `libraryfolders.vdf`, any `steamapps/common` folder named for
-Soldat), and on Linux Wine's, Steam's, Flatpak's and Snap's: a folder there is an install when
-the game's art folders (`gostek-gfx/`, `sfx/` and the like) are in it. Failing that,
+Soldat), and on Linux Wine's, Steam's, Flatpak's and Snap's: a folder there is an install
+when the game's art folders (`gostek-gfx/`, `sfx/` and the like) are in it. Failing that,
 **Browse...** brings up the system's folder dialog (Windows' own; zenity, kdialog or
 osascript elsewhere), and the folder picked is taken as it is, unchecked; if there is
-nothing in it to make a mod of, the tab says so and offers **Browse...** again. Once
-found, the install isn't shown again.
+nothing in it to make a mod of, the tab says so and offers **Browse...** again.
 
 Then the tab offers each thing in the install a mod can be made of, an **Import** each
 (**Imported** once a mod by its name is):
 
-- **Your changes**: art and sounds copied over the install's own `gostek-gfx/`, `sfx/` and
-  the rest, if any. Each file is weighed against 1.7.1 as it shipped
-  (`data/soldat-1.7.1.txt`, each file's size and CRC) and against Classic; what differs is
-  the player's. Made **My S1 Mod**; each mod and interface below is named for its folder.
+- **Your changes**: art, sounds and words copied over the install's own `gostek-gfx/`,
+  `sfx/`, `txt/default.txt` and the rest, if any. Each file is weighed against 1.7.1 as it
+  shipped (`data/soldat-1.7.1.txt`, each file's size and CRC) and against Classic; what
+  differs is the player's. Made **My S1 Mod**; each mod and interface below is named for its
+  folder.
 - **Mods**: each folder of `mods/<name>/` but those 1.7.1 ships with. A mod there is the
   player's whole: all of it goes in, weighed against nothing. Under it go the player's
   changes, as Soldat wore a mod over its own folders.
@@ -230,62 +280,62 @@ There is no choice about the changes underneath: a mod made from Soldat 1 looks 
 there. Then:
 
 - Each image's Soldat 1 scale, as Soldat 1 works it out: its `mod.ini`'s, by its path,
-  then its folder, then `DefaultScale`, else 1 (soldat1-mods.md). An image at another
-  scale than 4.5 is resized to it: up by a whole number with each pixel kept sharp, then
-  down to 4.5 smoothed, so old pixel art stays crisp at 4.5 times.
+  then its folder, then `DefaultScale`, else 1 (soldat1-mods.md); the edges' 1. Its pixels
+  are kept as they were, and the mod's `mod.json` says the scales, as few as say them all
+  (the most of them the mod's, and each folder's or file's that differs: `scales_compact`).
 - `.bmp` to `.png`, its colour key to alpha (green; black for the 15 images keyed so).
 - `[GOSTEK]` split into the soldier's and the weapons' `pivots.json`, only what differs from
   Classic's.
+- `txt/default.txt` as `text/strings.json`, the lines that differ from the game's English;
+  `txt/font.ini` and `fonts/` as `fonts`.
 - Of the install's own folders, only what differs from Soldat 1.7.1 as it shipped, and from
   Classic, goes in, weighed by size before CRC and by size before pixels, so it is quick.
-- Each custom interface is a `.srmod` of its own, its `hud` (its `setup.sif` as
-  `layout.json`, anchors and alignment resolved) and its `icons` (its cursor, arrow and
-  the rest of its 21 pictures), named after it and titled "<name> interface". One 1.7.1
-  ships with, every file as it came, is left out.
-- Left out: maps, scenery (Classic's alone), animations, `txt/` but the weapons' names (if
-  the game shows them), anything else no part holds; listed for the player.
+- Each custom interface is a mod of its own, its `hud` (its `setup.sif` as `layout.json`,
+  anchors and alignment resolved) and its `icons` (its cursor, arrow and the rest of its 21
+  pictures), named after it and titled "<name> interface". One 1.7.1 ships with, every file
+  as it came, is left out.
+- Left out: maps, scenery (Classic's alone), animations, `txt/` but `default.txt` and
+  `font.ini`, anything else no part holds.
 
-**`.smod`s of now** (the catalogue's three, and any a player made or installed): the game
-no longer wears them. The catalogue's are converted once, by a tool of the mods
-repository's (below), not by the game. One in a player's `mods/` is listed as an old mod,
-to get again from the catalogue or remake.
+**The mods of before**: an `.smod`, or a folder in `mods/` without a `mod.json` laid out as
+a Soldat 1 mod (`gostek-gfx/`, `sfx/`, `mod.ini`...), as this game wore them until now. As
+the game starts each is converted (`old_convert`): all of it goes in, as a Soldat 1 mod of
+`mods/` does, its images at its `mod.ini`'s scales, Classic's 4.5 where it gave none, as
+the game drew them; its `about.json` its `mod.json` (title, version, author, description,
+licence). It keeps its name, so the parts worn from it still are; what it was is put aside
+in `mods/.old/`, and the Mods page says what was done.
 
 ## The catalogue
 
-soldatreloaded-mods keeps a mod as its folder, as now, but laid out as a `.srmod`
-unpacked, `mod.json` in place of `about.json`. Publishing packs each new version as
-`<name>.srmod` and writes the index, `mods.json` on the `index` release, where it is now:
-`"format": 2`, each entry as now plus its `parts`, so the game can show what a mod changes
-before it is installed, and its `preview` if it has one.
+soldatreloaded-mods keeps a mod as its folder, laid out as above, `mod.json` in place of
+`about.json`. Publishing zips each new version as `<name>.srmod` and writes the index,
+`mods.json` on the `index` release: `"format": 2`, each entry as now plus its `parts`, so
+the game can show what a mod changes before it is installed, and its `preview` if it has
+one.
 
-The game of 0.19 and before reads the index only if its format is 1: format 2, it says the
-index isn't one it reads, and installs nothing, so it never takes a `.srmod` for a
-`.smod`. Its catalogue is gone until it updates, which the launcher does; the mods it has
-installed it keeps wearing.
-
-The three mods there now (Competitive, NoNameMod, RemasteredSounds) are converted once by
-a script of the mods repository's (their `mod.ini`'s scales read as the game reads them now,
-their old-sized art found by its images' size, as now; `txt/font.ini` and its `.ttf`s as
-`fonts`), checked by eye, and published as their next minor versions.
+Until then the catalogue serves the `.smod`s of before at format 1, and the game converts
+each as it installs it, as it does a mod of before in `mods/`; an update replaces the folder
+once the new one is whole.
 
 `scripts/check.sh` checks what the game does: `mod.json`, the parts against the folders,
 PNG only, files a part holds, the size limit (150 MB), the soldier's and guns' sizes.
 
 ## Building it
 
-1. **The format**: `mod.json`, the parts, reading a `.srmod` or its folder, finding a file
-   by part with Classic under it; `layout.json` read and written; pivots. Tests for each.
-2. **Classic** relaid as a `.srmod` folder; its crosshair and edges resized to 4.5;
-   the game drawing from it as before, checked pixel for pixel (the HUD, the soldier, a map).
-3. **Choosing**: `graphics.parts`; the Mods page by part. The game wears `.srmod`s.
-4. **The importer from Soldat 1**, interfaces included: art over the install's own files,
-   its `mods/` folders, its custom interfaces. Tested on the real thing: a 1.7.1 install,
-   one with art copied over its own, its `mods/classic`, its ten interfaces.
-5. **The catalogue**: the three mods converted by the mods repository's script;
-   publishing `.srmod`s and `mods.json` at format 2; the game reading it.
+1. **The format**: `mod.json`, the parts, reading a mod's folder (or its zip, to unpack),
+   finding a file by part with Classic under it; `layout.json` read and written; pivots;
+   scales. Tests for each.
+2. **Classic** relaid as a mod's folder; its crosshair and edges resized to 4.5 once; the
+   game drawing from it as before, checked pixel for pixel (the HUD, the soldier, a map).
+3. **Choosing**: `graphics.parts`; the Mods page by part.
+4. **Bringing mods in**: the importer from Soldat 1, interfaces and words included, its art
+   kept at its scales; zips unpacked; the mods of before converted. Tested on the real
+   thing: a 1.7.1 install, one with art copied over its own, its `mods/`, its interfaces,
+   its languages.
+5. **The catalogue**: the three mods published as mods of now; `mods.json` at format 2;
+   the game reading it.
 6. **The HUD editor**, on `layout.json`: done.
-7. **Pack and share**: the Mods page's **New mod** making a `.srmod` folder, and **Pack**
-   making the file.
+7. **The text part and its editor**: done.
 
 Soldat 1's custom interfaces are `hud` parts: their `setup.sif` is read by the importer,
 which writes it as `layout.json`, and the HUD draws the layout as Soldat 1 draws theirs.
