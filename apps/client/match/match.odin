@@ -436,6 +436,7 @@ shown :: proc(match: ^Match, config: ^res.Client_Config, sounds: ^sound.Sound) {
 	// playing: watching a demo or spectating keeps the team colours
 	me_now := &game.world.soldiers[match.me]
 	match.hud.feed.kill_recolor = match.mode != .Demo && me_now.active && me_now.team != .None && me_now.team != .Spectator
+	match.hud.feed.kill_hide_mine = config.interface.kill_log_hide_mine && match.hud.feed.kill_recolor // "mine" only while playing, as the colours
 	match.hud.feed.kill_mine = maybe_color(config.interface.kill_color_mine)
 	match.hud.feed.kill_team = maybe_color(config.interface.kill_color_team)
 	match.hud.feed.kill_enemy = maybe_color(config.interface.kill_color_enemy)

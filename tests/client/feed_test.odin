@@ -49,6 +49,46 @@ kill_feed_counts :: proc(t: ^testing.T) {
 	testing.expect_value(t, said(g, &feed, &names, game.Kill{killer = 1, target = 1, weapon = .AK74, kills = 53}), "gov (53)") // a suicide: one less
 }
 
+// With kill_hide_mine, my own kills and deaths (and my self-kill) stay out of the kill
+// feed, the big words about them still said; everyone else's are in it as before.
+@(test)
+kill_feed_hides_mine :: proc(t: ^testing.T) {
+	g := new(game.Game)
+	defer free(g)
+	testing.expect(t, game.game_init(g, game.DEFAULT_GAME_SETTINGS, authority = false))
+	defer game.game_destroy(g)
+	testing.expect(t, game.game_start_round(g, "ctf_Ash", seed = 1))
+	for i in 1 ..= 3 {
+		game.apply_ruling(&g.world, &g.resources, game.Respawn{
+			target = game.Soldier_Id(i), life = 1, team = .Alpha if i == 1 else .Bravo, primary = .AK74, secondary = .Knife,
+			pos = game.spawn_point(g.world.polymap, .Alpha if i == 1 else .Bravo, &g.world.rng),
+		})
+	}
+	names: [game.MAX_PLAYERS]string
+	names[1], names[2], names[3] = "gov", "Anna", "Kebab"
+	feed: hud.Feed
+	feed.kill_length = 10
+	feed.kill_hide_mine = true
+	me :: game.Soldier_Id(1)
+
+	heard :: proc(g: ^game.Game, feed: ^hud.Feed, names: ^[game.MAX_PLAYERS]string, kill: game.Kill) {
+		game.world_hear(&g.world, game.Ruling(kill), g.world.tick)
+		commands: [game.MAX_PLAYERS]game.Command
+		game.game_tick(g, &commands)
+		hud.feed_tick(feed, g, names, me)
+	}
+	heard(g, &feed, &names, game.Kill{killer = me, target = 2, weapon = .AK74, kills = 1})
+	testing.expect_value(t, sa.len(feed.kills), 0)
+	testing.expect(t, feed.big.ticks > 0, "the big words about my kill still said")
+	heard(g, &feed, &names, game.Kill{killer = 3, target = me, weapon = .AK74, kills = 1})
+	heard(g, &feed, &names, game.Kill{killer = me, target = me, weapon = .AK74, kills = 0})
+	testing.expect_value(t, sa.len(feed.kills), 0)
+	heard(g, &feed, &names, game.Kill{killer = 2, target = 3, weapon = .AK74, kills = 1})
+	testing.expect_value(t, sa.len(feed.kills), 2) // another's kill, the killer's line and the victim's
+	line := sa.get(feed.kills, 0)
+	testing.expect_value(t, utils.short_string_text(&line.text), "Anna (1)")
+}
+
 // The referee counts the kill into the Kill: the killer's kills with it, a suicide's one
 // less, never below none.
 @(test)
