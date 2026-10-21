@@ -78,7 +78,7 @@ unzip_to :: proc(z: ^utils.Zip_File, root, dest: string) -> string {
 
 // The folder `made` moved into `mods_dir` as the mod `name`, over a mod of that name with
 // `replace`. Why not, or "".
-@(private = "file")
+@(private)
 move_in :: proc(made, mods_dir, name: string, replace: bool) -> string {
 	target := utils.temp_path(mods_dir, name)
 	if os.is_dir(target) {

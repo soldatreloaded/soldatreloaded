@@ -7,17 +7,18 @@ import "core:thread"
 import res "../../../core/resources"
 
 // The Mods page's slow work, on a thread of its own so the game draws on while it runs:
-// importing a folder of the player's Soldat 1 (an install, every mod made of it at once,
-// or a mod or an interface of it alone: res.soldat_import), and unpacking a mod's zip
-// (converting it, a Soldat 1 mod's). One at a time, started, then taken once it is done,
-// as a Folder_Pick is.
+// making a mod, a copy of Classic (res.mod_from_classic); importing a folder of the
+// player's Soldat 1 (an install, every mod made of it at once, or a mod or an interface of
+// it alone: res.soldat_import); and unpacking a mod's zip. One at a time, started, then
+// taken once it is done, as a Folder_Pick is.
 //
 // The job wears a Classic of its own (res.mod_make), never the game's, which the Mods
 // page may wear anew while it runs. What it gives back is the context allocator's, the
 // taker's to keep or free.
 Soldat_Job_Kind :: enum {
+	Create, // a mod made in mods/, a copy of Classic
 	Import, // the folder at `root`, of Soldat 1, imported into mods/
-	Unpack, // the zip at `root` (a mod's, or a Soldat 1 mod's) unpacked into mods/
+	Unpack, // the zip at `root`, a mod's, unpacked into mods/
 }
 
 Soldat_Job :: struct {
@@ -29,7 +30,7 @@ Soldat_Job :: struct {
 	progress: res.Import_Progress, // Import's, read as it runs
 	// what came of it
 	imported: res.Soldat_Imported, // Import's
-	name:     string,              // Unpack's: the mod made, or meant to be
+	name:     string,              // Create's and Unpack's: the mod made, or meant to be
 	problem:  string,              // and why it wasn't; "" if it was
 }
 
@@ -75,6 +76,9 @@ soldat_job_run :: proc(data: rawptr) {
 	job := (^Soldat_Job)(data)
 	defer free_all(context.temp_allocator) // this thread's own
 	switch job.kind {
+	case .Create:
+		name, problem := res.mod_from_classic(res.MODS_DIR, context.temp_allocator)
+		job.name, job.problem = strings.clone(name), strings.clone(problem) // out of this thread's temp allocator
 	case .Unpack:
 		name, problem := res.mod_unpack(job.root, res.MODS_DIR, allocator = context.temp_allocator)
 		job.name, job.problem = strings.clone(name), strings.clone(problem) // out of this thread's temp allocator

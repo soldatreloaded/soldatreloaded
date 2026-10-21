@@ -13,20 +13,20 @@ import "../../../core/utils"
 import "../online"
 import "../ui"
 
-// The mods, on two tabs. Configure Mods: Classic and the player's mods in mods/, each a
-// folder, listed on the left; the one picked on the right, what it is and what of it is
-// worn. Each of its parts (the soldier, the weapons, the sounds, the text, ...) is worn
-// from it with a switch, and from whichever wore it before no longer; switched off, it
-// is Classic's again (graphics.parts, docs/srmod.md). Its art's scale, the pixels to a
-// unit its images were drawn at, part by part, and what its mod.json says of it are the
-// player's to change, saved into its mod.json; its HUD opens in the HUD editor, its words
-// in the text editor, its folder in the system's. Delete, after a second press to be
-// sure. Any change is worn at once.
+// The mods, on two tabs. Configure Mods: the player's mods in mods/, each a folder, listed
+// on the left; Classic isn't, being what every part worn from no mod is. The one picked on
+// the right: what it is, Delete (after a second press to be sure), and its parts, a chip
+// each (the soldier, the weapons, the sounds, the text, ...), on where it is worn from it,
+// and from whichever wore it before no longer; off, Classic's again (graphics.parts,
+// docs/srmod.md). Its settings: its name, what its mod.json says of it and its art's
+// scale, the pixels to a unit its images were drawn at, part by part, saved into its
+// mod.json. Edit Strings and Edit Layout open the text editor and the HUD editor on it,
+// Classic's where it hasn't the part, and save into it. Any change is worn at once.
 //
 // Install Mods: the mods' catalogue (online's catalog.odin), each mod the mods
 // repository publishes, installed, or updated to its newest version, in a click, its
 // download's progress shown; one picked says what it is and whose. Over it, Create (a new
-// mod, an empty folder to fill), Import .srmod (a .srmod, picked in the system's dialog;
+// mod, a copy of Classic to change), Import .srmod (a .srmod, picked in the system's dialog;
 // or a mod's file dropped on the window, on either tab) and Import S1 Mod (a folder of the
 // player's Soldat 1: its install, every mod made of it at once, or a mod of its mods/ or
 // one of its interfaces alone, 1.7.1's art under each as Soldat 1 wore it: res.soldat_import).
@@ -44,19 +44,28 @@ Mods :: struct {
 	listings: []res.Srmod_Listing,
 	versions: map[string]string, // each mod installed, by its version, as its mod.json says: the catalogue's to weigh
 	listed:   bool,   // read from mods/ since the page was opened
-	selected: string, // the mod picked, by name; MOD_CLASSIC for Classic
+	selected: string, // the mod picked, by name; "" for none (the first listed is, as the tab shows)
 	about:    int,    // the catalogue's mod picked, to say what it is; -1 for none
 	confirm:  bool,   // Delete pressed once: pressed again, it deletes
+	settings: bool,   // the picked mod's settings shown
 	note:     string, // what was last done, or why it couldn't be
 	note_bad: bool,
 	edit:     Mod_Edit,    // the picked mod's mod.json, as it is being changed
+	renaming: Mod_Rename,  // a mod being renamed, let go of first where it is worn
 	file:     Folder_Pick, // Import .srmod's file dialog, while it is up
 	folder:   Folder_Pick, // Import S1 Mod's folder dialog, while it is up
-	adding:   Soldat_Job,  // a mod's file being added, or a Soldat 1 folder imported
+	adding:   Soldat_Job,  // a mod made from Classic, a mod's file added, or a Soldat 1 folder imported
 }
 
-// What the picked mod's mod.json says, as the player changes it on the Installed tab;
-// saved when they say so.
+// A mod's new name, saved: the parts worn from it let go of, so its folder can be renamed
+// the next frame (rename_finish), then worn again by the new.
+Mod_Rename :: struct {
+	from, to: string, // "" for none
+	worn:     res.Parts,
+}
+
+// What the picked mod's mod.json says, and its name, as the player changes them in its
+// settings; saved when they say so.
 Mod_Edit :: struct {
 	name:    string, // the mod it is of; "" for none read yet
 	fields:  [Mod_Field]string,
@@ -68,6 +77,7 @@ Mod_Edit :: struct {
 }
 
 Mod_Field :: enum {
+	Name, // its folder's, by which it is worn
 	Title,
 	Version,
 	Author,
@@ -77,9 +87,9 @@ Mod_Field :: enum {
 }
 
 @(private = "file", rodata)
-FIELD_NAMES := [Mod_Field]string{.Title = "Title", .Version = "Version", .Author = "Author", .Description = "Description", .Licence = "Licence", .Source = "Where from"}
+FIELD_NAMES := [Mod_Field]string{.Name = "Name", .Title = "Title", .Version = "Version", .Author = "Author", .Description = "Description", .Licence = "Licence", .Source = "Where from"}
 @(private = "file", rodata)
-FIELD_HINTS := [Mod_Field]string{.Title = "My Mod", .Version = "1.0.0", .Author = "Your name", .Description = "What it changes", .Licence = "Free to share, crediting me", .Source = "A link, or how to reach you"}
+FIELD_HINTS := [Mod_Field]string{.Name = "My_Mod", .Title = "My Mod", .Version = "1.0.0", .Author = "Your name", .Description = "What it changes", .Licence = "Free to share, crediting me", .Source = "A link, or how to reach you"}
 
 MOD_ROW :: 42 // its name, and what it is under it
 CATALOG_ROW :: 36
@@ -107,6 +117,8 @@ mods_destroy :: proc(mods: ^Mods) {
 	delete(mods.selected)
 	delete(mods.note)
 	edit_forget(&mods.edit)
+	delete(mods.renaming.from)
+	delete(mods.renaming.to)
 	if path, taken := folder_pick_take(&mods.file); taken do delete(path)
 	if path, taken := folder_pick_take(&mods.folder); taken do delete(path)
 	soldat_job_forget(&mods.adding) // waited for, if it runs
@@ -125,6 +137,7 @@ page_mods :: proc(menu: ^Menu) {
 	install_taken(menu)
 	files_taken(menu)
 	if soldat_job_take(&mods.adding) do soldat_job_taken(menu, &mods.adding)
+	if mods.renaming.to != "" do rename_finish(menu)
 	if menu.texts.open {
 		text_editor_page(menu)
 		return
@@ -147,12 +160,18 @@ page_mods :: proc(menu: ^Menu) {
 // ---------------------------------------------------------------------------------
 // Configure Mods
 
-// The list of mods, and beside it (or under it, the page narrow) the one picked.
+// The list of mods, and beside it (or under it, the page narrow) the one picked: the first
+// listed until another is. Classic isn't listed: it is what every part not worn from a mod
+// is, and what a mod made on Install Mods begins as a copy of.
 @(private = "file")
 tab_installed :: proc(menu: ^Menu) {
 	k := &menu.kit
 	mods := &menu.mods
-	if mods.selected == "" do set_text(&mods.selected, res.MOD_CLASSIC)
+	if len(mods.listings) == 0 {
+		wrapped(k, "No mods yet. Every part is Classic's, the game's own. Create a mod, install one or import your own on Install Mods.", ui.MUTED)
+		return
+	}
+	if _, picked := listing_of(mods, mods.selected); !picked do pick(mods, mods.listings[0].name)
 	x, w := k.x, k.w
 	two := w >= TWO_PANES_W
 	top := k.y
@@ -167,21 +186,15 @@ tab_installed :: proc(menu: ^Menu) {
 	} else {
 		ui.gap(k, 10)
 	}
-	if strings.equal_fold(mods.selected, res.MOD_CLASSIC) {
-		classic_details(menu)
-	} else if listing, picked := listing_of(mods, mods.selected); picked {
-		mod_details(menu, listing)
-	}
+	if listing, picked := listing_of(mods, mods.selected); picked do mod_details(menu, listing)
 	k.y = max(k.y, list_end)
 	k.x, k.w = x, w
 }
 
-// Classic, then each mod: its title, and what it is or how much of it is worn.
+// Each mod: its title, and what it is or how much of it is worn.
 @(private = "file")
 mod_list :: proc(menu: ^Menu) {
-	k := &menu.kit
 	mods := &menu.mods
-	list_row(menu, res.MOD_CLASSIC, "Classic", "The game's own, under every mod", false, false)
 	for &listing in mods.listings {
 		worn, has := 0, 0
 		for part in listing.parts {
@@ -191,10 +204,6 @@ mod_list :: proc(menu: ^Menu) {
 		what, bad := listing_text(&listing)
 		if !bad && worn > 0 do what = fmt.tprintf("%s  -  %d of %d part%s worn", what, worn, has, "" if has == 1 else "s")
 		list_row(menu, listing.name, listing.title, what, bad, worn > 0)
-	}
-	if len(mods.listings) == 0 {
-		r := ui.row(k, 34, false)
-		if r.shown do ui.text_wrap(k, ui.TINY, "No mods yet: get one, or import your own, on Install Mods.", r.x + 12, r.y + 6, r.w - 24, ui.FAINT)
 	}
 }
 
@@ -227,80 +236,81 @@ listing_text :: proc(listing: ^res.Srmod_Listing) -> (text: string, bad: bool) {
 	return text, false
 }
 
-// Classic: what it is, its parts, worn where no mod's is; its HUD and its words to begin a
-// mod of one's own from.
-@(private = "file")
-classic_details :: proc(menu: ^Menu) {
-	k := &menu.kit
-	details_title(k, "Classic", "mods/classic/")
-	wrapped(k, "The game's own look, sound and words. Every part is Classic's where no mod's is worn, and every file a mod hasn't of a part is Classic's too.", ui.MUTED)
-	ui.section(k, "PARTS")
-	for part in res.MOD_PARTS {
-		r := ui.row(k, ui.ROW_H, false)
-		if !r.shown do continue
-		ui.text_fit(k, ui.LABEL, PART_TITLES[part], r.x + 10, r.y + r.h / 2, r.w * 0.5, ui.TEXT)
-		from := worn_from(menu, part)
-		state := "Worn" if from == "" else fmt.tprintf("Under %s", from)
-		ui.text_mid(k, ui.BODY, state, r.x + r.w - 10 - ui.width_of(k.ui, ui.BODY, state), r.y + r.h / 2, ui.TEXT if from == "" else ui.FAINT)
-	}
-	ui.section(k, "MAKE YOUR OWN")
-	wrapped(k, "Classic can't be changed, but its HUD and its words can begin your own, in the HUD editor and the text editor, each saved as a mod of its own.", ui.FAINT)
-	r := ui.row(k, ui.ROW_H + 6, false)
-	if !r.shown do return
-	x := r.x + 10
-	if button(k, &x, r, "Edit HUD", true) do hud_editor_open(menu, "")
-	if button(k, &x, r, "Edit words", true) do text_editor_open(menu, "", "Classic")
-	if button(k, &x, r, "Open its folder", false) do folder_open(utils.temp_path(res.MODS_DIR, res.MOD_CLASSIC))
-}
-
-// A mod's own: what it is; its parts, each worn from it or not; its art's scale; what its
-// mod.json says of it, changed and saved; and what may be done with it.
+// A mod's own: its title, and Delete (pressed twice); what it is; its parts, a chip each,
+// on where it is worn from it; its settings, its words and its HUD's layout to change. The
+// editors open on it as it is worn, Classic's where it hasn't the part, and save into it.
 @(private = "file")
 mod_details :: proc(menu: ^Menu, listing: ^res.Srmod_Listing) {
 	k := &menu.kit
 	mods := &menu.mods
-	e := &mods.edit
-	if !strings.equal_fold(e.name, listing.name) do edit_load(mods, listing.name)
+	ok := listing.problem == ""
 
-	details_title(k, listing.title, fmt.tprintf("mods/%s/", listing.name))
-	if listing.problem != "" {
+	r := ui.row(k, 34, false)
+	if r.shown {
+		pressed, left := row_button(k, r.x + r.w - 8, r.y + (r.h - ui.CTRL_H) / 2, "Sure?" if mods.confirm else "Delete", false)
+		if pressed {
+			if mods.confirm do mod_delete(menu, listing.name)
+			else do mods.confirm = true
+		}
+		ui.text_fit(k, ui.BOLD, listing.title, r.x + 10, r.y + 14, left - r.x - 14, ui.TEXT)
+		ui.text_fit(k, ui.TINY, fmt.tprintf("mods/%s/", listing.name), r.x + 10, r.y + 29, left - r.x - 14, ui.FAINT)
+	}
+	if !ok {
 		wrapped(k, fmt.tprintf("It can't be worn: %s. Mend it in its folder, or delete it.", listing.problem), ui.WARN)
 	} else if listing.description != "" {
 		wrapped(k, listing.description, ui.MUTED)
 	}
 
-	// its parts, a switch each
+	// its parts, a chip each: on, worn from it; off, from whichever mod wears it, else Classic
 	ui.section(k, "PARTS")
 	if listing.parts == {} {
-		wrapped(k, "It has no parts yet. Put soldier/, weapons/, effects/, objects/, hud/, icons/, sounds/, textures/, fonts/ or text/ in its folder, laid out as Classic's: what a part hasn't is Classic's.", ui.FAINT)
-	}
-	every, none := true, true
-	for part in res.Part {
-		if part not_in listing.parts do continue
-		on := worn_from(menu, part) == listing.name
-		every &&= on
-		none &&= !on
-		r := ui.row(k, ui.ROW_H, true)
-		flipped := ui.take_enter(k, r.focused) || ui.take_side(k, r.focused) != 0
-		if r.shown && ui.take(k, r.id, r.x, r.y, r.w, r.h) do flipped = true
-		if flipped && listing.problem == "" do wear(menu, part, "" if on else listing.name)
-		if !r.shown do continue
-		ui.text_fit(k, ui.LABEL, PART_TITLES[part], r.x + 10, r.y + r.h / 2, r.w * 0.4, ui.TEXT)
-		sx := r.x + r.w - 8 - 30
-		state := "Worn from it" if on else "Classic's" if worn_from(menu, part) == "" else fmt.tprintf("%s's", worn_from(menu, part))
-		ui.text_fit(k, ui.BODY, state, sx - 10 - min(ui.width_of(k.ui, ui.BODY, state), r.w * 0.45), r.y + r.h / 2, r.w * 0.45, ui.TEXT if on else ui.MUTED)
-		ui.switch_draw(k, sx, r.y + r.h / 2, on, r.hot || r.focused)
-	}
-	if listing.parts != {} && listing.problem == "" {
-		r := ui.row(k, ui.ROW_H + 6, false)
-		x := r.x + 10
-		if r.shown {
-			if button(k, &x, r, "Wear all of it", !every) do use_all(menu, listing)
-			if button(k, &x, r, "Wear none of it", false, disabled = none) do wear_none(menu, listing.name)
+		wrapped(k, "It has no parts yet: edit its words or its HUD's layout, or put soldier/, weapons/, sounds/ and the like in its folder, laid out as Classic's.", ui.FAINT)
+	} else {
+		c := ui.row(k, ui.CTRL_H + 10, false)
+		x := c.x + 10
+		for part in res.Part {
+			if part not_in listing.parts do continue
+			w := ui.chip_w(k, PART_TITLES[part])
+			if x > c.x + 10 && x + w > c.x + c.w - 10 { // no room left on this row: the next
+				c = ui.row(k, ui.CTRL_H + 10, false)
+				x = c.x + 10
+			}
+			on := worn_from(menu, part) == listing.name
+			if c.shown && ui.chip(k, x, c.y + 5, PART_TITLES[part], on) && ok do wear(menu, part, "" if on else listing.name)
+			x += w + 6
 		}
+		wrapped(k, "A part on is worn from this mod; off, from the mod that wears it, else Classic.", ui.FAINT)
 	}
 
-	// its art's scale, its whole and part by part
+	// what may be done with it
+	t := ui.row(k, ui.ROW_H + 6, false)
+	if t.shown {
+		x := t.x + 10
+		if button(k, &x, t, "Settings", mods.settings) do mods.settings = !mods.settings
+		if button(k, &x, t, "Edit Strings", false, disabled = !ok) do text_editor_open(menu, listing.name, listing.title)
+		if button(k, &x, t, "Edit Layout", false, disabled = !ok) do hud_editor_open(menu, listing.name, listing.title)
+	}
+	if mods.settings do mod_settings(menu, listing)
+}
+
+// The picked mod's settings: its name (its folder's, by which it is worn), what its
+// mod.json says of it, and its art's scale, whole and part by part; changed, then saved.
+@(private = "file")
+mod_settings :: proc(menu: ^Menu, listing: ^res.Srmod_Listing) {
+	k := &menu.kit
+	mods := &menu.mods
+	e := &mods.edit
+	if !strings.equal_fold(e.name, listing.name) do edit_load(mods, listing.name)
+
+	ui.section(k, "SETTINGS")
+	for field in Mod_Field {
+		longest := res.SRMOD_NAME_MAX if field == .Name else 200
+		if typed, changed := ui.field_row(k, FIELD_NAMES[field], &e.fields[field], e.fields[field], longest, FIELD_HINTS[field]); changed {
+			set_text(&e.fields[field], typed)
+		}
+	}
+	wrapped(k, "Its name is its folder's: letters, digits, - and _. Its title is what it is shown as.", ui.FAINT)
+
 	if listing.parts & SCALED_PARTS != {} {
 		ui.section(k, "ART SCALE")
 		wrapped(k, "How many pixels of its images make a unit in the world, as they were drawn: Classic's are 4.5, most of Soldat 1's 1. A bigger number draws the same image smaller.", ui.FAINT)
@@ -313,44 +323,18 @@ mod_details :: proc(menu: ^Menu, listing: ^res.Srmod_Listing) {
 		if e.deeper > 0 do wrapped(k, fmt.tprintf("Its mod.json says %d folder%s or file%s of its own scale besides, kept as they are.", e.deeper, "" if e.deeper == 1 else "s", "" if e.deeper == 1 else "s"), ui.FAINT)
 	}
 
-	// what its mod.json says of it
-	ui.section(k, "ABOUT IT")
-	for field in Mod_Field {
-		if typed, changed := ui.field_row(k, FIELD_NAMES[field], &e.fields[field], e.fields[field], 200, FIELD_HINTS[field]); changed {
-			set_text(&e.fields[field], typed)
-		}
-	}
 	changed := edit_changed(e)
 	r := ui.row(k, ui.ROW_H + 6, false)
-	if r.shown {
-		x := r.x + 10
-		if button(k, &x, r, "Save", true, disabled = !changed) do edit_save(menu, listing)
-		if button(k, &x, r, "Undo changes", false, disabled = !changed) do edit_load(mods, listing.name)
-		if e.problem != "" {
-			ui.text_fit(k, ui.TINY, e.problem, x + 4, r.y + r.h / 2, r.x + r.w - x - 8, ui.WARN)
-		} else if changed {
-			ui.text_fit(k, ui.TINY, "Not saved yet.", x + 4, r.y + r.h / 2, r.x + r.w - x - 8, ui.MUTED)
-		}
-	}
-
-	// what may be done with it
-	ui.section(k, "TOOLS")
-	t := ui.row(k, ui.ROW_H + 6, false)
-	if !t.shown do return
-	x := t.x + 10
-	ok := listing.problem == ""
-	if .Hud in listing.parts && ok && button(k, &x, t, "Edit HUD", false) do hud_editor_open(menu, listing.name)
-	if ok && button(k, &x, t, "Edit words", false) do text_editor_open(menu, listing.name, listing.title)
-	if button(k, &x, t, "Open its folder", false) do folder_open(utils.temp_path(res.MODS_DIR, listing.name))
-}
-
-// The picked mod's title, and where it is.
-@(private = "file")
-details_title :: proc(k: ^ui.Kit, title, place: string) {
-	r := ui.row(k, 34, false)
 	if !r.shown do return
-	ui.text_fit(k, ui.BOLD, title, r.x + 10, r.y + 14, r.w - 20, ui.TEXT)
-	ui.text_fit(k, ui.TINY, place, r.x + 10, r.y + 29, r.w - 20, ui.FAINT)
+	x := r.x + 10
+	if button(k, &x, r, "Save", true, disabled = !changed) do edit_save(menu, listing)
+	if button(k, &x, r, "Undo changes", false, disabled = !changed) do edit_load(mods, listing.name)
+	if button(k, &x, r, "Open its folder", false) do folder_open(utils.temp_path(res.MODS_DIR, listing.name))
+	if e.problem != "" {
+		ui.text_fit(k, ui.TINY, e.problem, x + 4, r.y + r.h / 2, r.x + r.w - x - 8, ui.WARN)
+	} else if changed {
+		ui.text_fit(k, ui.TINY, "Not saved yet.", x + 4, r.y + r.h / 2, r.x + r.w - x - 8, ui.MUTED)
+	}
 }
 
 // A scale to pick, of SCALES; a mod's own of none of them shown as it is. `whole` its
@@ -438,6 +422,7 @@ edit_load :: proc(mods: ^Mods, name: string) {
 	e.saved = details
 	for &s in ([]^string{&e.saved.title, &e.saved.version, &e.saved.author, &e.saved.description, &e.saved.licence, &e.saved.source}) do s^ = strings.clone(s^)
 	e.fields = {
+		.Name        = strings.clone(name),
 		.Title       = strings.clone(details.title),
 		.Version     = strings.clone(details.version),
 		.Author      = strings.clone(details.author),
@@ -461,7 +446,7 @@ edit_forget :: proc(e: ^Mod_Edit) {
 @(private = "file")
 edit_changed :: proc(e: ^Mod_Edit) -> bool {
 	s := &e.saved
-	was := [Mod_Field]string{.Title = s.title, .Version = s.version, .Author = s.author, .Description = s.description, .Licence = s.licence, .Source = s.source}
+	was := [Mod_Field]string{.Name = e.name, .Title = s.title, .Version = s.version, .Author = s.author, .Description = s.description, .Licence = s.licence, .Source = s.source}
 	if e.fields != was || e.scale != s.scale do return true
 	for part in res.Part {
 		mine := e.scales[part] if e.scales[part] > 0 else e.scale
@@ -472,11 +457,23 @@ edit_changed :: proc(e: ^Mod_Edit) -> bool {
 }
 
 // The changes written into the mod's mod.json; the mod worn again if any of it is, so its
-// art is drawn at its new scale.
+// art is drawn at its new scale. A new name, told first to be one a mod may have, is the
+// next frame's (rename_finish), the parts worn from it let go of meanwhile.
 @(private = "file")
 edit_save :: proc(menu: ^Menu, listing: ^res.Srmod_Listing) {
 	mods := &menu.mods
 	e := &mods.edit
+	name := strings.clone(listing.name, context.temp_allocator)
+	to := strings.clone(strings.trim_space(e.fields[.Name]), context.temp_allocator)
+	renamed := to != name
+	if renamed && !res.srmod_name_ok(to) {
+		set_text(&e.problem, "A name is letters, digits, - and _, 32 at most.")
+		return
+	}
+	if renamed && !strings.equal_fold(to, name) && (res.mod_exists(res.MODS_DIR, to) || strings.equal_fold(to, "default")) {
+		set_text(&e.problem, "There is a mod by that name already.")
+		return
+	}
 	details := res.Srmod_Details {
 		title       = e.fields[.Title],
 		version     = e.fields[.Version],
@@ -489,21 +486,54 @@ edit_save :: proc(menu: ^Menu, listing: ^res.Srmod_Listing) {
 	}
 	// a part at the whole mod's, said by the mod, not the part
 	for part in res.Part do if details.scales[part] == details.scale do details.scales[part] = 0
-	name := strings.clone(listing.name, context.temp_allocator)
 	if problem := res.srmod_details_write(res.MODS_DIR, name, details); problem != "" {
 		set_text(&e.problem, problem)
 		return
 	}
+	worn: res.Parts
+	for part in res.Part do if worn_from(menu, part) == name do worn += {part}
+	parts: [res.Part]string
+	if renamed {
+		set_text(&mods.renaming.from, name)
+		set_text(&mods.renaming.to, to)
+		mods.renaming.worn = worn
+		if worn != {} {
+			for part in res.Part do parts[part] = "" if part in worn else worn_from(menu, part)
+			use_parts(menu, parts) // the client lets go of its folder before the next frame
+		}
+		return
+	}
 	note(mods, fmt.tprintf("%s saved.", strings.trim_space(e.fields[.Title])), false)
-	worn := false
-	for part in res.Part do worn ||= worn_from(menu, part) == name
 	mods_relist(mods) // its listing anew: `listing` is gone
 	edit_load(mods, name)
-	if worn {
-		parts: [res.Part]string
+	if worn != {} {
 		for part in res.Part do parts[part] = worn_from(menu, part)
 		use_parts(menu, parts)
 	}
+}
+
+// A mod's renaming, let go of the frame before where it was worn: its folder renamed, and
+// its parts worn again by its new name, or by its old if it couldn't be.
+@(private = "file")
+rename_finish :: proc(menu: ^Menu) {
+	mods := &menu.mods
+	r := &mods.renaming
+	from, to, worn := strings.clone(r.from, context.temp_allocator), strings.clone(r.to, context.temp_allocator), r.worn
+	set_text(&r.from, "")
+	set_text(&r.to, "")
+	r.worn = {}
+	problem := res.mod_rename(res.MODS_DIR, from, to)
+	now := from if problem != "" else to
+	mods_relist(mods)
+	if worn != {} {
+		parts: [res.Part]string
+		for part in res.Part do parts[part] = now if part in worn else worn_from(menu, part)
+		use_parts(menu, parts)
+	}
+	pick(mods, now)
+	edit_load(mods, now)
+	if problem != "" do note(mods, fmt.tprintf("Saved, but not renamed: %s", problem), true)
+	else do note(mods, fmt.tprintf("Saved, and named %s.", to), false)
 }
 
 // ---------------------------------------------------------------------------------
@@ -525,44 +555,28 @@ tab_install :: proc(menu: ^Menu) {
 		if pressed do folder_pick_start(&mods.folder, "Pick your Soldat 1 folder, or a mod or an interface of it", rl.GetWindowHandle())
 		pressed, left = row_button(k, left, y, "Import .srmod", held)
 		if pressed do folder_pick_start(&mods.file, "Pick a mod to add", rl.GetWindowHandle(), MOD_FILE_PATTERNS[:])
-		pressed, left = row_button(k, left, y, "Create", false)
-		if pressed do mod_make_new(menu)
+		pressed, left = row_button(k, left, y, "Create", held)
+		if pressed do job_start(menu, .Create, "")
 		ui.text_fit(k, ui.BODY, adding_said(job), r.x + 12, r.y + r.h / 2, left - r.x - 16, ui.MUTED)
 	}
 	ui.gap(k, 4)
 	page_catalog(menu)
 }
 
-// What is being added, said beside the buttons: a mod's file, or a Soldat 1 folder, how far
-// and for how long; else what the catalogue is.
+// What is being added, said beside the buttons: a mod made from Classic, a mod's file, or a
+// Soldat 1 folder, how far and for how long; else what the catalogue is.
 @(private = "file")
 adding_said :: proc(job: ^Soldat_Job) -> string {
 	if !soldat_job_busy(job) do return "Mods made by the community."
 	took := elapsed(rl.GetTime() - job.started)
-	if job.kind == .Unpack do return fmt.tprintf("Adding %s... %s", filepath.base(job.root), took)
+	switch job.kind {
+	case .Create: return fmt.tprintf("Making a mod of Classic... %s", took)
+	case .Unpack: return fmt.tprintf("Adding %s... %s", filepath.base(job.root), took)
+	case .Import:
+	}
 	done, total := sync.atomic_load(&job.progress.done), sync.atomic_load(&job.progress.total)
 	if total > 1 do return fmt.tprintf("Importing your Soldat 1: %d of %d... %s", min(done + 1, total), total, took)
 	return fmt.tprintf("Importing %s... %s", filepath.base(job.root), took)
-}
-
-// A new mod's name, numbered after the first (My_Mod_2...).
-NEW_MOD_NAME :: "My_Mod"
-
-// A new mod, empty, picked on Configure Mods to fill, its folder opened.
-@(private = "file")
-mod_make_new :: proc(menu: ^Menu) {
-	mods := &menu.mods
-	name := NEW_MOD_NAME
-	for n := 2; res.mod_exists(res.MODS_DIR, name); n += 1 do name = fmt.tprintf("%s_%d", NEW_MOD_NAME, n)
-	if problem := res.mod_new(res.MODS_DIR, name); problem != "" {
-		note(mods, problem, true)
-		return
-	}
-	mods_relist(mods)
-	pick(mods, name)
-	mods.tab = .Configure
-	note(mods, fmt.tprintf("%s made: put its files in mods/%s/, and give it a title here.", name, name), false)
-	folder_open(utils.temp_path(res.MODS_DIR, name))
 }
 
 // A mod's file picked in the dialog, or dropped on the window, added: unpacked (or made
@@ -609,6 +623,16 @@ job_start :: proc(menu: ^Menu, kind: Soldat_Job_Kind, path: string) {
 soldat_job_taken :: proc(menu: ^Menu, job: ^Soldat_Job) {
 	mods := &menu.mods
 	switch job.kind {
+	case .Create:
+		if job.problem != "" {
+			note(mods, fmt.tprintf("No mod was made: %s", job.problem), true)
+			return
+		}
+		mods_relist(mods)
+		pick(mods, job.name)
+		mods.tab = .Configure
+		mods.settings = true // to name it
+		note(mods, fmt.tprintf("%s made, a copy of Classic: name it, and change what you will.", job.name), false)
 	case .Unpack:
 		if job.problem != "" {
 			what := job.name if job.name != "" else filepath.base(job.root)
@@ -794,26 +818,16 @@ install_taken :: proc(menu: ^Menu) {
 // ---------------------------------------------------------------------------------
 // The footer
 
-// What was last done, or what the catalogue's mod picked is; and Delete, for a mod picked
-// on the Installed tab.
+// What was last done, or what the catalogue's mod picked is; or, Delete pressed once on a
+// mod, that a second press deletes it.
 @(private = "file")
 action_bar :: proc(menu: ^Menu) {
 	k := &menu.kit
 	mods := &menu.mods
 	x, w := k.x, k.w
 	listing, picked := listing_of(mods, mods.selected)
-	deletable := mods.tab == .Configure && picked
-	if !deletable do mods.confirm = false
-	right := x + w
-	if mods.tab == .Configure {
-		deleted, dx := big_button(menu, right, "SURE?" if mods.confirm else "DELETE", false, !deletable)
-		right = dx - 10
-		if deleted && deletable {
-			if mods.confirm do mod_delete(menu, listing.name)
-			else do mods.confirm = true
-		}
-	}
-	tw := right - x - 6
+	if mods.tab != .Configure || !picked do mods.confirm = false
+	tw := w - 6
 	c := menu.catalog
 	switch {
 	case mods.tab == .Install && mods.about >= 0 && mods.about < len(c.mods) && mods.note == "":
@@ -886,7 +900,7 @@ mods_relist :: proc(mods: ^Mods) {
 		mods.versions[strings.clone(listing.name)] = strings.clone(listing.version)
 	}
 	mods.listed = true
-	if _, still := listing_of(mods, mods.selected); !still && !strings.equal_fold(mods.selected, res.MOD_CLASSIC) do set_text(&mods.selected, "")
+	if _, still := listing_of(mods, mods.selected); !still do set_text(&mods.selected, "")
 	edit_forget(&mods.edit) // read again as it is next shown
 	mods.confirm = false
 }
@@ -945,7 +959,7 @@ mod_delete :: proc(menu: ^Menu, name: string) {
 		return
 	}
 	note(mods, fmt.tprintf("%s deleted.", gone), false)
-	set_text(&mods.selected, res.MOD_CLASSIC)
+	set_text(&mods.selected, "") // the first listed, as the tab next shows
 	mods_relist(mods)
 }
 

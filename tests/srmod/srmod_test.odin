@@ -396,49 +396,65 @@ layout_worn :: proc(t: ^testing.T) {
 	testing.expect(t, l.alpha == 150 && l.team_box.at == {1, 2} && l.ping.at == {10, 10}, "the mod's over Classic's")
 }
 
-// A HUD as the HUD editor saves it: the hud part's files of the mod it began from
-// (srmod_part_files), its folder's or its .srmod's alike, and a mod of a hud alone written
-// with them and a layout (hud_mod_write); saved again over itself, its description kept.
+// A HUD as the HUD editor saves it, into the mod it was opened on: its hud/layout.json,
+// and its mod.json listing a hud part it hadn't; its other parts, and its pictures, as
+// they were.
 @(test)
 hud_saved :: proc(t: ^testing.T) {
 	dir := scratch(t, "hud_saved")
 	defer os.remove_all(dir)
-	write(utils.temp_path(dir, "Neo", "mod.json"), info("Neo", `"hud", "sounds"`))
-	write(utils.temp_path(dir, "Neo", "hud", "health.png"), "neo health")
-	write(utils.temp_path(dir, "Neo", "hud", "guns", "1.png"), "neo gun")
-	write(utils.temp_path(dir, "Neo", "hud", "layout.json"), `{"alpha": 90}`)
-	write(utils.temp_path(dir, "Neo", "sounds", "shot.wav"), "not the hud's")
-
-	neo, why, ok := res.srmod_open(utils.temp_path(dir, "Neo"))
-	if !testing.expectf(t, ok, "Neo opened (%s)", why) do return
-	pictures := res.srmod_part_files(&neo, .Hud, context.temp_allocator)
-	res.srmod_close(&neo)
-	testing.expect_value(t, len(pictures), 3)
-	testing.expect(t, string(pictures["health.png"]) == "neo health" && string(pictures["guns/1.png"]) == "neo gun", "its hud's files, in their folders, and no other part's")
+	write(utils.temp_path(dir, "Neo", "mod.json"), info("Neo", `"sounds"`))
+	write(utils.temp_path(dir, "Neo", "sounds", "shot.wav"), "neo shot")
 
 	layout := res.hud_layout_default()
 	layout.alpha = 120
 	layout.health.icon.at = {50, 300}
-	testing.expect(t, res.hud_mod_write(dir, "My_HUD", "My HUD", "Made in the HUD editor, from Neo's HUD.", layout, pictures), "written")
-	mine, mwhy, mok := res.srmod_open(utils.temp_path(dir, "My_HUD"))
-	defer res.srmod_close(&mine)
-	if !testing.expectf(t, mok, "My_HUD opened (%s)", mwhy) do return
-	testing.expect(t, mine.parts == {.Hud} && mine.info.title == "My HUD", "a hud alone")
-	again := res.srmod_part_files(&mine, .Hud, context.temp_allocator)
-	testing.expect(t, string(again["health.png"]) == "neo health" && string(again["guns/1.png"]) == "neo gun", "Neo's pictures in it")
+	testing.expect_value(t, res.mod_hud_write(dir, "Neo", layout), "")
+	neo, why, ok := res.srmod_open(utils.temp_path(dir, "Neo"))
+	defer res.srmod_close(&neo)
+	if !testing.expectf(t, ok, "Neo opened (%s)", why) do return
+	testing.expect_value(t, neo.parts, res.Parts{.Hud, .Sounds})
+	text, _ := utils.read_file(utils.temp_path(dir, "Neo", "hud", "layout.json"), context.temp_allocator)
 	read_back := res.hud_layout_default()
-	testing.expect(t, res.hud_layout_read(again["layout.json"], "layout.json", &read_back) && read_back == layout, "its layout, not Neo's")
-	res.srmod_close(&mine)
+	testing.expect(t, res.hud_layout_read(text, "layout.json", &read_back) && read_back == layout, "its layout")
+	shot, _ := utils.read_file(utils.temp_path(dir, "Neo", "sounds", "shot.wav"), context.temp_allocator)
+	testing.expect_value(t, string(shot), "neo shot")
 
 	layout.alpha = 200
-	testing.expect(t, res.hud_mod_write(dir, "My_HUD", "My HUD", mine_description(dir), layout, again), "saved over itself")
-	over, _, _ := res.srmod_open(utils.temp_path(dir, "My_HUD"))
-	defer res.srmod_close(&over)
-	testing.expect(t, strings.has_prefix(over.info.description, res.HUD_EDITOR_MADE) && strings.contains(over.info.description, "Neo"), "the editor's, from Neo's still")
+	testing.expect_value(t, res.mod_hud_write(dir, "Neo", layout), "") // saved over, the part listed once
+	testing.expect_value(t, res.mod_hud_write(dir, "Gone", layout), "It isn't in mods/ any more.")
+}
 
-	mine_description :: proc(dir: string) -> string {
-		m, _, _ := res.srmod_open(utils.temp_path(dir, "My_HUD"))
-		defer res.srmod_close(&m) // let go of before it is written over
-		return strings.clone(m.info.description, context.temp_allocator)
-	}
+// A new mod as Install Mods' Create makes it: a copy of Classic, every part but the
+// scenery, named NewMod, then NewMod_2, titled to match; renamed, its folder and its
+// mod.json's name, in another case alone too, and never over another.
+@(test)
+made_and_renamed :: proc(t: ^testing.T) {
+	dir := scratch(t, "made_and_renamed")
+	defer os.remove_all(dir)
+	classic := utils.temp_path(dir, "classic")
+	write(utils.temp_path(classic, "mod.json"), `{"format": 1, "name": "classic", "title": "Classic", "version": "1.0.0", "licence": "CC BY 4.0", "parts": ["soldier", "hud", "scenery"], "scale": 4.5}`)
+	write(utils.temp_path(classic, "soldier", "klata.png"), "chest")
+	write(utils.temp_path(classic, "hud", "layout.json"), `{"alpha": 255}`)
+	write(utils.temp_path(classic, "scenery", "tree.png"), "a tree")
+	write(utils.temp_path(classic, "NOTICE.md"), "credits")
+
+	name, problem := res.mod_from_classic(dir, context.temp_allocator)
+	testing.expect(t, problem == "" && name == res.MOD_NEW_NAME, "NewMod")
+	made, why, ok := res.srmod_open(utils.temp_path(dir, name))
+	if !testing.expectf(t, ok, "it opens (%s)", why) do return
+	testing.expect(t, made.parts == {.Soldier, .Hud} && made.info.title == res.MOD_NEW_TITLE && made.info.licence == "CC BY 4.0", "Classic's parts but the scenery, its licence")
+	res.srmod_close(&made)
+	chest, _ := utils.read_file(utils.temp_path(dir, name, "soldier", "klata.png"), context.temp_allocator)
+	testing.expect(t, string(chest) == "chest" && utils.file_exists(utils.temp_path(dir, name, "NOTICE.md")) && !os.exists(utils.temp_path(dir, name, "scenery")), "Classic's files, but its scenery")
+	second, _ := res.mod_from_classic(dir, context.temp_allocator)
+	testing.expect_value(t, second, "NewMod_2")
+
+	testing.expect_value(t, res.mod_rename(dir, "NewMod", "Sharp"), "")
+	sharp, _, sharp_ok := res.srmod_open(utils.temp_path(dir, "Sharp"))
+	testing.expect(t, sharp_ok && sharp.info.name == "Sharp" && !os.exists(utils.temp_path(dir, "NewMod")), "its folder and its name")
+	res.srmod_close(&sharp)
+	testing.expect_value(t, res.mod_rename(dir, "Sharp", "sharp"), "")
+	testing.expect(t, slice.equal(res.srmods_list(dir), []string{"NewMod_2", "sharp"}), "in another case alone")
+	testing.expect(t, res.mod_rename(dir, "sharp", "NewMod_2") != "" && res.mod_rename(dir, "sharp", "Bad Name") != "", "not over another, nor a name a mod can't have")
 }

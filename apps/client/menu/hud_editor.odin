@@ -15,19 +15,16 @@ import "../ui"
 // window as the game draws it, with made-up numbers, each part outlined. A part is picked
 // by a click or from the panel's list, dragged or nudged with the arrows, and in the
 // panel shown or hidden, its bar's style and fill, its text's alignment, what it is kept
-// beside as the view widens, how it is turned; and the whole HUD's opacity. Saved, it is
-// a mod of its own, a hud alone with the pictures of the HUD it began from
-// (res.hud_mod_write), and worn: "My HUD", or the mod the editor made that it was opened
-// on, saved over. A .srmod worn is a file open, so one saved over is let go of first.
+// beside as the view widens, how it is turned; and the whole HUD's opacity. It opens on a
+// mod's HUD as the game wears it, Classic's where the mod has no hud part, and saves into
+// that mod, its hud/layout.json (res.mod_hud_write), its pictures as they are; then wears
+// its HUD. A mod worn may have files open, so it is let go of first.
 
 Hud_Editor :: struct {
 	open:     bool,
-	from:     string, // the title of the mod whose HUD it began from, Classic's or another's
-	description: string, // the mod saved's: where its HUD began, kept as it is saved over
-	target:   string, // the mod it saves into: the editor's own, opened on or saved once; "" until then
+	from:     string, // the title of the mod it is of
+	target:   string, // and its name, which it saves into
 	art:      hud.Art,
-	pictures: map[string][]byte, // the hud part's files of the mod it began from, saved with the layout
-	scales:   map[string]f32,    // and each one's pixels to a unit, as that mod says
 	layout:   res.Hud_Layout,
 	saved:    res.Hud_Layout, // as it was opened or last saved: unsaved while they differ, and Reset's
 	undo:     [dynamic]res.Hud_Layout,
@@ -40,6 +37,7 @@ Hud_Editor :: struct {
 	panel_h:  f32,    // its height, as it was laid out last
 	panel_on: bool,   // the panel being dragged by its title
 	saving:   enum {None, Letting_Go, Writing},
+	worn:     res.Parts, // the parts worn from it, let go of while it is saved
 	leaving:  bool, // Escape once with changes unsaved: again leaves without them
 	note:     string,
 	note_bad: bool,
@@ -48,12 +46,10 @@ Hud_Editor :: struct {
 
 PANEL_W :: 262
 PANEL_TITLE_H :: 30
-EDITOR_NAME :: "My_HUD" // the mod it saves into, the first time: then My_HUD_2...
-EDITOR_TITLE :: "My HUD"
 
-// The editor opened on the HUD of the mod `name` ("" for Classic's): its layout as the
-// game wears it, and its pictures drawn as the game draws them.
-hud_editor_open :: proc(menu: ^Menu, name: string) {
+// The editor opened on the HUD of the mod `name`, titled `title`: its layout as the game
+// wears it, Classic's where the mod has none, and its pictures drawn as the game draws them.
+hud_editor_open :: proc(menu: ^Menu, name, title: string) {
 	e := &menu.editor
 	hud_editor_close(menu)
 	choice: [res.Part]string
@@ -62,20 +58,9 @@ hud_editor_open :: proc(menu: ^Menu, name: string) {
 	hud.art_load(&e.art, mod)
 	hud.art_opaque(&e.art, mod)
 	e.art.book.mod = {} // every picture is in hand: the mod is let go of below
-	e.from = strings.clone("Classic")
-	if name != "" && mod.worn != nil {
-		source := res.worn_mod(mod.worn, .Hud)
-		e.pictures = res.srmod_part_files(source, .Hud)
-		e.scales = res.hud_picture_scales(source, e.pictures)
-		delete(e.from)
-		e.from = strings.clone(source.info.title)
-		if strings.has_prefix(source.info.description, res.HUD_EDITOR_MADE) {
-			e.target = strings.clone(name)
-			e.description = strings.clone(source.info.description)
-		}
-	}
 	res.mod_destroy(&mod)
-	if e.description == "" do e.description = fmt.aprintf("%s, from %s's HUD.", res.HUD_EDITOR_MADE, e.from)
+	e.from = strings.clone(title)
+	e.target = strings.clone(name)
 
 	e.open = true
 	e.layout = e.art.layout
@@ -90,17 +75,9 @@ hud_editor_close :: proc(menu: ^Menu) {
 	e := &menu.editor
 	if !e.open do return
 	hud.art_destroy(&e.art)
-	for path, data in e.pictures {
-		delete(path)
-		delete(data)
-	}
-	delete(e.pictures)
-	for path in e.scales do delete(path)
-	delete(e.scales)
 	delete(e.undo)
 	delete(e.from)
 	delete(e.target)
-	delete(e.description)
 	delete(e.note)
 	e^ = {}
 	ui.kit_reset_page(&menu.kit)
@@ -283,7 +260,7 @@ editor_panel :: proc(menu: ^Menu, u: ^ui.Ui) {
 		else do e.panel = {clamp(u.mouse.x - e.grab.x, 0, u.width - PANEL_W), clamp(u.mouse.y - e.grab.y, 0, VIEW_H - PANEL_TITLE_H)}
 	}
 	ui.text_mid(k, ui.LABEL, "HUD editor", x + 12, y + PANEL_TITLE_H / 2, ui.TEXT)
-	from := fmt.tprintf("from %s", e.from)
+	from := fmt.tprintf("of %s", e.from)
 	ui.text_fit(k, ui.TINY, from, x + 12 + ui.width_of(u, ui.LABEL, "HUD editor") + 8, y + PANEL_TITLE_H / 2, PANEL_W - 110, ui.FAINT)
 
 	ui.kit_column(k, x + 6, PANEL_W - 12, y + PANEL_TITLE_H, VIEW_H + 1000)
@@ -381,41 +358,34 @@ editor_note :: proc(e: ^Hud_Editor, text: string, bad: bool) {
 @(private = "file")
 editor_save :: proc(menu: ^Menu) {
 	e := &menu.editor
-	if e.target == "" {
-		name, title := EDITOR_NAME, EDITOR_TITLE
-		for n := 2; res.mod_exists(res.MODS_DIR, name); n += 1 {
-			name, title = fmt.tprintf("%s_%d", EDITOR_NAME, n), fmt.tprintf("%s %d", EDITOR_TITLE, n)
-		}
-		e.target = strings.clone(name)
-	}
 	parts: [res.Part]string
-	worn := false
-	for p in res.Part {
-		parts[p] = worn_from(menu, p)
-		if strings.equal_fold(parts[p], e.target) {
-			parts[p] = ""
-			worn = true
-		}
-	}
+	for p in res.Part do parts[p] = worn_from(menu, p)
 	switch e.saving {
 	case .None:
 	case .Letting_Go:
 		e.saving = .Writing
-		if worn do use_parts(menu, parts) // the client lets go of it before the next frame
+		e.worn = {}
+		for p in res.Part {
+			if !strings.equal_fold(parts[p], e.target) do continue
+			e.worn += {p}
+			parts[p] = ""
+		}
+		if e.worn != {} do use_parts(menu, parts) // the client lets go of it before the next frame
 	case .Writing:
 		e.saving = .None
-		title := EDITOR_TITLE
-		if e.target != EDITOR_NAME do title = strings.concatenate({EDITOR_TITLE, " ", strings.trim_prefix(e.target, EDITOR_NAME + "_")}, context.temp_allocator)
-		if !res.hud_mod_write(res.MODS_DIR, e.target, title, e.description, e.layout, e.pictures, e.scales) {
-			editor_note(e, "It couldn't be saved: is the disk full, or the mod open elsewhere?", true)
+		problem := res.mod_hud_write(res.MODS_DIR, e.target, e.layout)
+		// what was worn from it worn again, and its HUD with it once saved
+		for p in e.worn do parts[p] = e.target
+		if problem == "" do parts[.Hud] = e.target
+		mods_relist(&menu.mods)
+		use_parts(menu, parts)
+		if problem != "" {
+			editor_note(e, fmt.tprintf("It couldn't be saved: %s", problem), true)
 			return
 		}
 		e.saved = e.layout
 		e.leaving = false
-		mods_relist(&menu.mods)
-		parts[.Hud] = e.target
-		use_parts(menu, parts)
-		editor_note(e, fmt.tprintf("Saved as %s, and worn. Its HUD chip is on the Mods page.", title), false)
+		editor_note(e, fmt.tprintf("Saved into %s, and its HUD worn.", e.from), false)
 	}
 }
 

@@ -267,32 +267,3 @@ worn_layout :: proc(worn: ^Worn) -> (layout: Hud_Layout) {
 	if i := worn.chosen[.Hud]; i >= 0 do over(&layout, &worn.mods[i])
 	return
 }
-
-// How the description of a mod the HUD editor made begins: one that begins so is the
-// editor's, saved over as it is edited again.
-HUD_EDITOR_MADE :: "Made in the HUD editor"
-
-// The mod `name` made in `mods_dir`, over one by that name: a mod of a hud alone,
-// `layout` its layout.json and `pictures` (srmod_part_files of the hud it was made from)
-// beside it, each at its scale in `scales` (by the same path; SRMOD_SCALE if not there),
-// `description` its own. False if it couldn't be written.
-hud_mod_write :: proc(mods_dir, name, title, description: string, layout: Hud_Layout, pictures: map[string][]byte, scales: map[string]f32 = nil) -> bool {
-	entries := make(map[string][]byte, context.temp_allocator)
-	in_mod := make(map[string]f32, context.temp_allocator)
-	for path, data in pictures {
-		if strings.equal_fold(path, HUD_LAYOUT_FILE) do continue
-		dest := strings.concatenate({PART_NAMES[.Hud], "/", path}, context.temp_allocator)
-		entries[dest] = data
-		if scale, has := scales[path]; has do in_mod[dest] = scale
-	}
-	entries[strings.concatenate({PART_NAMES[.Hud], "/", HUD_LAYOUT_FILE}, context.temp_allocator)] = transmute([]byte)hud_layout_text(layout)
-	return srmod_write(mods_dir, name, title, description, entries, in_mod)
-}
-
-// The scale of each of `pictures` (srmod_part_files of the mod's hud), by the same path:
-// with `allocator`.
-hud_picture_scales :: proc(mod: ^Srmod, pictures: map[string][]byte, allocator := context.allocator) -> map[string]f32 {
-	scales := make(map[string]f32, allocator)
-	for path in pictures do scales[strings.clone(path, allocator)] = srmod_scale(mod, strings.concatenate({PART_NAMES[.Hud], "/", path}, context.temp_allocator))
-	return scales
-}

@@ -83,9 +83,9 @@ unit, 4.5 if it says none (Images, below); `scales` a part's, a folder's or a fi
 by its path in the mod, the longest that holds an image winning. The rest are the
 catalogue's `about.json`'s fields of before, unchanged.
 
-The Mods page changes what `mod.json` says of a mod (its title, version, author,
-description, licence and source) and its parts' scales, and makes a new mod: its folder,
-and a `mod.json` of no part, to fill.
+The Mods page changes what `mod.json` says of a mod (its name, renaming its folder; its
+title, version, author, description, licence and source) and its parts' scales, and makes
+a new mod: a copy of Classic, every part but the scenery, to change (`mod_from_classic`).
 
 **Zipped**, a mod is a `.zip` (or `.srmod`, the same) of its folder, stored or deflated,
 `mod.json` at its root or a folder or two down: what is handed over, and what the
@@ -176,20 +176,20 @@ the original worked both out from which pictures an interface had and whether it
 custom at all (soldat1-mods.md), which an import resolves once and writes down, and the
 editor shows and changes. A part a layout leaves out is Classic's layout's.
 
-**The HUD editor** edits this file. The Mods page opens it on any mod's HUD (**Edit HUD**
-on its row, Classic's on its own): the HUD over the whole window as the game draws it,
+**The HUD editor** edits this file. The Mods page opens it on any mod's HUD (**Edit Layout**
+on its page), Classic's where the mod has none: the HUD over the whole window as the game
+draws it,
 with made-up numbers, each part outlined (as much of its picture as isn't see-through).
 A part is picked by a click or from the panel's list, dragged or nudged with the arrows
 (Shift by 10); an icon moved takes along what is anchored to it. The panel shows or
 hides it, sets a bar's style and fill, a text's alignment, what it is kept beside, how
 it is turned, and the whole HUD's opacity; Undo (Ctrl+Z), Reset, Save, Close (Escape,
-twice with changes unsaved). There are no pictures to change in it: those of the HUD it
-began from are kept.
+twice with changes unsaved). There are no pictures to change in it: the mod's are kept,
+Classic's where it has none.
 
-Saved, a HUD is a mod of its own: `My HUD` (`My_HUD`, then `My_HUD_2`...), a `hud` part
-alone, its `layout.json` and the pictures of the HUD it began from (at their scales), and
-worn at once. Its description begins "Made in the HUD editor": opened on such a mod, the
-editor saves over it. Writing a `setup.sif` for Soldat 1 from a layout is left for later.
+Saved, the layout is the mod's own `hud/layout.json` (`mod_hud_write`), a `hud` part it is
+given if it hadn't one, and its HUD is worn at once, with whatever else of it was. Writing a
+`setup.sif` for Soldat 1 from a layout is left for later.
 
 ## The text
 
@@ -209,12 +209,13 @@ said: it would print the wrong thing or nothing. The server's own lines (who cam
 who was kicked, a map vote that found none) go by their key and the name in them, so each
 client says them in the words it wears; their English goes too, for the server's log.
 
-**The text editor** edits it: **Edit words** on a mod's page, or Classic's. Each line is
+**The text editor** edits it: **Edit Strings** on a mod's page, Classic's lines where the
+mod has none. Each line is
 listed by what it is about and found by a search; the one picked is typed into, Classic's
 beside it, and a line that would drop a placeholder isn't taken. **Read a Soldat 1
 file...** brings in a `default.txt` or one of its `languages/*.txt`. Saved, the lines that
-differ from Classic's are the mod's `strings.json`, and its text is worn; Classic's are
-saved as a mod of their own, `My Text` (`My_Text`, then `My_Text_2`...). The fonts are
+differ from Classic's are the mod's `strings.json`, a `text` part it is given if it hadn't
+one, and its text is worn. The fonts are
 Latin-1: a language of other letters (Cyrillic, Greek, Chinese) shows boxes for them.
 
 Soldat 1 says the same in `txt/default.txt`: UTF-16, a line each by number, 821 of them,
@@ -231,11 +232,14 @@ The client config's `graphics.parts`, a mod by part; a part not named is Classic
 "parts": {"soldier": "NoNameMod", "weapons": "NoNameMod", "sounds": "RemasteredSounds", "hud": "micro1", "text": "Deutsch"}
 ```
 
-The Mods page's **Configure Mods** lists Classic and each mod; beside the one picked, its
-parts, each worn from it with a switch (and so from whichever wore it no longer), **Wear all
-of it** and **Wear none of it**; its art's scale, the whole mod's and part by part; what its
-`mod.json` says of it, changed and saved; and **Edit HUD**, **Edit words** and its folder.
-A mod on for no part is installed and does nothing.
+The Mods page's **Configure Mods** lists each mod, but not Classic: a part worn from no mod
+is Classic's. Beside the one picked: its title and **Delete** (pressed twice); its parts, a
+chip each, on where it is worn from it (and so from whichever wore it no longer), off
+where Classic, or another mod, is; **Settings**, its name (its folder's, by which it is
+worn), what its `mod.json` says of it and its art's scale, the whole mod's and part by
+part, changed and saved; **Edit Strings** and **Edit Layout**, the text editor and the
+HUD editor on it, Classic's where it hasn't the part, saving into it. A mod on for no part
+is installed and does nothing.
 
 A file is looked for in the chosen mod's part, then in Classic's: by its path within the
 part, in any case. A missing pivot is Classic's; a missing key of `layout.json`,
@@ -245,14 +249,15 @@ part, in any case. A missing pivot is Classic's; a missing key of `layout.json`,
 
 The game's own look, sound and words, `mods/classic/`, laid out as any mod: its
 `mod.json` and every part, whole. It is what every part falls back to, so it has every
-file the game draws, plays or says. It can't be removed, changed, or chosen against itself.
+file the game draws, plays or says. It can't be removed, changed, or chosen against itself,
+and isn't listed on the Mods page: a mod of one's own begins as a copy of it (Create).
 
 ## Bringing mods in
 
 On the Mods page's **Install Mods**, beside the catalogue, three buttons:
 
-- **Create**: an empty mod, `My_Mod` (then `My_Mod_2`...), its folder opened to fill, picked
-  on Configure Mods to give it a title.
+- **Create**: a copy of Classic, every part but the scenery, `NewMod` (then `NewMod_2`...),
+  titled New Mod, made on a thread; picked on Configure Mods, its settings open to name it.
 - **Import .srmod**: a `.srmod` picked in the system's dialog, which offers nothing else,
   unzipped into its folder as it is (The folder, above); one without a `mod.json` is
   refused, never converted. A `.srmod` or `.zip` dropped on the game's window, on either

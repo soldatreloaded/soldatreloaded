@@ -12,17 +12,16 @@ import "../ui"
 
 // The text editor: what the game says in a match (res.Strings: the kill feed's, the big
 // words', the console's, the HUD's), line by line, as a mod's text part says it. It opens
-// on the Mods page over the tabs, on a mod's words (its own over Classic's) or Classic's:
+// on the Mods page over the tabs, on a mod's words (its own over Classic's, Classic's if none):
 // each line listed by what it is about, the one picked typed into at the top, Classic's
 // beside it, its placeholders (%s a name, %d a number) kept, a line that would drop one
 // refused. A Soldat 1 txt/default.txt, or one of its txt/languages/*.txt, can be read into
-// it. Saved, the lines that differ from Classic's are the mod's text/strings.json, and its
-// text is worn; Classic's, which can't be changed, are saved as a mod of their own, My
-// Text (My_Text, then My_Text_2...), as the HUD editor saves a HUD.
+// it. Saved, the lines that differ from Classic's are the mod's text/strings.json, a text
+// part it is given if it hadn't one, and its text is worn.
 Text_Editor :: struct {
 	open:     bool,
-	from:     string, // the mod whose words these are, by its title; "Classic"
-	target:   string, // the mod saved into, by name; "" until Classic's are saved once
+	from:     string, // the mod whose words these are, by its title
+	target:   string, // and by its name, which it saves into
 	lines:    [res.String_Id]string, // as they are being changed
 	saved:    [res.String_Id]string, // as they were opened or last saved
 	classic:  [res.String_Id]string, // Classic's, under every mod's
@@ -36,7 +35,6 @@ Text_Editor :: struct {
 	pick:     Folder_Pick,      // a Soldat 1 text file asked for
 }
 
-TEXT_EDITOR_NAME :: "My_Text" // the mod Classic's words are saved into, the first time: then My_Text_2...
 TEXT_ROW :: 40
 
 // The lines, by what they are about, each group from its first line to its last.
@@ -76,8 +74,8 @@ text_editor_open :: proc(menu: ^Menu, name: string, title: string) {
 		e.lines[id] = strings.clone(worn.lines[id])
 		e.saved[id] = strings.clone(worn.lines[id])
 	}
-	e.from = strings.clone(title if name != "" else "Classic")
-	if name != "" do e.target = strings.clone(name)
+	e.from = strings.clone(title)
+	e.target = strings.clone(name)
 	e.open = true
 	e.picked = .Killed_By
 	set_text(&e.typed, e.lines[e.picked])
@@ -266,20 +264,10 @@ text_editor_leave :: proc(menu: ^Menu) {
 	text_editor_close(menu)
 }
 
-// The lines that differ from Classic's written as the mod's text (a new mod's, made as
-// Classic's are first saved), and its text worn.
+// The lines that differ from Classic's written as the mod's text, and its text worn.
 @(private = "file")
 text_editor_save :: proc(menu: ^Menu) {
 	e := &menu.texts
-	if e.target == "" {
-		name := TEXT_EDITOR_NAME
-		for n := 2; res.mod_exists(res.MODS_DIR, name); n += 1 do name = fmt.tprintf("%s_%d", TEXT_EDITOR_NAME, n)
-		if problem := res.mod_new(res.MODS_DIR, name); problem != "" {
-			editor_note(e, fmt.tprintf("Not saved: %s", problem), true)
-			return
-		}
-		e.target = strings.clone(name)
-	}
 	own: [res.String_Id]string
 	for id in res.String_Id do if e.lines[id] != e.classic[id] do own[id] = e.lines[id]
 	if problem := res.mod_text_write(res.MODS_DIR, e.target, own); problem != "" {
@@ -288,7 +276,7 @@ text_editor_save :: proc(menu: ^Menu) {
 	}
 	for id in res.String_Id do set_text(&e.saved[id], e.lines[id])
 	e.leaving = false
-	editor_note(e, fmt.tprintf("Saved into %s, and worn.", e.target), false)
+	editor_note(e, fmt.tprintf("Saved into %s, and worn.", e.from), false)
 	mods_relist(&menu.mods)
 	parts: [res.Part]string
 	for part in res.Part do parts[part] = worn_from(menu, part)
