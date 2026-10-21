@@ -15,13 +15,16 @@ import res "../../../core/resources"
 import "../../../core/utils"
 
 // The mods' catalogue: what the mods repository publishes (soldatreloaded-mods), its
-// index (the client config's network.mods_index, a mods.json) listing each mod's newest
-// version, where its zip is, its size and SHA-256. The index, and a mod installed from
-// it, each come on a thread of their own, so a frame never waits on the web or on the
-// disk: a mod's zip is fetched, checked against its SHA-256 and that it is a zip,
-// written hidden in mods/, and only then put in its place as it is, mods/<name>.smod,
-// over the version that was there (and the folder an install of before unpacked it
-// into). One mod is installed at a time. The Mods page reads it; nothing here draws.
+// index (the client config's network.mods_index, a mods.json of format 2) listing each
+// mod's newest version, what parts it changes, where its .srmod is, its size and SHA-256.
+// The index, and a mod installed from it, each come on a thread of their own, so a frame
+// never waits on the web or on the disk: a mod's .srmod is fetched, checked against its
+// SHA-256 and that it is a zip, written hidden in mods/, and only then unpacked into its
+// folder as it is, mods/<name>/, over the version that was there (res.mod_unpack, its
+// mod.json saying that name). One mod is installed at a time. The Mods page reads it;
+// nothing here draws.
+
+CATALOG_FORMAT :: 2 // the index's layout this game reads: each mod a .srmod
 
 Catalog_State :: enum {
 	Idle,     // never asked
@@ -39,6 +42,7 @@ Catalog_Mod :: struct {
 	description: string,
 	licence:     string,
 	source:      string,
+	parts:       []string, // what it changes, by part ("soldier", "sounds"), as its mod.json says
 	url:         string,
 	size:        int,
 	sha256:      string,
@@ -116,7 +120,7 @@ catalog_pump :: proc(c: ^Catalog) {
 		mods:   []Catalog_Mod,
 	}
 	index: Index
-	if err := json.unmarshal(f.body, &index); err != nil || index.format != 1 {
+	if err := json.unmarshal(f.body, &index); err != nil || index.format != CATALOG_FORMAT {
 		catalog_fail(c, "the mods' index isn't one this game reads")
 		return
 	}
@@ -177,7 +181,7 @@ install_progress :: proc(i: ^Install) -> (state: Install_State, done: f32) {
 	return state, clamp(done, 0, 1)
 }
 
-// The version of the player's mod `name` in `mods_dir`, as its about.json says; empty if
+// The version of the player's mod `name` in `mods_dir`, as its mod.json says; empty if
 // it has none, or isn't there.
 installed_version :: proc(mods_dir, name: string) -> string {
 	return res.mod_version(mods_dir, name)
@@ -299,6 +303,8 @@ catalog_mod_clone :: proc(m: Catalog_Mod) -> Catalog_Mod {
 	for &s in ([]^string{&c.name, &c.title, &c.version, &c.author, &c.description, &c.licence, &c.source, &c.url, &c.sha256}) {
 		s^ = strings.clone(s^)
 	}
+	c.parts = make([]string, len(m.parts))
+	for part, i in m.parts do c.parts[i] = strings.clone(part)
 	return c
 }
 
@@ -307,4 +313,6 @@ catalog_mod_free :: proc(m: Catalog_Mod) {
 	for s in ([]string{m.name, m.title, m.version, m.author, m.description, m.licence, m.source, m.url, m.sha256}) {
 		delete(s)
 	}
+	for part in m.parts do delete(part)
+	delete(m.parts)
 }

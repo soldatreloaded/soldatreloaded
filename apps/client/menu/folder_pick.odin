@@ -16,7 +16,7 @@ Folder_Pick :: struct {
 }
 
 // The file a mod comes in, as Import .srmod's dialog offers it: our own, zipped. (A .zip
-// or a .smod dropped on the window is still taken: mods_tidy's converting.)
+// of one, the same, dropped on the window is taken too.)
 @(rodata)
 MOD_FILE_PATTERNS := [?]string{"*.srmod"}
 @(rodata)

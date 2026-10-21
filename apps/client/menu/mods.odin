@@ -584,7 +584,7 @@ files_taken :: proc(menu: ^Menu) {
 	for i in 0 ..< int(dropped.count) {
 		path := string(dropped.paths[i])
 		extension := strings.to_lower(filepath.ext(path), context.temp_allocator)
-		if extension == ".zip" || extension == res.SRMOD_EXTENSION || extension == res.MOD_EXTENSION {
+		if extension == ".zip" || extension == res.SRMOD_EXTENSION {
 			job_start(menu, .Unpack, path)
 			return
 		}
@@ -715,6 +715,7 @@ page_catalog :: proc(menu: ^Menu) {
 			room := r.w - PROGRESS_W - 40
 			ui.text_fit(k, ui.LABEL, m.title, r.x + 12, r.y + r.h / 2 - 7, room, ui.TEXT)
 			meta := fmt.tprintf("v%s  -  by %s  -  %.1f MB", m.version, m.author, f32(m.size) / (1024 * 1024))
+			if len(m.parts) > 0 do meta = fmt.tprintf("%s  -  %s", meta, strings.join(m.parts, ", ", context.temp_allocator)) // what it changes, before it is installed
 			ui.text_fit(k, ui.TINY, meta, r.x + 12, r.y + r.h / 2 + 8, room, ui.FAINT)
 		}
 	}

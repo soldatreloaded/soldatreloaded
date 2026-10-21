@@ -114,14 +114,11 @@ soldat_is_install :: proc(dir: string) -> bool {
 	return false
 }
 
-// How a mod is made (mod_import): from a Soldat install, the default; or from a mod of
-// before, whole.
+// How a mod is made (mod_import): from a Soldat install, the default; or from a Soldat 1
+// mod of no install, whole.
 Import_Options :: struct {
-	whole:         bool,        // every file of the first folder goes in, laid out as a Soldat 1 mod: a mod of before
-	base:          bool,        // the install's own folders go in whole, 1.7.1's art as it came too, each file the game reads, Classic's or not: the ground Soldat 1 wore a mod over
-	default_scale: f32,         // pixels to a unit where a mod.ini says none: Soldat 1's 1 (0), our mods of before Classic's 4.5
-	about:         Srmod_About, // what its mod.json says of it beside its name and title
-	description:   string,      // its description; "" for where it was made from
+	whole: bool, // every file of the first folder goes in, laid out as a Soldat 1 mod: a mod of no install
+	base:  bool, // the install's own folders go in whole, 1.7.1's art as it came too, each file the game reads, Classic's or not: the ground Soldat 1 wore a mod over
 }
 
 // What a mod's mod.json says of it, as it is written (srmod_write), beside its name,
@@ -232,7 +229,7 @@ soldat_sources_destroy :: proc(sources: []Soldat_Source, allocator := context.al
 // see-through made alpha, its pixels as they were and its mod.json saying the scale
 // Soldat 1 drew it at (import_file); and the soldier's and the weapons' pivots, from their mod.inis'
 // [GOSTEK], where they differ from Classic's. With `options.whole`, the first folder is a
-// mod of its own, all of it going in (a mod of before, converted: mods_tidy). With
+// mod of its own, all of it going in (a Soldat 1 mod of no install: soldat_import). With
 // `options.base`, the install's own folders go in whole, as Soldat 1 drew them under a
 // mod, each file the game reads and every pivot, Classic's or not: so a mod's art sits
 // among 1.7.1's, not Classic's redrawn, and stays so whatever becomes of Classic.
@@ -246,7 +243,7 @@ mod_import :: proc(dirs: []string, mods_dir, name: string, classic: Mod, title :
 	if problem := mod_name_problem(mods_dir, name); problem != "" do return {problem = problem}
 	if !srmod_name_ok(name) do return {problem = "A mod's name is letters, digits, - and _, 32 at most."}
 	if len(dirs) == 0 do return {problem = "Pick what to make the mod from."}
-	default_scale := options.default_scale if options.default_scale > 0 else 1
+	default_scale :: 1 // where a mod.ini says none, as Soldat 1 draws it
 	stock := stock_load()
 	merged := make(map[string]Layered, 256, context.temp_allocator)
 	anchors := make(map[string]f32, context.temp_allocator)
@@ -305,8 +302,8 @@ mod_import :: proc(dirs: []string, mods_dir, name: string, classic: Mod, title :
 	if result.changed == 0 {
 		return {problem = "Nothing there differs from the game as it came. Put your art and sounds in its folders first."}
 	}
-	description := options.description if options.description != "" else fmt.tprintf("Made from %s, in Soldat 1.7.1.", strings.join(dirs, " and ", context.temp_allocator))
-	if !srmod_write(mods_dir, name, title if title != "" else name, description, entries, scales, options.about) {
+	description := fmt.tprintf("Made from %s, in Soldat 1.7.1.", strings.join(dirs, " and ", context.temp_allocator))
+	if !srmod_write(mods_dir, name, title if title != "" else name, description, entries, scales) {
 		return {problem = "The mod couldn't be written into mods/: is the disk full?"}
 	}
 	log.infof("made the mod %s from %v: %d files that differ from the game's", name, dirs, result.changed)

@@ -1,9 +1,11 @@
 # .srmod: Soldat Reloaded's mods
 
 Being built: the format, Classic laid out as one, wearing mods by part, bringing them in
-from Soldat 1 and from a zip, the mods of before converted, the HUD editor and the text
-editor are done (steps 1 to 4, 6 and 7, below). It replaces the mods of before (folders
-and `.smod`s laid out as Soldat 1's, stacked), which the game converts. How Soldat 1 does
+from Soldat 1 and from a zip, the HUD editor and the text editor are done (steps 1 to 4, 6
+and 7, below); the game reads the catalogue at format 2, which the mods repository is yet
+to publish (step 5). It replaces the mods of before (folders and `.smod`s laid out as
+Soldat 1's, stacked), which the game no longer reads: a breaking change, those it finds put
+aside (The mods of before, below). How Soldat 1 does
 it, which this is measured against and imports from, is [soldat1-mods.md](soldat1-mods.md).
 
 ## Why
@@ -89,9 +91,10 @@ and a `mod.json` of no part, to fill.
 `mod.json` at its root or a folder or two down: what is handed over, and what the
 catalogue serves. The game unpacks it into `mods/<name>/` (`mod_unpack`) as it comes in:
 picked on the Mods page, dropped on the window, installed from the catalogue, or found in
-`mods/` as the game starts (`mods_tidy`), which puts the zip aside in `mods/.old/`. A
-`.zip` or `.smod` without a `mod.json`, of a mod laid out as a Soldat 1 mod's, is
-converted (below); a `.srmod` without one is refused.
+`mods/` as the game starts (`mods_tidy`), which puts the zip aside in `mods/.old/`. One
+without a `mod.json` is refused: nothing is converted. Asked for by its name, as the
+catalogue asks, one whose `mod.json` says another is refused too, so an install never
+takes another mod's place.
 
 ## The parts
 
@@ -252,9 +255,8 @@ On the Mods page's **Install Mods**, beside the catalogue, three buttons:
   on Configure Mods to give it a title.
 - **Import .srmod**: a `.srmod` picked in the system's dialog, which offers nothing else,
   unzipped into its folder as it is (The folder, above); one without a `mod.json` is
-  refused, never converted. A `.srmod`, `.zip` or `.smod` dropped on the game's window, on
-  either tab, is taken too; a `.zip` or `.smod` without a `mod.json` converted as a mod of
-  before is (below). A Soldat 1 mod comes in by Import S1 Mod, not zipped.
+  refused, never converted. A `.srmod` or `.zip` dropped on the game's window, on either
+  tab, is taken the same. A Soldat 1 mod comes in by Import S1 Mod, not zipped.
 - **Import S1 Mod**: a folder of the player's Soldat 1 picked in the system's folder dialog
   (Windows' own; zenity, kdialog or osascript elsewhere), imported on a thread, its
   progress said beside the buttons (`soldat_import`).
@@ -309,12 +311,11 @@ left out. There is no choice about it. Then:
   `font.ini`, anything else no part holds.
 
 **The mods of before**: an `.smod`, or a folder in `mods/` without a `mod.json` laid out as
-a Soldat 1 mod (`gostek-gfx/`, `sfx/`, `mod.ini`...), as this game wore them until now. As
-the game starts each is converted (`old_convert`): all of it goes in, as a Soldat 1 mod of
-`mods/` does, its images at its `mod.ini`'s scales, Classic's 4.5 where it gave none, as
-the game drew them; its `about.json` its `mod.json` (title, version, author, description,
-licence). It keeps its name, so the parts worn from it still are; what it was is put aside
-in `mods/.old/`, and the Mods page says what was done.
+a Soldat 1 mod (`gostek-gfx/`, `sfx/`, `mod.ini`...), as this game wore them up to 0.27.
+The game no longer reads them, nor converts them: a breaking change. As it starts, each it
+finds is put aside in `mods/.old/` as it was, once, and the Mods page says so: a mod of
+the catalogue is installed again from Install Mods, a player's own brought in with Import
+S1 Mod.
 
 ## The catalogue
 
@@ -324,9 +325,10 @@ soldatreloaded-mods keeps a mod as its folder, laid out as above, `mod.json` in 
 the game can show what a mod changes before it is installed, and its `preview` if it has
 one.
 
-Until then the catalogue serves the `.smod`s of before at format 1, and the game converts
-each as it installs it, as it does a mod of before in `mods/`; an update replaces the folder
-once the new one is whole.
+The game reads format 2 alone (`CATALOG_FORMAT`), showing each mod's parts on its row, and
+installs a `.srmod` as it is, its `mod.json` saying the name the index gives it; an update
+replaces the folder once the new one is whole. Until the repository publishes format 2,
+Install Mods says the index isn't one the game reads.
 
 `scripts/check.sh` checks what the game does: `mod.json`, the parts against the folders,
 PNG only, files a part holds, the size limit (150 MB), the soldier's and guns' sizes.
@@ -340,11 +342,11 @@ PNG only, files a part holds, the size limit (150 MB), the soldier's and guns' s
    game drawing from it as before, checked pixel for pixel (the HUD, the soldier, a map).
 3. **Choosing**: `graphics.parts`; the Mods page by part.
 4. **Bringing mods in**: the importer from Soldat 1, interfaces and words included, its art
-   kept at its scales; zips unpacked; the mods of before converted. Tested on the real
+   kept at its scales; zips unpacked; the mods of before put aside. Tested on the real
    thing: a 1.7.1 install, one with art copied over its own, its `mods/`, its interfaces,
    its languages.
-5. **The catalogue**: the three mods published as mods of now; `mods.json` at format 2;
-   the game reading it.
+5. **The catalogue**: the game reading `mods.json` at format 2: done. The repository's
+   mods published as mods of now, and its index at format 2: to do.
 6. **The HUD editor**, on `layout.json`: done.
 7. **The text part and its editor**: done.
 
