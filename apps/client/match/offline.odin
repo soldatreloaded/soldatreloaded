@@ -153,9 +153,11 @@ round_start :: proc(match: ^Match) -> bool {
 
 	soldier := &game.world.soldiers[me]
 	soldier.player.look = look_of(config)
-	my_team := kept if kept == .Alpha || kept == .Bravo else .Alpha
 	match.loadout.primary = .Punch // the secondary the last picked, the config's at the start
-	spawn(game, me, my_team, match.loadout)
+	// on my team; until I've picked one, watching, the team menu up (limbo_tick) as a
+	// server's spectator just joined is asked
+	if kept == .Alpha || kept == .Bravo do spawn(game, me, kept, match.loadout)
+	else do sim.soldier_place(game, me, .Spectator, remote = false)
 	// the bots on their teams, each kept as it was (the config's, /addbot's); the slots
 	// with none let go
 	for id in 1 ..< sim.MAX_PLAYERS {

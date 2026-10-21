@@ -38,6 +38,7 @@ Limbo :: struct {
 	was_dead:   bool,       // as of the tick before
 	died_at:    Maybe(u32), // the tick I died, while the menu waits to come up
 	team_asked: bool,       // the team menu shown since the join, which a new round keeps
+	team:       res.Team,   // the team I was on as of the tick before: a change is a first life again
 }
 
 // The line's texts at `place`, for the frame: a clock's time, from the tick it counts
@@ -303,15 +304,24 @@ weapons_menu_key :: proc(match: ^Match) {
 }
 
 // After each tick: the weapons menu up at my first life and a second after I die, while
-// the round is played or paused, unless the server gives no primary to pick. Online, a spectator just joined is shown the team menu, once.
+// the round is played or paused, unless the server gives no primary to pick; and at the
+// first life on a team changed to. A spectator just joined (online, or offline at the
+// start) is shown the team menu, once.
 limbo_tick :: proc(match: ^Match) {
 	limbo := &match.limbo
 	menus := &match.hud.menus
 	world := &match.game.world
 	me := &world.soldiers[match.me]
-	if match.mode == .Online && me.active && me.team == .Spectator && !limbo.team_asked && .Escape not_in menus.open {
+	if match.mode != .Demo && me.active && me.team == .Spectator && !limbo.team_asked && .Escape not_in menus.open {
 		hud.menus_show(menus, .Team, true)
 		limbo.team_asked = true
+	}
+	// a new team is a new first life: placed on it alive, the weapons menu comes up as it
+	// does at a round's start, whatever its key locked on the team before
+	if me.team != limbo.team {
+		limbo.team = me.team
+		limbo.placed = false
+		limbo.locked = false
 	}
 	if !me.active || me.team == .Spectator do return
 
