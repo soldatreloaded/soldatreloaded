@@ -104,6 +104,7 @@ Match :: struct {
 	record:     Record_Asked,
 	request:    Request, // what a command asked of the client, handed over at the frame's end
 	settings:   bool, // the escape menu's Settings chosen: the settings asked of the client at the frame's end
+	in_settings: bool, // the settings are over the match (match_update's held): my typing dots go up, so the others see I am away
 	zone:       ^datetime.TZ_Region, // the local time zone, the HUD clock's; nil, and the clock is UTC
 }
 
@@ -241,6 +242,7 @@ match_pace :: proc(match: ^Match) -> f64 {
 // on, my soldier standing.
 match_update :: proc(match: ^Match, config: ^res.Client_Config, sounds: ^sound.Sound, ticks: int, alpha, dt: f32, held := false) -> Request {
 	match.request = nil
+	match.in_settings = held
 	draw.camera_fit(&match.camera, draw.view_of(&config.graphics))
 	watch_zoom(match, dt, held) // spectating or a demo: the scroll's zoom over the view's
 	if match.mode != .Offline {

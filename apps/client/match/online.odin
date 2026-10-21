@@ -115,7 +115,7 @@ online_step :: proc(match: ^Match, config: ^res.Client_Config) -> sim.Command {
 	playing := match.mode == .Demo
 	me := &w.soldiers[match.me]
 	if !playing { // my look, my loadout and my typing are mine to say
-		me.player.typing = prompt_up(match)
+		me.player.typing = typing_shown(match)
 		me.player.look = look_of(config)
 		me.loadout = match.loadout
 	} else {

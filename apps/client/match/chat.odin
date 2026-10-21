@@ -544,3 +544,9 @@ emote_wheel_keys :: proc(match: ^Match, config: ^res.Client_Config, before: [2]f
 	if pick, picked := hud.emote_pick(w.pointer); picked do emote(match, EMOTES[pick])
 	w^ = {}
 }
+
+// Whether my typing dots are up over my head for the others: at the prompt, or with the
+// settings open over the match (the wire's typing bit says both).
+typing_shown :: proc(match: ^Match) -> bool {
+	return prompt_up(match) || match.in_settings
+}

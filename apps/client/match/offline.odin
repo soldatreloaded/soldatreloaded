@@ -106,7 +106,7 @@ offline_step :: proc(match: ^Match, config: ^res.Client_Config) -> sim.Command {
 		sim.world_ask_kill(&game.world, match.me, brutal)
 		match.suicide = nil
 	}
-	game.world.soldiers[match.me].player.typing = prompt_up(match)
+	game.world.soldiers[match.me].player.typing = typing_shown(match)
 	names := soldier_names(match)
 	ai.bots_commands(&match.bots, game, &names, &commands)
 	dummies_commands(match, &commands)
