@@ -112,6 +112,31 @@ mod_new :: proc(mods_dir, name: string) -> string {
 	return ""
 }
 
+// The mod `name`'s words: `lines` (those not "") its text/strings.json, and its mod.json
+// listing its text part. Why not, or "".
+mod_text_write :: proc(mods_dir, name: string, lines: [String_Id]string) -> string {
+	path := srmod_path(mods_dir, name)
+	if path == "" do return "It isn't in mods/ any more."
+	for line, id in lines {
+		if line == "" do continue
+		if problem := string_problem(id, line); problem != "" do return fmt.tprintf("%s: %s", STRINGS[id].key, problem)
+	}
+	folder := utils.temp_path(path, PART_NAMES[.Text])
+	if os.make_directory_all(folder) != nil || os.write_entire_file(utils.temp_path(folder, STRINGS_FILE), transmute([]byte)strings_json(lines)) != nil {
+		return "Its text/strings.json couldn't be written."
+	}
+	info_path := utils.temp_path(path, SRMOD_INFO_FILE)
+	text, read := utils.read_file(info_path, context.temp_allocator)
+	info: Srmod_Info
+	if !read || json.unmarshal(text, &info, .JSON, context.temp_allocator) != nil do return "Its mod.json can't be read."
+	for part in info.parts do if strings.equal_fold(part, PART_NAMES[.Text]) do return ""
+	parts := make([dynamic]string, context.temp_allocator)
+	append(&parts, ..info.parts)
+	append(&parts, PART_NAMES[.Text])
+	info.parts = parts[:]
+	return "" if info_write(info_path, info) else "Its mod.json couldn't be written."
+}
+
 // `info` written as the mod.json at `path`, as the game writes one. False, logged, if it
 // can't be.
 @(private)

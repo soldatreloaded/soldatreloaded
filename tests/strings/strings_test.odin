@@ -136,6 +136,39 @@ from_soldat :: proc(t: ^testing.T) {
 	}
 }
 
+// The text editor's save: a mod's words written as its text/strings.json, its mod.json
+// listing its text part then, and read back as it is worn; a line that drops its
+// placeholder refused, nothing written.
+@(test)
+saved :: proc(t: ^testing.T) {
+	dir := scratch(t, "saved")
+	defer os.remove_all(dir)
+	write(utils.temp_path(dir, "classic", "mod.json"), `{"format": 1, "name": "classic", "version": "1.0.0", "parts": ["text"]}`)
+	write(utils.temp_path(dir, "classic", "text", "strings.json"), `{}`)
+	testing.expect_value(t, res.mod_new(dir, "My_Text"), "")
+	lines: [res.String_Id]string
+	lines[.Killed_By] = "Erledigt von %s"
+	lines[.Tie] = "Unentschieden"
+	testing.expect_value(t, res.mod_text_write(dir, "My_Text", lines), "")
+	mod, why, ok := res.srmod_open(utils.temp_path(dir, "My_Text"))
+	testing.expectf(t, ok && mod.parts == {.Text} && len(mod.problems) == 0, "its text part, listed (%s)", why)
+	res.srmod_close(&mod)
+	testing.expect_value(t, res.mod_text_write(dir, "My_Text", lines), "") // again: listed once
+
+	choice: [res.Part]string
+	choice[.Text] = "My_Text"
+	worn := res.mod_make(dir, choice)
+	defer res.mod_destroy(&worn)
+	said := res.strings_load(worn)
+	defer res.strings_destroy(&said)
+	testing.expect(t, said.lines[.Killed_By] == "Erledigt von %s" && said.lines[.Tie] == "Unentschieden" && said.lines[.You_Killed] == "You killed %s", "its lines, and Classic's where it says none")
+
+	lines[.Killed_By] = "Erledigt"
+	testing.expect(t, res.mod_text_write(dir, "My_Text", lines) != "", "a line without its name refused")
+	data, _ := utils.read_file(utils.temp_path(dir, "My_Text", "text", "strings.json"), context.temp_allocator)
+	testing.expect(t, strings.contains(string(data), "Erledigt von %s"), "and nothing written")
+}
+
 // A Soldat 1 mod's txt/default.txt made its text/strings.json by the importer, the lines
 // that differ alone; its other txt/ files left out.
 @(test)

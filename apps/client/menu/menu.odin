@@ -88,6 +88,7 @@ Menu :: struct {
 	taunts:       Taunt_Editor,
 	custom_size:  Custom_Size, // the Graphics tab's resolution typed
 	editor:       Hud_Editor, // the HUD editor, over the whole window while it is open
+	texts:        Text_Editor, // the text editor, over the Mods page's tabs while it is open
 	in_game:      bool, // over a game: its settings alone (IN_GAME_PAGES), and Back to game
 }
 
@@ -172,6 +173,7 @@ menu_destroy :: proc(menu: ^Menu) {
 	offline_destroy(&menu.offline)
 	demos_destroy(&menu.demos)
 	hud_editor_close(menu)
+	text_editor_close(menu)
 	mods_destroy(&menu.mods)
 	delete(menu.servers.search)
 	delete(menu.taunts.text)
@@ -417,6 +419,11 @@ rail_keys :: proc(menu: ^Menu) {
 		go_page(menu, sa.get(pages, to))
 		k.in_page = in_page
 		k.page = 0
+	}
+	// the text editor's, while it is open on the page: Escape leaves it
+	if menu.texts.open && menu.page == .Mods && k.back && k.popup.kind == .None {
+		text_editor_leave(menu)
+		k.back = false
 	}
 	if menu.in_game && k.back {
 		rail_leave(menu)

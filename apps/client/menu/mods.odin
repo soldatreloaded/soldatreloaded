@@ -143,6 +143,10 @@ page_mods :: proc(menu: ^Menu) {
 	im := &mods.import_
 	if soldat_job_take(&im.job) do soldat_job_taken(menu, &im.job)
 	if soldat_job_take(&mods.adding) do soldat_job_taken(menu, &mods.adding)
+	if menu.texts.open {
+		text_editor_page(menu)
+		return
+	}
 
 	if picked := Mods_Tab(ui.tabs(k, TAB_NAMES[:], int(mods.tab))); picked != mods.tab {
 		mods.tab = picked
@@ -259,11 +263,12 @@ classic_details :: proc(menu: ^Menu) {
 		ui.text_mid(k, ui.BODY, state, r.x + r.w - 10 - ui.width_of(k.ui, ui.BODY, state), r.y + r.h / 2, ui.TEXT if from == "" else ui.FAINT)
 	}
 	ui.section(k, "MAKE YOUR OWN")
-	wrapped(k, "Classic can't be changed, but its HUD can begin one of your own in the HUD editor, saved as a mod of a HUD alone.", ui.FAINT)
+	wrapped(k, "Classic can't be changed, but its HUD and its words can begin your own, in the HUD editor and the text editor, each saved as a mod of its own.", ui.FAINT)
 	r := ui.row(k, ui.ROW_H + 6, false)
 	if !r.shown do return
 	x := r.x + 10
 	if button(k, &x, r, "Edit HUD", true) do hud_editor_open(menu, "")
+	if button(k, &x, r, "Edit words", true) do text_editor_open(menu, "", "Classic")
 	if button(k, &x, r, "Open its folder", false) do folder_open(utils.temp_path(res.MODS_DIR, res.MOD_CLASSIC))
 }
 
@@ -354,6 +359,7 @@ mod_details :: proc(menu: ^Menu, listing: ^res.Srmod_Listing) {
 	x := t.x + 10
 	ok := listing.problem == ""
 	if .Hud in listing.parts && ok && button(k, &x, t, "Edit HUD", false) do hud_editor_open(menu, listing.name)
+	if ok && button(k, &x, t, "Edit words", false) do text_editor_open(menu, listing.name, listing.title)
 	if button(k, &x, t, "Open its folder", false) do folder_open(utils.temp_path(res.MODS_DIR, listing.name))
 }
 
@@ -536,7 +542,7 @@ tab_add :: proc(menu: ^Menu) {
 		picking := folder_pick_busy(&mods.file)
 		unpacking := soldat_job_busy(job) && job.kind == .Unpack
 		if button(k, &x, r, "Picking..." if picking else "Pick a file...", true, disabled = picking || soldat_job_busy(job)) {
-			folder_pick_start(&mods.file, "Pick a mod to add", rl.GetWindowHandle(), file = true)
+			folder_pick_start(&mods.file, "Pick a mod to add", rl.GetWindowHandle(), MOD_FILE_PATTERNS[:])
 		}
 		if unpacking do ui.text_fit(k, ui.BODY, fmt.tprintf("Adding %s... %s", filepath.base(job.root), elapsed(rl.GetTime() - job.started)), x + 4, r.y + r.h / 2, r.x + r.w - x - 12, ui.MUTED)
 	}

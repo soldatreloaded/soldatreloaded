@@ -10,23 +10,26 @@ Folder_Pick :: struct {
 	thread: ^thread.Thread,
 	title:  string,
 	owner:  rawptr, // the game's window, the dialog's owner: so it comes up over it
-	file:   bool,   // a mod's file (MOD_FILE_PATTERNS), not a folder
+	files:  []string, // the files to pick from, by their patterns ("*.zip"); nil for a folder
 	done:   bool,   // atomic: the dialog is closed, and `path` may be read
 	path:   string, // the folder or file picked; "" if none was
 }
 
 // The files a mod comes in, as the file dialog offers them.
-MOD_FILE_PATTERNS :: [?]string{"*.zip", "*.srmod", "*.smod"}
+@(rodata)
+MOD_FILE_PATTERNS := [?]string{"*.zip", "*.srmod", "*.smod"}
+@(rodata)
+TEXT_FILE_PATTERNS := [?]string{"*.txt"}
 
-// The dialog up, titled `title`, over the window `owner`: for a folder, or with `file` a
-// mod's file. Nothing if one is up already.
-folder_pick_start :: proc(pick: ^Folder_Pick, title: string, owner: rawptr, file := false) {
+// The dialog up, titled `title`, over the window `owner`: for a folder, or with `files` a
+// file of those patterns (MOD_FILE_PATTERNS). Nothing if one is up already.
+folder_pick_start :: proc(pick: ^Folder_Pick, title: string, owner: rawptr, files: []string = nil) {
 	if pick.thread != nil do return
-	pick.title, pick.owner, pick.file, pick.path = title, owner, file, ""
+	pick.title, pick.owner, pick.files, pick.path = title, owner, files, ""
 	sync.atomic_store(&pick.done, false)
 	pick.thread = thread.create_and_start_with_data(pick, proc(data: rawptr) {
 		p := (^Folder_Pick)(data)
-		p.path, _ = pick_path(p.title, p.owner, p.file)
+		p.path, _ = pick_path(p.title, p.owner, p.files)
 		sync.atomic_store(&p.done, true)
 	})
 }

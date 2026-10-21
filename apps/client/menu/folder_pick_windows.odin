@@ -5,9 +5,9 @@ import "core:strings"
 import win "core:sys/windows"
 
 // Windows' own file dialog (IFileOpenDialog), over `owner`: picking a folder, or with
-// `file` a mod's file. The path picked, with the context allocator; false if the player
+// `files` a file of those patterns. The path picked, with the context allocator; false if the player
 // cancelled it.
-pick_path :: proc(title: string, owner: rawptr, file: bool) -> (path: string, ok: bool) {
+pick_path :: proc(title: string, owner: rawptr, files: []string) -> (path: string, ok: bool) {
 	win.CoInitializeEx(nil, .APARTMENTTHREADED)
 	defer win.CoUninitialize()
 	dialog: ^win.IFileOpenDialog
@@ -15,11 +15,10 @@ pick_path :: proc(title: string, owner: rawptr, file: bool) -> (path: string, ok
 	defer dialog->Release()
 	options: win.FILEOPENDIALOGOPTIONS
 	dialog->GetOptions(&options)
-	if file {
+	if files != nil {
 		dialog->SetOptions(options | win.FOS_FILEMUSTEXIST | win.FOS_FORCEFILESYSTEM)
-		patterns := MOD_FILE_PATTERNS
 		types := [?]win.COMDLG_FILTERSPEC {
-			{win.utf8_to_wstring("Mods", context.temp_allocator), win.utf8_to_wstring(strings.join(patterns[:], ";", context.temp_allocator), context.temp_allocator)},
+			{win.utf8_to_wstring(strings.join(files, " ", context.temp_allocator), context.temp_allocator), win.utf8_to_wstring(strings.join(files, ";", context.temp_allocator), context.temp_allocator)},
 		}
 		dialog->SetFileTypes(len(types), &types[0])
 	} else {
