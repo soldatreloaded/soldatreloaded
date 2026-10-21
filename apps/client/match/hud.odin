@@ -96,6 +96,7 @@ hud_data :: proc(match: ^Match, config: ^res.Client_Config) -> (data: hud.Hud_Da
 			name       = names[id],
 			team       = soldier.team,
 			dead       = soldier.vitals.dead,
+			health     = soldier.vitals.health / sim.DEFAULT_HEALTH,
 			bot        = soldier.player.bot,
 			flag       = carries_flag(world, &soldier),
 			kills      = soldier.tally.kills,
@@ -188,6 +189,7 @@ hud_data :: proc(match: ^Match, config: ^res.Client_Config) -> (data: hud.Hud_Da
 	if interface.show_jitter do data.stats += {.Jitter}
 	data.player_names = interface.player_names
 	data.team_names = interface.team_names
+	data.health_bars = interface.spectator_health
 	data.name_color = rl.Color(interface.name_color)
 	data.carrier_color = rl.Color(interface.carrier_color)
 	data.scoreboard_mute = interface.scoreboard_mute

@@ -66,6 +66,7 @@ tab_interface :: proc(menu: ^Menu) {
 	ui.section(k, "NAMES")
 	ui.toggle(k, "Player names", &config.interface.player_names)
 	ui.toggle(k, "Teammates' names always", &config.interface.team_names)
+	ui.toggle(k, "Health bars when spectating", &config.interface.spectator_health)
 	ui.color_row(k, "Teammate name colour", &config.interface.name_color)
 	ui.color_row(k, "Flag carrier name colour", &config.interface.carrier_color)
 	ui.enum_select(k, "Typing indicator", &config.interface.typing, TYPING_NAMES[:])

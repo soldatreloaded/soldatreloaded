@@ -67,6 +67,7 @@ Hud_Data :: struct {
 	stats_color:  rl.Color,
 	player_names: bool,
 	team_names:   bool, // teammates' names by them always, not only out of view
+	health_bars:  bool, // spectating, each living player's health over its head
 	name_color:   rl.Color, // teammates' names
 	carrier_color: rl.Color, // a teammate carrying the flag
 	scoreboard_mute: bool, // the scoreboard's mute signs, clicked to mute
@@ -95,6 +96,7 @@ Player :: struct {
 	name:   string,
 	team:   res.Team,
 	dead:   bool,
+	health: f32, // its share of sim.DEFAULT_HEALTH
 	bot:    bool,
 	flag:   bool, // carrying the other team's
 	kills:  i32,
