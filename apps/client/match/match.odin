@@ -286,7 +286,7 @@ match_draw :: proc(match: ^Match, u: ^ui.Ui, config: ^res.Client_Config) {
 	area := view.area
 	ui.ui_fit(u, area)
 	sky := draw.sky_of(&match.game.polymap, &config.graphics)
-	draw.minimap_fit(&match.minimap, &match.art, &match.game.polymap, u.scale, sky) // into its own texture: before the scissor
+	draw.minimap_fit(&match.minimap, &match.art, &match.game.polymap, u.scale, sky, draw.map_look_of(&config.graphics)) // into its own texture: before the scissor
 	direct := draw.view_direct(view)
 	if !direct { // into the canvas too, before the scissor
 		draw.canvas_fit(&match.canvas, view.size)

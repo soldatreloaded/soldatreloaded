@@ -98,6 +98,10 @@ tab_graphics :: proc(menu: ^Menu) {
 	ui.toggle(k, "Bullet trails", &graphics.trails)
 	ui.toggle(k, "Show other players as the classic soldier", &graphics.original_soldiers) // every style but mine drawn as the male
 	ui.toggle(k, "Render smooth polygons", &graphics.smooth_polygons) // no edge texture along their outsides
+	ui.slider(k, "Map saturation", &graphics.map_saturation, 0, res.MAP_SATURATION_HIGHEST, 5, "%d%%")
+	ui.slider(k, "Map brightness", &graphics.map_brightness, res.MAP_BRIGHTNESS_LOWEST, res.MAP_BRIGHTNESS_HIGHEST, 5, "%d%%")
+	ui.toggle(k, "Force polygon colour", &graphics.force_polygon_color) // one colour of mine over the texture, the map's opacity kept
+	if graphics.force_polygon_color do ui.color_row(k, "Polygon colour", &graphics.forced_polygon_color)
 	if picked := ui.select_box(k, "Sky", SKY_NAMES[:], nil, 1 if graphics.force_sky else 0); picked >= 0 {
 		graphics.force_sky = picked == 1
 	}

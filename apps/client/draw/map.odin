@@ -22,6 +22,91 @@ sky_of :: proc(polymap: ^res.Poly_Map, graphics: ^res.Graphics_Settings) -> (sky
 	return
 }
 
+// How the player has the map's polygons and their edges drawn: their colours, texture
+// and all, more or less vivid and bright; and their corners in a colour of the player's
+// own over the texture instead of the map's (graphics.force_polygon_color), each corner's
+// opacity the map's.
+Map_Look :: struct {
+	saturation: f32, // 1 as the map has them, 0 grey
+	brightness: f32, // 1 as the map has them
+	forced:     bool,
+	color:      utils.Rgba, // the corners', while forced
+}
+
+map_look_of :: proc(graphics: ^res.Graphics_Settings) -> (look: Map_Look) {
+	look.saturation = f32(clamp(graphics.map_saturation, 0, res.MAP_SATURATION_HIGHEST)) / 100
+	look.brightness = f32(clamp(graphics.map_brightness, res.MAP_BRIGHTNESS_LOWEST, res.MAP_BRIGHTNESS_HIGHEST)) / 100
+	look.forced = graphics.force_polygon_color
+	look.color = graphics.forced_polygon_color
+	return
+}
+
+// A polygon's or an edge's corner's colour as `look` has it.
+map_corner :: proc(look: Map_Look, color: utils.Rgba) -> utils.Rgba {
+	if !look.forced do return color
+	return {look.color.r, look.color.g, look.color.b, color.a}
+}
+
+// Whether `look` changes the colours past the corners': the map's shader is needed.
+@(private = "file")
+look_shaded :: proc(look: Map_Look) -> bool {
+	return look.saturation != 1 || look.brightness != 1
+}
+
+// What is drawn with the map's shader, from the texture and the corner's colour, both
+// premultiplied: the colour greyed or made vivid about its luma, then brightened, and kept
+// within its opacity, as premultiplied colour must be.
+@(private = "file")
+MAP_FRAGMENT_SHADER :: `#version 330
+in vec2 fragTexCoord;
+in vec4 fragColor;
+uniform sampler2D texture0;
+uniform vec4 colDiffuse;
+uniform float saturation;
+uniform float brightness;
+out vec4 finalColor;
+void main() {
+	vec4 c = texture(texture0, fragTexCoord) * colDiffuse * fragColor;
+	float luma = dot(c.rgb, vec3(0.299, 0.587, 0.114));
+	vec3 rgb = mix(vec3(luma), c.rgb, saturation) * brightness;
+	finalColor = vec4(clamp(rgb, 0.0, c.a), c.a);
+}
+`
+
+// The map's shader, made the first time a look needs it, with the look's numbers.
+// raylib's default vertex shader feeds it.
+Map_Shader :: struct {
+	shader:     rl.Shader,
+	saturation: i32, // the uniforms' locations
+	brightness: i32,
+}
+
+// Draws what follows with `look`'s shader, where it needs one: ended by map_shade_end.
+@(private = "file")
+map_shade_begin :: proc(art: ^Art, look: Map_Look) {
+	if !look_shaded(look) do return
+	s := &art.map_shader
+	if s.shader.id == 0 {
+		s.shader = rl.LoadShaderFromMemory(nil, MAP_FRAGMENT_SHADER)
+		s.saturation = rl.GetShaderLocation(s.shader, "saturation")
+		s.brightness = rl.GetShaderLocation(s.shader, "brightness")
+	}
+	saturation, brightness := look.saturation, look.brightness
+	rl.SetShaderValue(s.shader, s.saturation, &saturation, .FLOAT)
+	rl.SetShaderValue(s.shader, s.brightness, &brightness, .FLOAT)
+	rl.BeginShaderMode(s.shader)
+}
+
+@(private = "file")
+map_shade_end :: proc(look: Map_Look) {
+	if look_shaded(look) do rl.EndShaderMode()
+}
+
+map_shader_destroy :: proc(s: ^Map_Shader) {
+	if s.shader.id != 0 do rl.UnloadShader(s.shader)
+	s^ = {}
+}
+
 // The polygons drawn behind everything (the map's background ones) or in front of the
 // soldiers (the rest).
 Polygon_Layer :: enum {
@@ -54,16 +139,19 @@ draw_sky :: proc(sky: Sky, polymap: ^res.Poly_Map, camera: Camera) {
 	rlgl.SetTexture(0)
 }
 
-// The layer's polygons, each corner its own colour over the map's texture.
+// The layer's polygons, each corner its own colour over the map's texture, as `look` has
+// them.
 @(private = "package")
-draw_polygons :: proc(art: ^Art, polymap: ^res.Poly_Map, layer: Polygon_Layer) {
+draw_polygons :: proc(art: ^Art, polymap: ^res.Poly_Map, layer: Polygon_Layer, look: Map_Look) {
+	map_shade_begin(art, look)
+	defer map_shade_end(look)
 	rlgl.SetTexture(art.map_texture.id if art.map_texture.id != 0 else rlgl.GetTextureIdDefault())
 	for &polygon in polymap.polygons {
 		if polygon_layer(polygon) != layer do continue
 		rlgl.CheckRenderBatchLimit(3)
 		rlgl.Begin(rlgl.TRIANGLES)
 		for k in 0 ..< 3 {
-			vertex(polygon.vertices[k], polygon.uvs[k], polygon.colors[k])
+			vertex(polygon.vertices[k], polygon.uvs[k], map_corner(look, polygon.colors[k]))
 		}
 		rlgl.End()
 	}
@@ -139,16 +227,18 @@ edge_strip :: proc(a, b: [2]f32, color_a, color_b: utils.Rgba, size: [2]f32) -> 
 	return
 }
 
-// The edges drawn under the polygons of `layer`.
+// The edges drawn under the polygons of `layer`, as `look` has them.
 @(private = "package")
-draw_edges :: proc(art: ^Art, layer: Polygon_Layer) {
+draw_edges :: proc(art: ^Art, layer: Polygon_Layer, look: Map_Look) {
 	if art.edge_texture.id == 0 do return
+	map_shade_begin(art, look)
+	defer map_shade_end(look)
 	rlgl.SetTexture(art.edge_texture.id)
 	for &edge in art.edges[layer] {
 		rlgl.CheckRenderBatchLimit(4)
 		rlgl.Begin(rlgl.QUADS)
 		uvs := [4][2]f32{{0, 0}, {1, 0}, {1, 1}, {0, 1}}
-		for k in 0 ..< 4 do vertex(edge.corners[k], uvs[k], edge.colors[k])
+		for k in 0 ..< 4 do vertex(edge.corners[k], uvs[k], map_corner(look, edge.colors[k]))
 		rlgl.End()
 	}
 	rlgl.SetTexture(0)
