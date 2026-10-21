@@ -75,11 +75,33 @@ heard_apply :: proc(world: ^World, resources: ^Resources, authority: ^Authority,
 			respawn, is_respawn := w.(Respawn)
 			if is_respawn && placed_already(world, respawn) do continue
 			chosen := world.soldiers[respawn.target].loadout if is_respawn else {}
-			rule(world, resources, w, out)
+			rule_heard(world, resources, w, out, authority)
 			if is_respawn do arm_chosen(world, resources, respawn, chosen, authority)
 		}
 	}
 	if turn == .Things do sa.clear(&world.heard)
+}
+
+// A ruling heard from the server, done as the server did it, but for where the things
+// come up: only the server places a thing (its snapshot brings a kit where it came up,
+// a flag home, and its word of the carrier lets go of it), so a machine without
+// authority leaves that to the snapshot. Done here, it would pick a spawn point with
+// its own random numbers and show the kit there until the snapshot moved it. What is
+// the soldier's it still does: a kit's gift, a capture's tally, a gun out of its slot.
+// Recorded as every ruling is, for the sounds and the feed.
+@(private = "file")
+rule_heard :: proc(world: ^World, resources: ^Resources, ruling: Ruling, out: ^Tick_Output, authority: ^Authority) {
+	if authority != nil {
+		rule(world, resources, ruling, out)
+		return
+	}
+	sa.push_back(&out.rulings, ruling)
+	#partial switch r in ruling {
+	case Flag_Return, Thing_Respawn: // the snapshot brings it where it came up
+	case Flag_Capture: world.soldiers[r.soldier].tally.flags += 1
+	case Pickup:       thing_pick_up_heard(world, r)
+	case:              apply_ruling(world, resources, ruling)
+	}
 }
 
 // Whether the soldier is already alive in the life `respawn` begins.
