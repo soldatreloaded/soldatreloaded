@@ -34,3 +34,16 @@ draw_names :: proc(u: ^ui.Ui, data: ^Hud_Data) {
 		write(u, player.name, {x, y}, WEAPONS_FONT, with_alpha(color, alpha))
 	}
 }
+
+// The winners' names under their gosteks on the end screen's stage (data.stage): each
+// centred under the feet, in the names' lettering and colour, as a name by a player.
+draw_stage_names :: proc(u: ^ui.Ui, data: ^Hud_Data) {
+	h := line_height(u, WEAPONS_FONT)
+	for i in 0 ..< data.stage.count {
+		player := &data.players[data.stage.ids[i]]
+		if !player.active do continue
+		feet := data.stage.feet[i]
+		w := text_width(u, player.name, WEAPONS_FONT)
+		write(u, player.name, {feet.x - w / 2, feet.y + (30 - h) / 2}, WEAPONS_FONT, data.name_color)
+	}
+}

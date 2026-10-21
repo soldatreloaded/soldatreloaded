@@ -302,8 +302,13 @@ match_draw :: proc(match: ^Match, u: ^ui.Ui, config: ^res.Client_Config) {
 	} else {
 		draw.canvas_show(&match.canvas, area)
 	}
-	draw.draw_victory(&match.art, match.game, area, rl.GetTime()) // the winners' stage, over the frozen field
+	spots := draw.draw_victory(&match.art, match.game, area, rl.GetTime()) // the curtain and the winners' stage, over the frozen field
 	data := hud_data(match, config)
+	data.stage.count = spots.count // the winners' feet, in the HUD's units, for their names
+	for i in 0 ..< spots.count {
+		data.stage.ids[i] = spots.ids[i]
+		data.stage.feet[i] = (spots.feet[i] - {area.x, area.y}) / u.scale
+	}
 	rlgl.PushMatrix() // the HUD's units are from the view's top-left
 	rlgl.Translatef(area.x, area.y, 0)
 	hud.hud_draw(u, &match.hud, &data, &match.minimap)

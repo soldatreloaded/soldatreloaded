@@ -113,6 +113,7 @@ hud_draw :: proc(u: ^ui.Ui, hud: ^Hud, data: ^Hud_Data, minimap: ^draw.Minimap) 
 	board_bottom: f32
 	if hud.scoreboard && !summary do board_bottom = draw_scoreboard_box(u, art, data)
 	if summary do draw_round_summary(u, data) // the end screen, under the menus
+	if data.ended do draw_stage_names(u, data) // the winners' names under their gosteks
 	draw_menu_boxes(u, art, menus, data)
 	draw_vote_box(u, art, data)
 	if !summary do draw_team_box(u, art, data)

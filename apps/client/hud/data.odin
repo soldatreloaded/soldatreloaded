@@ -20,6 +20,7 @@ Hud_Data :: struct {
 	paused:       bool,
 	ended:        bool, // over, its scores standing until the next
 	ended_fade:   f32,  // how far the end screen has come in over the field, 0 to 1 (draw.victory_fade)
+	stage:        Stage, // where the winners stand on the end screen's stage, for their names
 	hostname:     string, // the server's, over the scoreboard
 
 	// everyone, me among them
@@ -193,4 +194,12 @@ Emote_Wheel :: struct {
 	open:    bool,
 	pointer: [2]f32, // in units from the wheel's middle
 	pick:    int,    // of EMOTE_LABELS; -1 for none
+}
+
+// The winners on the end screen's stage (draw.draw_victory): each one's feet, in the
+// HUD's units, where their name is written under them.
+Stage :: struct {
+	count: int,
+	ids:   [sim.MAX_PLAYERS]sim.Soldier_Id,
+	feet:  [sim.MAX_PLAYERS][2]f32,
 }
