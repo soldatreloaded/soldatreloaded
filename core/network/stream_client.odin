@@ -65,6 +65,7 @@ Client_Stream :: struct {
 	view_at:      u32,  // the tick the next begin_tick shows, its clock passed over, 0 for the clock's: a demo's, as recorded
 	round:        u16,  // the round I am in (Msg_Map); snapshots of another are dropped
 	stats:        Client_Stream_Stats,
+	eats:         Eats, // my hits here the server never awarded, counted (eats.odin)
 }
 
 // What the client's end has seen of the line, counted: none of it steers the stream.
@@ -425,9 +426,11 @@ frame_on_show_apply :: proc(c: ^Client_Stream, g: ^game.Game, me: game.Soldier_I
 	}
 }
 
-// After the client's tick: its own decisions among the tick's events, for the server.
+// After the client's tick: its own decisions among the tick's events, for the server;
+// and its hits and the server's damage, to count the eats.
 client_stream_collect :: proc(c: ^Client_Stream, g: ^game.Game, me: game.Soldier_Id) {
 	wire_collect(&c.out, &g.output, g.world.tick - 1, me) // the tick just run
+	eats_tick(&c.eats, c, g, me)
 }
 
 // Each frame: the offsets ease away, nine tenths of a correction gone `seconds` after

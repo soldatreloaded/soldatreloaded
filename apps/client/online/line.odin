@@ -158,6 +158,7 @@ line_disconnect :: proc(n: ^Line) {
 		return
 	}
 	if n.link.host == nil do return
+	eats_log(n)
 	network.net_close(&n.link)
 	n.state = .Off
 	n.vote = {}
@@ -391,6 +392,7 @@ heard :: proc(n: ^Line, game: ^sim.Game, data: []u8) {
 		m: network.Msg_Map
 		network.msg_map(&b, &m)
 		if !network.buffer_done(&b) do return
+		eats_log(n) // the round's that ends, on its own map, before they are let go of
 		n.round = m.round
 		n.map_name = m.map_name
 		n.hostname = m.hostname
@@ -477,6 +479,22 @@ line_quiet :: proc(n: ^Line, slot: sim.Soldier_Id) -> bool {
 }
 
 Stream_Stats :: network.Client_Stream_Stats
+Eat_Stats :: network.Eat_Stats
+eats_total :: network.eats_total
+
+// The round's eats, to the log, if I hit anyone in it: my hits on my screen the server
+// never awarded, and why (network.eats_said), to measure the line by.
+@(private = "file")
+eats_log :: proc(n: ^Line) {
+	s := n.stream.eats.stats
+	if s.hits == 0 && s.unseen == 0 do return
+	log.infof("eats this round on %s: %s", utils.short_string_text(&n.map_name), network.eats_said(s))
+}
+
+// My hits on my screen this round, and the eats among them (eats_log).
+line_eats :: proc(n: ^Line) -> network.Eat_Stats {
+	return n.stream.eats.stats
+}
 
 // What the stream has seen of the line, counted.
 line_stats :: proc(n: ^Line) -> Stream_Stats {

@@ -216,6 +216,45 @@ server's counts the states it dropped (ServerStream). The headless tests hold th
 (tests/rewind_test.c), the streams and their sizes (tests/stream_test.c). Every commit
 that changes the netcode says what it measured, on what line.
 
+**Eats**, hits my own bullets made on my screen that the server never awarded, are
+counted on the client (core/network/eats.odin): each Hit of mine with damage waits for
+the server's Damage of it on that soldier, a round trip and the view's lead behind the
+newest snapshot and half a second more, and one left waiting is an eat, put down to the
+first of: the target died or came back meanwhile; the shot past the server's history or
+its catch-up, by my ping; the target shown from an older word, stepped on; none of these.
+A Damage come before my hit of it (the server's bullet met the soldier a tick or two
+before mine did) waits a quarter second for it. One matched by no hit here is counted too
+("unseen"). `cl_netstats` says the hits and eats of each second, and the log the round's,
+by cause, as it ends.
+
+tests/network/eats_test.odin fires an AK at a target that runs, jumps and jets at random
+(or strafes, its keys changed every few ticks) over lines made up in the test, and,
+knowing both worlds, also says what truly caused each eat: the target the client had was
+the server's of that tick yet judged there against another ("server frame"), the
+server's of another tick ("view off"), stepped on from an older word, or the tick's word
+and still not the server's ("diverged": a frame's keys changed, which the client steps on
+the old). Measured over five minutes a line (`-define:EATS_MINUTES=5`), eats of hits:
+
+| Line | Catch-up 30 ticks | Catch-up 64 (the history's) |
+|---|---|---|
+| 50 ms each way | 0 of 836 | 0 of 836 |
+| 50 ms, jitter of 3 ticks | 0 of 807 | 0 of 807 |
+| 50 ms, 5% loss | 2 of 919 | 2 of 919 |
+| 300 ms each way, 1% loss | 133 of 824 | 1 of 835 |
+| 50 ms, 10% loss, jitter of 3 | 0 of 861 | 0 of 861 |
+| jitter of 3, strafing target | | 1 of 947 |
+| 5% loss, strafing target | | 4 of 1016 |
+
+The rewind lines up with the client's view exactly; the catch-up's half second, past
+which a shot was judged against frames too late, was the eats at a high ping, and is now
+the history's second. Judging a client's shot against the others as a client steps them
+(the frame before on its last keys, rather than the server's frame, which a key pressed
+in it moved) matched the client's view on 99% of ticks rather than 83%, and changed no
+count beyond the noise: the difference is a fraction of a unit, inside a body. It doubled
+the server's stepping of the soldiers, and was not kept. Nor was a shot carrying the word
+each soldier it met was stepped from: at 10% loss, a third of the ticks stepped, none was
+eaten. What is left is one hit or so in a thousand, with no cause in common.
+
 ## The order of work
 
 1. The simulation from the port-simulation branch onto main: bullets and their
@@ -254,7 +293,7 @@ that changes the netcode says what it measured, on what line.
    owner is never sent its own back. A packet carries the events past the other side's
    acknowledgement, capped, each with its seq and the tick it happened; the receiver
    applies each once into the game's mailbox, and a shot heard is run forward from its
-   tick to now, at most half a second. A client's word about anyone but itself is
+   tick to now, at most as far back as the history keeps (a second; half, as first built). A client's word about anyone but itself is
    dropped. The client's tick keeps to the server's from the snapshots. Measured on
    the loopback: a client's shots made on the server and numbered as its own, a bot's
    shots made on the client with its count in step, the server's wounds heard by the
