@@ -230,11 +230,17 @@ recording_follow :: proc(match: ^Match) {
 		r.round_recorded = true
 	}
 	if demo.recording(&match.recorder) && !online.line_live(n) do recording_stop(match)
+	// every message the line brings goes to the recording and the clips (recording_tap)
+	n.tap = recording_tap
+	n.tap_user = match
+	if online.line_live(n) do clips_follow(match)
+	else do clips_drop(match)
 	demo.recorder_frame(&match.recorder)
 }
 
-// After my tick, my part of it.
+// After my tick, my part of it: into the recording, and the clips.
 recording_tick :: proc(match: ^Match, view: u32, command: sim.Command) {
+	clips_tick(match, view, command)
 	if !demo.recording(&match.recorder) do return
 	me := &match.game.world.soldiers[match.me]
 	demo.recorder_tick(&match.recorder, view, command, match.input.cursor, me if me.active else nil)
@@ -246,7 +252,6 @@ recording_stop :: proc(match: ^Match) {
 	path := strings.clone(r.path, context.temp_allocator)
 	ticks := r.ticks
 	demo.recorder_close(r)
-	match.line.tap = nil
 	client_say(match, "Demo saved: %s (%s)", path, demo.ticks_text(ticks))
 }
 
@@ -265,19 +270,21 @@ recording_start :: proc(match: ^Match, name: string) {
 		return
 	}
 	demo.recorder_join(&match.recorder, n)
-	n.tap = recording_tap
-	n.tap_user = match
 	client_say(match, "Recording demo: %s", path)
 }
 
-// Every message the line brings, into the recording. A Map ends it: the round it was of
-// is over, and record_rounds begins the next.
+// Every message the line brings, into the recording and the clips. A Map ends them: the
+// round they were of is over, and record_rounds begins the next.
 @(private = "file")
 recording_tap :: proc(user: rawptr, data: []u8, kind: network.Msg_Kind) {
 	match := cast(^Match)user
 	#partial switch kind {
-	case .Map:      recording_stop(match)
+	case .Map:
+		recording_stop(match)
+		clips_drop(match)
 	case .Map_Part: // a map being fetched is no part of the game
-	case:           demo.recorder_packet(&match.recorder, data)
+	case:
+		demo.recorder_packet(&match.recorder, data)
+		clips_packet(match, data)
 	}
 }
