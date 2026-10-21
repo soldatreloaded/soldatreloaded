@@ -100,6 +100,7 @@ Match :: struct {
 	quality:    Line_Seen,
 	playback:   Playback, // a demo playing
 	recorder:   demo.Recorder, // online: the game recorded
+	clips:      Clips, // online: the last seconds kept in memory, for the clip key
 	record:     Record_Asked,
 	request:    Request, // what a command asked of the client, handed over at the frame's end
 	settings:   bool, // the escape menu's Settings chosen: the settings asked of the client at the frame's end
@@ -196,6 +197,7 @@ match_join :: proc(match: ^Match, n: ^online.Line, config: ^res.Client_Config, m
 
 match_end :: proc(match: ^Match) {
 	recording_stop(match)
+	clips_drop(match)
 	if match.line != nil {
 		match.line.tap = nil
 		match.line.tap_user = nil

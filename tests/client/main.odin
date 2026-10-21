@@ -352,6 +352,69 @@ demo_caps_found :: proc(t: ^testing.T) {
 	testing.expectf(t, caps[1].tick >= bravo_at && caps[1].tick < bravo_at + 30, "bravo's when it came: %d, scored at %d", caps[1].tick, bravo_at)
 }
 
+// A clip's recording, kept in memory: saved part way, it is a demo as any, its world made
+// from its Map and its ticks as many as were kept; and it records on after the save.
+@(test)
+demo_clip_saved :: proc(t: ^testing.T) {
+	PATH :: "test_demos/clip.srdm"
+	defer os.remove_all("test_demos")
+	s := new(Session)
+	defer free(s)
+	testing.expect(t, session_open(s))
+	defer session_close(s)
+	testing.expect(t, until(s, joined))
+	for _ in 0 ..< 30 do pump(s) // a round under way, a clip begun in it
+
+	recorder := new(demo.Recorder)
+	defer free(recorder)
+	defer demo.recorder_close(recorder)
+	header := demo.Header{date = 1234, slot = u8(s.n.slot), map_name = s.n.map_name}
+	demo.recorder_open_memory(recorder, header)
+	testing.expect(t, demo.recording(recorder), "recording in memory")
+	demo.recorder_join(recorder, &s.n)
+	s.recorder = recorder
+	s.n.tap = proc(user: rawptr, data: []u8, kind: network.Msg_Kind) {
+		if kind != .Map && kind != .Map_Part do demo.recorder_packet((^demo.Recorder)(user), data)
+	}
+	s.n.tap_user = recorder
+	for _ in 0 ..< 90 do pump(s)
+	kept := recorder.ticks
+	testing.expect(t, demo.recorder_save(recorder, PATH), "the clip is written")
+	for _ in 0 ..< 10 do pump(s)
+	testing.expect(t, recorder.ticks > kept, "and records on")
+	s.n.tap = nil
+	s.recorder = nil
+
+	player := new(demo.Player)
+	defer free(player)
+	why, opened := demo.player_open(player, PATH)
+	testing.expectf(t, opened, "the clip opens: %s", why)
+	defer demo.player_close(player)
+	testing.expect_value(t, player.header.ticks, kept)
+	g := new(game.Game)
+	defer free(g)
+	testing.expect(t, game.game_init(g, game.DEFAULT_GAME_SETTINGS, authority = false))
+	defer game.game_destroy(g)
+	n := &s.n
+	online.line_play(n, game.Soldier_Id(player.header.slot))
+	made := false
+	ticks: u32
+	loop: for {
+		switch record in demo.player_next(player) {
+		case []u8:
+			online.line_feed(n, g if made else nil, record)
+		case demo.Frame:
+			if online.line_take_map(n) do made = game.game_start_round(g, utils.short_string_text(&n.map_name), seed = 1, data_dir = n.map_dir)
+		case ^demo.Tick:
+			ticks += 1
+		case nil:
+			break loop
+		}
+	}
+	testing.expect(t, made, "its world made from its Map")
+	testing.expect_value(t, ticks, kept)
+}
+
 // The browser's queries: a server on the list asked what it plays, and answering.
 @(test)
 browser_asks :: proc(t: ^testing.T) {

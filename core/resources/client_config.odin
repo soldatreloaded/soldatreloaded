@@ -323,7 +323,10 @@ Network_Settings :: struct {
 
 Demo_Settings :: struct {
 	record_rounds: bool `jsoncomment:"a demo of every round joined, into demos/"`,
+	clip_seconds:  i32 `jsoncomment:"the clip key (clip) saves about this many seconds of the game just played as a demo, into demos/: 10 to 120; 0 keeps none, and no clip is taken"`,
 }
+
+CLIP_SECONDS_MAX :: 120
 
 // Offline Play: capture the flag against bots, on this machine and no other, with no
 // server. Its limits, its bots and its maps.
@@ -422,6 +425,7 @@ DEFAULT_CLIENT_CONFIG := Client_Config {
 		discord         = true,
 	},
 	sound = {volume = 50, levels = SOUND_LEVELS_DEFAULT},
+	demos = {clip_seconds = 30},
 	network = {server = "127.0.0.1:23073", lobby = LOBBY_URL, mods_index = MODS_INDEX_URL, smooth = 100},
 	offline = {time_limit = 15, capture_limit = 10, respawn_time = 2, max_grenades = 2, aimbot_miss_chance = 5, bots = {difficulty = 100, chat = true}},
 	radio = {
@@ -457,6 +461,7 @@ DEFAULT_BINDS := [?][2]string {
 	{"f9", "togglewindow"},
 	{"f7", "minimize"},
 	{"f10", "togglerecord"},
+	{"f5", "clip"},
 	{"f6", "demo_pause"},
 	{"f8", "demo_fast"},
 	{"leftarrow", "demo_tick_r -600"},

@@ -14,11 +14,36 @@ import "../online"
 // ticks.
 
 Recorder :: struct {
-	file:     ^os.File, // nil while not recording
+	file:     ^os.File, // nil while not recording into a file
 	path:     string,
 	name:     string, // the file's, without its directory or extension: the scoreboard shows it
 	ticks:    u32,
 	unframed: bool,   // packets written since the last frame mark
+	// or kept in memory, a clip's (recorder_open_memory): its records, after `header`,
+	// until recorder_save writes them out
+	memory:   bool,
+	header:   Header,
+	records:  [dynamic]u8,
+}
+
+// A recording kept in memory with `header`, for recorder_save to write out whenever it is
+// wanted: the match's clips, the last seconds of the game.
+recorder_open_memory :: proc(r: ^Recorder, header: Header) {
+	recorder_close(r)
+	r^ = {memory = true, header = header}
+}
+
+// The memory recording so far written to `path`, a demo as any: its header with the
+// ticks so far. It records on. False if it couldn't be written.
+recorder_save :: proc(r: ^Recorder, path: string) -> bool {
+	if !r.memory do return false
+	os.make_directory_all(filepath.dir(path))
+	data := make([]u8, HEADER_SIZE + len(r.records), context.temp_allocator)
+	header := r.header
+	header.ticks = r.ticks
+	header_write(data, &header)
+	copy(data[HEADER_SIZE:], r.records[:])
+	return utils.write_file(path, data)
 }
 
 // A file begun at `path` with `header` (its ticks set as it closes). False, with nothing
@@ -40,13 +65,13 @@ recorder_open :: proc(r: ^Recorder, path: string, header: Header) -> bool {
 }
 
 recording :: proc(r: ^Recorder) -> bool {
-	return r.file != nil
+	return r.file != nil || r.memory
 }
 
 // The round as the client has it, mid-way: the server's weapons, its Map, its vote, its
 // scripts' texts in the world, and the snapshots in hand.
 recorder_join :: proc(r: ^Recorder, n: ^online.Line) {
-	if r.file == nil do return
+	if !recording(r) do return
 	buf: [network.MTU]u8
 	if weapons, heard := n.weapons.?; heard { // before the world they are played in
 		m := network.Msg_Weapons{weapons = weapons}
@@ -70,14 +95,14 @@ recorder_join :: proc(r: ^Recorder, n: ^online.Line) {
 }
 
 recorder_packet :: proc(r: ^Recorder, data: []u8) {
-	if r.file == nil || data == nil do return
+	if !recording(r) || data == nil do return
 	record(r, .Packet, data)
 	r.unframed = true
 }
 
 // The frame's packets are in; nothing is written if there were none.
 recorder_frame :: proc(r: ^Recorder) {
-	if r.file == nil || !r.unframed do return
+	if !recording(r) || !r.unframed do return
 	record(r, .Frame, nil)
 	r.unframed = false
 }
@@ -85,7 +110,7 @@ recorder_frame :: proc(r: ^Recorder) {
 // After my tick: the tick on show, my command, my cursor; `me` my soldier, nil if it
 // isn't in the game.
 recorder_tick :: proc(r: ^Recorder, view: u32, command: sim.Command, cursor: utils.Vec2, me: ^sim.Soldier) {
-	if r.file == nil do return
+	if !recording(r) do return
 	t := new(Tick, context.temp_allocator)
 	t.head = {view = view, command = command, cursor = cursor, present = me != nil}
 	if me != nil do t.self = me^
@@ -99,7 +124,12 @@ recorder_tick :: proc(r: ^Recorder, view: u32, command: sim.Command, cursor: uti
 
 // The ticks written into the header, and the file closed.
 recorder_close :: proc(r: ^Recorder) {
-	if r.file == nil do return
+	if r.memory {
+		delete(r.records)
+		r^ = {}
+		return
+	}
+	if !recording(r) do return
 	ticks: [4]u8
 	put_u32(ticks[:], r.ticks)
 	if _, err := os.seek(r.file, TICKS_AT, .Start); err == nil do os.write(r.file, ticks[:])
@@ -115,6 +145,11 @@ record :: proc(r: ^Recorder, kind: Record_Kind, data: []u8) {
 	head: [3]u8
 	head[0] = u8(kind)
 	put_u16(head[1:], u16(len(data)))
+	if r.memory {
+		append(&r.records, ..head[:])
+		append(&r.records, ..data)
+		return
+	}
 	os.write(r.file, head[:])
 	if len(data) > 0 do os.write(r.file, data)
 }

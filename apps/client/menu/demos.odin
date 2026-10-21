@@ -23,6 +23,13 @@ Demos :: struct {
 }
 
 DEMO_ROW :: 20
+
+// The clip lengths offered, in seconds; 0 keeps no clips. A config's own between them
+// stays until one is picked.
+@(rodata)
+CLIP_CHOICES := [?]i32{0, 15, 30, 60, 120}
+@(rodata)
+CLIP_CHOICE_NAMES := [?]string{"Off", "15s", "30s", "1m", "2m"}
 SCROLL_DEMOS :: ui.SCROLL_PAGE + 3
 
 demos_destroy :: proc(demos: ^Demos) {
@@ -47,8 +54,17 @@ page_demos :: proc(menu: ^Menu) {
 
 	record := &menu.config.demos.record_rounds
 	if ui.chip(k, x, y, "Record every game", record^) do record^ = !record^
+	// the clip key's length, as chips after it: how much of the game it saves
+	cx := x + ui.chip_w(k, "Record every game") + 20
+	ui.text_mid(k, ui.BODY, "Clip length", cx, y + ui.CTRL_H / 2, ui.MUTED)
+	cx += ui.width_of(u, ui.BODY, "Clip length") + 8
+	clip := &menu.config.demos.clip_seconds
+	for choice, i in CLIP_CHOICES {
+		if ui.chip(k, cx, y, CLIP_CHOICE_NAMES[i], clip^ == choice) do clip^ = choice
+		cx += ui.chip_w(k, CLIP_CHOICE_NAMES[i]) + 6
+	}
 	counted := "1 demo" if n == 1 else fmt.tprintf("%d demos", n)
-	ui.text_mid(k, ui.BODY, counted, x + w - ui.width_of(u, ui.BODY, counted), y + ui.CTRL_H / 2, ui.FAINT)
+	if cw := ui.width_of(u, ui.BODY, counted); x + w - cw > cx + 10 do ui.text_mid(k, ui.BODY, counted, x + w - cw, y + ui.CTRL_H / 2, ui.FAINT)
 	y += ui.CTRL_H + 12
 
 	// the columns, from the right: date, length, player, map; the name has the rest
