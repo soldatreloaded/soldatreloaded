@@ -24,15 +24,18 @@ Minimap :: struct {
 	offset: [2]f32,             // the world's top-left, which is its top-left
 	pixels: f32,                // the window's pixels to a unit it was drawn for
 	sky:    Sky,                // and the sky it was drawn with
+	look:   Map_Look,           // and the polygons' look
 }
 
-// The minimap of the map drawn with `art` under `sky`, for a window of `pixels` pixels to
-// a unit: drawn now, unless it was already for that window and that sky.
-minimap_fit :: proc(minimap: ^Minimap, art: ^Art, polymap: ^res.Poly_Map, pixels: f32, sky: Sky) {
-	if minimap.pixels == pixels && minimap.sky == sky do return
+// The minimap of the map drawn with `art` under `sky`, its polygons as `look` has them,
+// for a window of `pixels` pixels to a unit: drawn now, unless it was already for that
+// window, that sky and that look.
+minimap_fit :: proc(minimap: ^Minimap, art: ^Art, polymap: ^res.Poly_Map, pixels: f32, sky: Sky, look: Map_Look) {
+	if minimap.pixels == pixels && minimap.sky == sky && minimap.look == look do return
 	minimap_destroy(minimap)
 	minimap.pixels = pixels
 	minimap.sky = sky
+	minimap.look = look
 	low, high := map_bounds(polymap)
 	extent := high - low
 	minimap.scale = MINIMAP_SPAN / (extent.x + extent.y)
@@ -49,8 +52,8 @@ minimap_fit :: proc(minimap: ^Minimap, art: ^Art, polymap: ^res.Poly_Map, pixels
 	rlgl.DisableBackfaceCulling()
 	draw_sky_beyond(sky, polymap, low, high)
 	draw_sky(sky, polymap, {pos = low + extent / 2, view = extent})
-	draw_polygons(art, polymap, .Background)
-	draw_polygons(art, polymap, .Terrain)
+	draw_polygons(art, polymap, .Background, look)
+	draw_polygons(art, polymap, .Terrain, look)
 	rl.EndBlendMode()
 	rlgl.EnableBackfaceCulling()
 	rl.EndMode2D()

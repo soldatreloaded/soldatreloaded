@@ -26,6 +26,7 @@ Art :: struct {
 	map_texture:   rl.Texture2D,  // none where the mod hasn't the map's: the polygons are their colours alone
 	edge_texture:  rl.Texture2D,  // the polygons' outer edges' (map.odin); none where the mod hasn't one
 	edges:         [Polygon_Layer][]Map_Edge, // the outer edges, by the layer they are drawn under
+	map_shader:    Map_Shader,    // the polygons' and edges' where graphics shade them (map.odin), made when first needed
 	scenery:       []Atlas_Image, // by the map's scenery index; none where the mod hasn't the image
 	scenery_atlas: Atlas,         // the scenery's images
 	sprite_atlas:  Atlas,         // every sprite's image
@@ -87,6 +88,7 @@ art_sprites_load :: proc(art: ^Art, mod: res.Mod) {
 art_destroy :: proc(art: ^Art) {
 	poa_hair_destroy(&art.gostek.poa)
 	free(art.air_animations)
+	map_shader_destroy(&art.map_shader)
 	art_map_destroy(art)
 	atlas_destroy(&art.sprite_atlas)
 	art^ = {}
@@ -113,6 +115,7 @@ draw_world :: proc(art: ^Art, game: ^sim.Game, frame: ^Frame, sparks: ^Sparks, c
 	polymap := &game.polymap
 	seconds := rl.GetTime() // what pulses goes by it
 	sky := sky_of(polymap, graphics)
+	look := map_look_of(graphics)
 	draw_sky_behind(sky, camera)
 	rl.BeginMode2D(camera_raylib(camera, area))
 	rl.BeginBlendMode(.ALPHA_PREMULTIPLY)
@@ -124,8 +127,8 @@ draw_world :: proc(art: ^Art, game: ^sim.Game, frame: ^Frame, sparks: ^Sparks, c
 	}
 
 	draw_sky(sky, polymap, camera)
-	if !graphics.smooth_polygons do draw_edges(art, .Background) // under the polygons, which cover their inner half
-	draw_polygons(art, polymap, .Background)
+	if !graphics.smooth_polygons do draw_edges(art, .Background, look) // under the polygons, which cover their inner half
+	draw_polygons(art, polymap, .Background, look)
 	if graphics.scenery do draw_scenery(art, polymap, .Behind_Map)
 	draw_bullets(&art.bullets, &game.world, frame.alpha, graphics.grenade_color, graphics.trails)
 	draw_soldiers(art, game, frame, graphics.grenade_color, graphics.original_soldiers, me)
@@ -133,8 +136,8 @@ draw_world :: proc(art: ^Art, game: ^sim.Game, frame: ^Frame, sparks: ^Sparks, c
 	draw_sparks(&art.sparks, sparks, frame.alpha)
 	draw_scenery(art, polymap, .Behind_Players)
 	draw_things(&art.things, game, &frame.figures, .Quads, frame.alpha, seconds)
-	if !graphics.smooth_polygons do draw_edges(art, .Terrain)
-	draw_polygons(art, polymap, .Terrain)
+	if !graphics.smooth_polygons do draw_edges(art, .Terrain, look)
+	draw_polygons(art, polymap, .Terrain, look)
 	draw_scenery(art, polymap, .In_Front)
 	if graphics.hitboxes do draw_hitboxes(game, frame)
 }

@@ -109,6 +109,11 @@ Control_Settings :: struct {
 SENSITIVITY_LOWEST :: 0.1
 SENSITIVITY_HIGHEST :: 5.0
 
+// The map's polygons' saturation and brightness the settings allow, percent.
+MAP_SATURATION_HIGHEST :: 200
+MAP_BRIGHTNESS_LOWEST :: 25
+MAP_BRIGHTNESS_HIGHEST :: 200
+
 Graphics_Settings :: struct {
 	parts:             Part_Choice `jsoncomment:"the mod each part of the game is worn from (the soldier, the weapons, the effects, the objects, the hud, the icons, the sounds, the textures, the fonts, the text), by its name in mods/; empty for Classic's. Chosen on the Mods page, which wears them at once."`,
 	screen_width:      i32 `jsoncomment:"the resolution's width: windowed, the window's; fullscreen, the world is drawn at it and scaled to the screen"`,
@@ -127,6 +132,10 @@ Graphics_Settings :: struct {
 	force_sky:         bool `jsoncomment:"the sky in forced_sky_top and forced_sky_bottom on every map instead of the map's own"`,
 	forced_sky_top:    utils.Rgba `jsoncomment:"the forced sky's colour at the top, RRGGBB"`,
 	forced_sky_bottom: utils.Rgba `jsoncomment:"the forced sky's colour at the bottom, RRGGBB"`,
+	map_saturation:    i32 `jsoncomment:"the map's polygons' colours, percent: 100 as the map has them, 0 grey, up to 200 twice as vivid"`,
+	map_brightness:    i32 `jsoncomment:"the map's polygons' brightness, percent: 100 as the map has them, from 25 to 200"`,
+	force_polygon_color: bool `jsoncomment:"every polygon in forced_polygon_color over its texture instead of the map's own colours, each corner's opacity kept"`,
+	forced_polygon_color: utils.Rgba `jsoncomment:"the forced polygons' colour, RRGGBB; white shows the texture as it is"`,
 	grenade_color:     Maybe(utils.Rgba) `jsoncomment:"the grenades in this colour, RRGGBB, flat and solid; empty for their own art"`,
 	original_soldiers: bool `jsoncomment:"every other player's soldier drawn as Soldat 1's, the male, whatever style its player picked (the female, rat, furry or waifu), a waifu's hair and headgear as his nearest: so a mod made for Soldat 1 looks the same on everyone; your own stays in the style you picked"`,
 	air_wind_up:       Air_Style `jsoncomment:"a jump's wind-up drawn as Soldat 1's (classic) or as the new airborne clips (fluid): what is drawn alone, the game's moves and hitboxes are Soldat 1's either way"`,
@@ -404,7 +413,10 @@ DEFAULT_CLIENT_CONFIG := Client_Config {
 		weather           = true,
 		forced_sky_top    = {0, 0, 0, 255},
 		forced_sky_bottom = {0, 0, 0, 255},
-		crosshair_color   = {255, 255, 255, 255},
+		map_saturation    = 100,
+		map_brightness    = 100,
+		forced_polygon_color = {255, 255, 255, 255},
+		crosshair_color  = {255, 255, 255, 255},
 		crosshair_size    = 100,
 		cursor_color      = {255, 255, 255, 255},
 		cursor_size       = 100,
