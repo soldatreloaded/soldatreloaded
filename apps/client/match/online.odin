@@ -74,10 +74,7 @@ world_make :: proc(match: ^Match) -> bool {
 take :: proc(match: ^Match) -> bool {
 	n := match.line
 	if online.line_take_map(n) && !world_make(match) do return false
-	if change, changed := online.line_take_map_change(n); changed {
-		match.game.world.round_stats = change.stats // the round's figures the server sent, for the end scoreboard
-		hud_round_ended(match)
-	}
+	if _, changed := online.line_take_map_change(n); changed do hud_round_ended(match)
 	// a vote begun: its box comes up (ClientHandleVoteOn), the stats go
 	if n.vote_seq != match.vote.seen {
 		match.vote.seen = n.vote_seq

@@ -302,7 +302,6 @@ match_draw :: proc(match: ^Match, u: ^ui.Ui, config: ^res.Client_Config) {
 	} else {
 		draw.canvas_show(&match.canvas, area)
 	}
-	draw.draw_victory(&match.art, match.game, area, rl.GetTime()) // the winners' stage, over the frozen field
 	data := hud_data(match, config)
 	rlgl.PushMatrix() // the HUD's units are from the view's top-left
 	rlgl.Translatef(area.x, area.y, 0)

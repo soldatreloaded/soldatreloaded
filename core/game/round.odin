@@ -54,24 +54,10 @@ round_update :: proc(round: ^Round, settings: ^Game_Settings, world: ^World, res
 
 	judge_lives(world, resources, out)
 
-	// the captures, and the round's figures: when a flag was grabbed, each capture's time
 	for ruling in sa.slice(&out.rulings) {
-		#partial switch r in ruling {
-		case Flag_Grab:
-			world.flag_grabbed[r.flag] = world.tick
-		case Flag_Capture:
-			round.captures[world.soldiers[r.soldier].team] += 1
-			if grab := world.flag_grabbed[r.flag]; grab != 0 {
-				took := i32(world.tick - grab)
-				cap := &world.round_stats[r.soldier].fastest_cap
-				if cap^ == 0 || took < cap^ do cap^ = took
-			}
+		if capture, is_capture := ruling.(Flag_Capture); is_capture {
+			round.captures[world.soldiers[capture.soldier].team] += 1
 		}
-	}
-	// the flags carried this tick, for the longest carrier
-	for &thing in world.things {
-		if !thing_is_flag(thing.kind) do continue
-		if holder, held := thing.holder.?; held do world.round_stats[holder].carry_ticks += 1
 	}
 	won := round.captures[.Alpha] >= settings.capture_limit || round.captures[.Bravo] >= settings.capture_limit
 

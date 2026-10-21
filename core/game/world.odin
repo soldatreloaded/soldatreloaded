@@ -52,20 +52,6 @@ World :: struct {
 	kills_asked:  sa.Small_Array(MAX_PLAYERS, Kill_Asked), // deaths asked of the referee from outside the step (referee.odin)
 	placed:       sa.Small_Array(MAX_PLAYERS, Respawn), // placings made outside the step, told with the next step's rulings (spawn.odin)
 	spawns_set:   [MAX_PLAYERS]Maybe(utils.Vec2), // where a soldier is placed, over its team's spawn points: a host's say (a server script's), for the round
-	round_stats:  [MAX_PLAYERS]Round_Stats, // the round's figures the server keeps and sends at its end (Map_Change); not on the wire, reset each round by world_init
-	streak_now:   [MAX_PLAYERS]i32,         // each player's run of kills so far, for the best (server's)
-	flag_grabbed: [MAX_THINGS]u32,          // the tick each flag was last grabbed, for the cap time (server's)
-}
-
-// A player's figures over a round, the server's, sent once at its end for the end
-// scoreboard; the kills, deaths and captures are the soldier's own tally beside these.
-Round_Stats :: struct {
-	shots:       i32, // bullets fired that could hit, for the accuracy
-	hits:        i32, // damaging hits landed on the enemy
-	headshots:   i32, // kills by a shot to the head
-	streak:      i32, // the best run of kills without dying
-	carry_ticks: i32, // ticks spent carrying a flag, for the longest carrier
-	fastest_cap: i32, // the quickest grab-to-capture, in ticks; 0 for no capture
 }
 
 // What the game plays by on every map, loaded once and never changed: the animations,

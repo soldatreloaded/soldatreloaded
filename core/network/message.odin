@@ -261,20 +261,11 @@ msg_vote :: proc(b: ^Buffer, m: ^Msg_Vote) {
 Msg_Map_Change :: struct {
 	counter: u16,
 	map_name: Map_Name,
-	stats:    [game.MAX_PLAYERS]game.Round_Stats, // each player's figures for the round just ended, for the end scoreboard
 }
 
 msg_map_change :: proc(b: ^Buffer, m: ^Msg_Map_Change) {
 	net_u16(b, &m.counter)
 	net_string(b, &m.map_name)
-	for &s in m.stats {
-		net_u32(b, cast(^u32)&s.shots)
-		net_u32(b, cast(^u32)&s.hits)
-		net_u32(b, cast(^u32)&s.headshots)
-		net_u32(b, cast(^u32)&s.streak)
-		net_u32(b, cast(^u32)&s.carry_ticks)
-		net_u32(b, cast(^u32)&s.fastest_cap)
-	}
 }
 
 // The escape menu's map window pages through the server's own list of maps (the

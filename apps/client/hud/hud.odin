@@ -130,9 +130,8 @@ hud_draw :: proc(u: ^ui.Ui, hud: ^Hud, data: ^Hud_Data, minimap: ^draw.Minimap) 
 		draw_minimap(u, art, minimap, data)
 		zoom_end(z)
 	}
-	summary := data.ended && players(data) > 1 // the end screen replaces the plain scoreboard
 	board_bottom: f32
-	if hud.scoreboard && !summary {
+	if hud.scoreboard {
 		z = zoom_around(u, board_anchor(u), by)
 		board_bottom = draw_scoreboard_box(u, art, data)
 		zoom_end(z)
@@ -145,11 +144,11 @@ hud_draw :: proc(u: ^ui.Ui, hud: ^Hud, data: ^Hud_Data, minimap: ^draw.Minimap) 
 
 	if me.active do draw_bar_texts(u, data)
 	draw_team_scores(u, data)
-	if summary do draw_round_summary(u, art, data)
-	z = zoom_around(u, board_anchor(u), by) // the pause's word, the stats and the scoreboard's, where the scoreboard is
+	z = zoom_around(u, board_anchor(u), by) // who won, the pause's word, the stats and the scoreboard's, where the scoreboard is
+	if data.ended && hud.scoreboard && players(data) > 1 do draw_round_end(u, data, board_bottom)
 	if data.paused do draw_paused(u)
-	if hud.stats && !summary do draw_stats(u, art, feed, data, hud.scoreboard)
-	if hud.scoreboard && !summary do draw_scoreboard(u, data, board_bottom)
+	if hud.stats do draw_stats(u, art, feed, data, hud.scoreboard)
+	if hud.scoreboard do draw_scoreboard(u, data, board_bottom)
 	zoom_end(z)
 	z = zoom_around(u, {}, by)
 	draw_console(u, feed, hud.scoreboard || hud.stats || team || (typing && .Weapons in menus.open), typing, data.prompt.scroll)
@@ -211,7 +210,7 @@ hud_draw :: proc(u: ^ui.Ui, hud: ^Hud, data: ^Hud_Data, minimap: ^draw.Minimap) 
 		draw_pointer(u, art, data)
 		zoom_end(z)
 	} else if demo_bar_shown(hud) do pointer_draw(u, art, data.mouse, data.pointer.color, data.pointer.scale) // the bar's, at the mouse
-	if mute_board && !summary && !menus_any_open(menus) do scoreboard_mute_input(hud, u, data)
+	if mute_board && !menus_any_open(menus) do scoreboard_mute_input(hud, u, data)
 }
 
 // What the kill feed is drawn about, unscaled: the side it keeps to, at its top.

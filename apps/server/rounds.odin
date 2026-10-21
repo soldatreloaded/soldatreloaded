@@ -115,7 +115,7 @@ round_start :: proc(sv: ^Server, map_name: string) -> bool {
 
 // The round's end to one peer, or (nil) everyone: the map coming and the ticks until it.
 tell_map_change :: proc(sv: ^Server, peer: net.Peer) {
-	m := net.Msg_Map_Change{map_name = sv.pending_map, stats = sv.game.world.round_stats} // the round's figures go with its end
+	m := net.Msg_Map_Change{map_name = sv.pending_map}
 	if ended, is_ended := sv.game.round.phase.(game.Ended); is_ended do m.counter = u16(max(ended.countdown, 0))
 	if peer != nil {
 		net.net_send_message(peer, .Map_Change, net.msg_map_change, &m)

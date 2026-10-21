@@ -36,8 +36,6 @@ judge :: proc(world: ^World, resources: ^Resources, authority: ^Authority, out: 
 		#partial switch e in event {
 		case Hit:     hit_land(world, resources, authority, e, out)
 		case Suicide: hit_land(world, resources, authority, suicide_hit(world, e.soldier), out)
-		case Shot_Fired: // the round's figures: a shot that could hit, for the accuracy
-			if authority != nil && !e.shot.harmless do world.round_stats[e.shot.owner].shots += 1
 		}
 	}
 	out.judged = len(events)
@@ -159,8 +157,6 @@ hit_damage :: proc(world: ^World, hit: Hit) -> f32 {
 	return hit.amount if wounds(world, hit) else 0
 }
 
-HEAD_PART :: 12 // the skeleton's head: a kill there is a headshot (the client's HEAD_PART)
-
 // The wound of a hit, and the death of a soldier it leaves below 1. A corpse is wounded
 // too, which is what tears it apart, but dies once. A wound of less than none heals: a
 // regenerating polygon's, as the original's HealthHit takes its -2 (soldier_hurt keeps
@@ -179,7 +175,6 @@ judge_hit :: proc(world: ^World, resources: ^Resources, hit: Hit, out: ^Tick_Out
 		health_before = target.vitals.health,
 	}
 	rule(world, resources, damage, out)
-	if hit.shooter != hit.target do world.round_stats[hit.shooter].hits += 1 // a hit that drew the enemy's blood, for the accuracy
 	if target.vitals.dead || target.vitals.health >= 1.0 do return
 
 	// whether the body burns (Sprites.pas Die, "Fire on from bullet")
@@ -191,14 +186,6 @@ judge_hit :: proc(world: ^World, resources: ^Resources, hit: Hit, out: ^Tick_Out
 	// the killer's tally with this kill, a suicide's one less (soldier_kill)
 	kills := world.soldiers[hit.shooter].tally.kills
 	kills = kills + 1 if hit.shooter != hit.target else max(kills - 1, 0)
-	// the round's figures: the victim's run ends, the killer's grows and may be its best,
-	// and a shot to the head is a headshot
-	world.streak_now[hit.target] = 0
-	if hit.shooter != hit.target {
-		if hit.part == HEAD_PART do world.round_stats[hit.shooter].headshots += 1
-		world.streak_now[hit.shooter] += 1
-		world.round_stats[hit.shooter].streak = max(world.round_stats[hit.shooter].streak, world.streak_now[hit.shooter])
-	}
 	rule(world, resources, Kill {
 		killer    = hit.shooter,
 		target    = hit.target,
