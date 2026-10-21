@@ -28,6 +28,11 @@ Figure :: struct {
 	pos:    utils.Vec2, // its body
 	points: Points,
 	corpse: bool,       // dead with its body started: the points are the corpse's
+	// each point as drawn less the game's, which what hangs on the soldier (a carried flag,
+	// a parachute) is pinned to: the airborne clips' and the fluid recoil's difference, and
+	// online the correction still easing in. None for a corpse, drawn as the game has it.
+	shift:  sim.Joints,
+	clip:   bool, // the gun in its hands drawn with its magazine (held_clip_shown)
 }
 
 Frame :: struct {
@@ -55,7 +60,34 @@ frame_build :: proc(frame: ^Frame, before: ^Snapshot, game: ^sim.Game, alpha: f3
 		to := &world.soldiers[id]
 		offset := offsets[id] if offsets != nil else {}
 		frame.figures[id] = figure_between(game.resources.animations, &before.soldiers[id], to, &before.corpses[id], &world.corpses[id], frame.alpha, offset, art, world.tick, id)
+		frame.figures[id].clip = held_clip_shown(to.arsenal.primary, &game.resources.weapons[to.arsenal.primary.weapon])
 	}
+}
+
+// A soldier's shift as its tick is drawn (Figure.shift, without a frame's blend between
+// ticks): for what is made off it at the tick, a spark off its feet or its gun. None for
+// the dead, and only the offset without the art's airborne clips.
+@(private = "package")
+soldier_shift :: proc(art: ^Art, game: ^sim.Game, id: int, offset: utils.Vec2) -> (shift: sim.Joints) {
+	soldier := &game.world.soldiers[id]
+	if !soldier.active || soldier.vitals.dead do return
+	animations := game.resources.animations
+	base := sim.soldier_pose(animations, soldier, soldier.body.pos)
+	drawn := base
+	if art != nil do drawn = visual_soldier_pose(animations, art.air_animations, soldier, soldier.body.pos, game.world.tick, &art.air_transitions[id], &art.air_tuning, art.air_styles)
+	for &s, i in shift do s = drawn[i] - base[i] + offset
+	return
+}
+
+// The game's point `pos` of soldier `id`'s, `joints`, moved as the soldier is drawn: by
+// the shift of its point nearest it. For where the game says a spark comes off it.
+@(private = "package")
+shifted :: proc(shift: ^sim.Joints, joints: ^sim.Joints, pos: utils.Vec2) -> utils.Vec2 {
+	nearest, best := 0, max(f32)
+	for joint, i in joints {
+		if d := utils.length(joint - pos); d < best do nearest, best = i, d
+	}
+	return pos + shift[nearest]
 }
 
 // `t` of the way from `a` to `b`.
@@ -100,6 +132,7 @@ figure_between :: proc(animations: ^res.Animations, from, to: ^sim.Soldier, corp
 		}
 	}
 	copy(figure.points[:], joints[:])
+	for &s, i in figure.shift do s = joints[i] - base[i] + offset // `base` is at figure.pos, the offset in it
 	for k in 0 ..< len(to.pose.swing) {
 		swing := between(from.pose.swing[k], to.pose.swing[k], alpha) if continuous else to.pose.swing[k]
 		figure.points[len(joints) + k] = swing + offset

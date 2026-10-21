@@ -447,7 +447,7 @@ shown :: proc(match: ^Match, config: ^res.Client_Config, sounds: ^sound.Sound) {
 	match.hud.feed.kill_enemy = maybe_color(config.interface.kill_color_enemy)
 	match.hud.feed.kill_self = maybe_color(config.interface.kill_color_self)
 	if !match.playback.seeking {
-		draw.sparks_tick(&match.sparks, game) // the round standing, the sparks hang too
+		draw.sparks_tick(&match.sparks, game, &match.art, offsets) // the round standing, the sparks hang too
 		_, playing := game.round.phase.(sim.Playing)
 		if config.graphics.weather && playing {
 			draw.sparks_weather(&match.sparks, &game.polymap, match.camera, game.world.tick)

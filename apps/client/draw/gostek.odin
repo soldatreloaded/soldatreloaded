@@ -34,6 +34,7 @@ Gostek_Art :: struct {
 	parts:   [res.Gostek][len(PARTS)][2][2]Sprite,
 	centers: [res.Gostek][len(PARTS)][2][2][2]f32, // where each is pinned, as the mod.ini of the mod its image is from has it
 	weapons: [res.Weapon][2]Sprite, // [mirrored]
+	clips:   [res.Weapon][2]Sprite, // the magazines in the guns, [mirrored]
 	flashes: [res.Weapon]Sprite,
 	held:    [res.Weapon]Weapon_Anchors, // and where each weapon is
 }
@@ -233,7 +234,7 @@ draw_gostek :: proc(art: ^Gostek_Art, soldier: ^sim.Soldier, figure: ^Figure, sh
 			front_hair_drawn = true
 		}
 		if custom_hair && part.hair != .Army do continue
-		if part.grip do draw_held_weapon(art, soldier, points, facing_left)
+		if part.grip do draw_held_weapon(art, soldier, points, facing_left, figure.clip)
 		if !part_shown(part, outfit) do continue
 
 		mirrored := facing_left && part.flip

@@ -85,7 +85,7 @@ sparks_event :: proc(sparks: ^Sparks, game: ^sim.Game, event: sim.Event) {
 	case sim.Blood:        if !e.bloodless do blood(sparks, e.pos, e.velocity)
 	case sim.Explosion:    explosion(sparks, e)
 	case sim.Fired:        fired(sparks, game, e)
-	case sim.Antic:        antic(sparks, e)
+	case sim.Antic:        antic(sparks, game, e)
 	case sim.Polygon_Effect:
 		#partial switch e.polygon {
 		case .Lava, .Explodes:
@@ -186,14 +186,24 @@ thrown :: proc(sparks: ^Sparks, back: utils.Vec2) -> utils.Vec2 {
 	return {-back.x - 3.5 + f32(below(sparks, 70)) / 10, back.y - 3.5 + f32(below(sparks, 65)) / 10}
 }
 
+// A soldier's points as it is drawn this tick: the game's, moved by its shift.
+@(private = "file")
+drawn_pose :: proc(sparks: ^Sparks, game: ^sim.Game, id: int) -> (joints: sim.Joints) {
+	soldier := &game.world.soldiers[id]
+	joints = sim.soldier_pose(game.resources.animations, soldier, soldier.body.pos)
+	for &joint, i in joints do joint += sparks.shift[id][i]
+	return
+}
+
 // A shot: the casing out of the breech, sideways to the aim and tumbling, and a puff of
-// smoke off the muzzle (SpriteEffects.pas PlayFire).
+// smoke off the muzzle (SpriteEffects.pas PlayFire), off the gun as it is drawn.
 @(private = "file")
 fired :: proc(sparks: ^Sparks, game: ^sim.Game, f: sim.Fired) {
 	shooter := &game.world.soldiers[f.soldier]
 	if !shooter.active do return
+	game_joints := sim.soldier_pose(game.resources.animations, shooter, shooter.body.pos)
 	if SHELL_FILES[f.weapon] != "" && f.weapon != .Spas12 && f.weapon != .M79 {
-		joints := sim.soldier_pose(game.resources.animations, shooter, shooter.body.pos)
+		joints := drawn_pose(sparks, game, int(f.soldier))
 		dir := f32(shooter.body.direction)
 		aim := utils.normalize(f.velocity)
 		side := utils.Vec2{dir * aim.y * (random(sparks) * 0.5 + 0.8), -dir * aim.x * (random(sparks) * 0.5 + 0.8)}
@@ -204,20 +214,23 @@ fired :: proc(sparks: ^Sparks, game: ^sim.Game, f: sim.Fired) {
 	#partial switch f.weapon {
 	case .Knife, .Chainsaw, .Frag_Grenade:
 	case:
-		spark_add(sparks, .Little_Smoke, f.pos, utils.normalize(f.velocity) * 0.35, 30)
+		spark_add(sparks, .Little_Smoke, shifted(&sparks.shift[f.soldier], &game_joints, f.pos), utils.normalize(f.velocity) * 0.35, 30)
 	}
 }
 
-// An antic's spark, where and how fast the simulation says; the piss's odds are rolled
-// here.
+// An antic's spark, how fast the simulation says, and where, moved onto the soldier as it
+// is drawn; the piss's odds are rolled here.
 @(private = "file")
-antic :: proc(sparks: ^Sparks, e: sim.Antic) {
+antic :: proc(sparks: ^Sparks, game: ^sim.Game, e: sim.Antic) {
+	soldier := &game.world.soldiers[e.soldier]
+	joints := sim.soldier_pose(game.resources.animations, soldier, soldier.body.pos)
+	at := shifted(&sparks.shift[e.soldier], &joints, e.pos)
 	switch e.kind {
-	case .Spit:        spark_add(sparks, .Spit, e.pos, e.velocity, 245)
-	case .Cigar_Puff:  spark_add(sparks, .Little_Smoke, e.pos, e.velocity, 65)
-	case .Match:       spark_add(sparks, .Match, e.pos, e.velocity, 245)
-	case .Cigar_Throw: spark_add(sparks, .Cigar, e.pos, e.velocity, 245)
-	case .Piss:        if e.odds > 0 && below(sparks, int(e.odds)) == 0 do spark_add(sparks, .Piss, e.pos, e.velocity, f32(e.life))
+	case .Spit:        spark_add(sparks, .Spit, at, e.velocity, 245)
+	case .Cigar_Puff:  spark_add(sparks, .Little_Smoke, at, e.velocity, 65)
+	case .Match:       spark_add(sparks, .Match, at, e.velocity, 245)
+	case .Cigar_Throw: spark_add(sparks, .Cigar, at, e.velocity, 245)
+	case .Piss:        if e.odds > 0 && below(sparks, int(e.odds)) == 0 do spark_add(sparks, .Piss, at, e.velocity, f32(e.life))
 	}
 }
 
@@ -237,9 +250,9 @@ jets_burn :: proc(sparks: ^Sparks, game: ^sim.Game) {
 	legs := [2]struct {
 		foot, knee, hip: int,
 	}{{1, 4, 5}, {2, 3, 6}}
-	for &soldier in game.world.soldiers {
+	for &soldier, id in game.world.soldiers {
 		if !soldier.active || soldier.vitals.dead || !soldier_jetting(&soldier) do continue
-		joints := sim.soldier_pose(game.resources.animations, &soldier, soldier.body.pos)
+		joints := drawn_pose(sparks, game, id)
 		jet := soldier.player.look.jet
 		jet.a = 255
 		for leg in legs {
@@ -267,7 +280,7 @@ reloads_drop :: proc(sparks: ^Sparks, game: ^sim.Game) {
 
 		clip_out := gun.reload_count == info.clip_out_time && gun.reload_count > 0 && last != gun.reload_count && gun.ammo == 0
 		if clip_out && CLIP_FILES[gun.weapon] != "" {
-			joints := sim.soldier_pose(game.resources.animations, &soldier, soldier.body.pos)
+			joints := drawn_pose(sparks, game, id)
 			hand := joints[15 - 1]
 			vel := soldier.body.velocity
 			if clip := spark_add(sparks, .Clip, hand + {0, 6}, vel + {0, -0.001}, 255); clip != nil do clip.weapon = gun.weapon
@@ -275,16 +288,17 @@ reloads_drop :: proc(sparks: ^Sparks, game: ^sim.Game) {
 				if clip := spark_add(sparks, .Clip, hand + {-2, 7}, vel + {0.3, -0.003}, 255); clip != nil do clip.weapon = gun.weapon
 			}
 		}
-		if clip_out && gun.weapon == .M79 do reload_shell(sparks, game, &soldier, .M79, 0.08)
-		if gun.weapon == .Spas12 && pump >= 25 && last_pump > 0 && last_pump < 25 do reload_shell(sparks, game, &soldier, .Spas12, 0.025)
+		if clip_out && gun.weapon == .M79 do reload_shell(sparks, game, id, .M79, 0.08)
+		if gun.weapon == .Spas12 && pump >= 25 && last_pump > 0 && last_pump < 25 do reload_shell(sparks, game, id, .Spas12, 0.025)
 	}
 }
 
 // A casing out of a reload, spun away from the hand along the aim (SpriteEffects.pas
-// PlayShell).
+// PlayShell), off the hand as it is drawn.
 @(private = "file")
-reload_shell :: proc(sparks: ^Sparks, game: ^sim.Game, soldier: ^sim.Soldier, weapon: res.Weapon, spin: f32) {
-	joints := sim.soldier_pose(game.resources.animations, soldier, soldier.body.pos)
+reload_shell :: proc(sparks: ^Sparks, game: ^sim.Game, id: int, weapon: res.Weapon, spin: f32) {
+	soldier := &game.world.soldiers[id]
+	joints := drawn_pose(sparks, game, id)
 	hand := joints[15 - 1]
 	dir := f32(soldier.body.direction)
 	b := utils.normalize(soldier.controls.aim - hand) * game.resources.weapons[weapon].stats.speed
@@ -347,10 +361,10 @@ wounded_bleed :: proc(sparks: ^Sparks, game: ^sim.Game) {
 	}
 	odds := 2 * BLOOD_RANDOM_NORMAL if live > 300 else BLOOD_RANDOM_NORMAL
 
-	for &soldier in game.world.soldiers {
+	for &soldier, id in game.world.soldiers {
 		if !soldier.active || soldier.vitals.dead || soldier.team == .Spectator || soldier.vitals.health >= HURT_HEALTH do continue
 		if below(sparks, odds) != 0 do continue
-		joints := sim.soldier_pose(game.resources.animations, &soldier, soldier.body.pos)
+		joints := drawn_pose(sparks, game, id)
 		spark_add(sparks, .Blood, joints[5 - 1] + {2, 0}, soldier.body.velocity, 65 - f32(below(sparks, 10)))
 	}
 }

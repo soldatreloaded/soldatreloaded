@@ -58,7 +58,7 @@ draw_preview :: proc(preview: ^Preview, dress: Dress, at: [2]f32, scale: f32, fa
 		vitals = {health = sim.DEFAULT_HEALTH, cease_fire = -1},
 		player = {look = dress.look},
 	}
-	figure: Figure
+	figure := Figure{clip = true} // a full gun
 	joints := sim.soldier_pose(preview.animations, &soldier, {0, 0})
 	copy(figure.points[:], joints[:])
 	// the chain's and the dreadlocks' points at rest, as the swing would settle them on a
