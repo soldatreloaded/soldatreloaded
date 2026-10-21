@@ -17,6 +17,7 @@ draw_names :: proc(u: ^ui.Ui, data: ^Hud_Data) {
 	mine := &data.players[data.me]
 	watching := mine.team == .Spectator
 	only_out := !data.team_names && !watching
+	by := shrink_of(u, data)
 	for &player, id in data.players {
 		if !player.active || player.team == .Spectator do continue
 		if !watching && (id == int(data.me) || player.team != mine.team) do continue
@@ -31,6 +32,8 @@ draw_names :: proc(u: ^ui.Ui, data: ^Hud_Data) {
 		dy := max(abs(mine.head.y - player.head.y), 1)
 		alpha := min(255, 50 + int(math.round(100000 / (dx + dy / 2))))
 		color := data.carrier_color if player.flag else DEAD_COLOR if player.dead else data.name_color
+		z := zoom_around(u, {x + w / 2, y + h / 2}, by) // unscaled, as big as in a 640 by 480 window (zoom.odin)
 		write(u, player.name, {x, y}, WEAPONS_FONT, with_alpha(color, alpha))
+		zoom_end(z)
 	}
 }

@@ -14,7 +14,9 @@ import "../ui"
 // and the grenades, each a bar beside its icon; the rounds left and the weapon's name;
 // my place, my kills and the limit. The team box with the scores and the flags away
 // from home. The original's RenderInterface and RenderPlayerInterfaceTexts, as its
-// default interface lays them out.
+// default interface lays them out. Each group is drawn `by` as big about its icon as it
+// is laid out (zoom.odin), and the status and the team box about their corners, as the
+// original's interface unscaled keeps their distances in pixels.
 
 // The default interface (LoadDefaultInterfaceData), in the layout's units: each icon's
 // place, anchored across the view; each bar's and text's beside its icon, which it
@@ -41,26 +43,31 @@ import "../ui"
 @(private = "file") LIMIT_COLOR :: rl.Color{114, 120, 255, 255}
 
 // The bars and their icons.
-draw_bars :: proc(u: ^ui.Ui, art: ^Art, mine: ^Mine) {
+draw_bars :: proc(u: ^ui.Ui, art: ^Art, mine: ^Mine, by: f32 = 1) {
 	p := &art.pictures
+	z := zoom_around(u, spread(u, HEALTH_ICON), by)
 	picture(u, p[.Health], aligned(u, anchored(u, HEALTH_ICON, HEALTH_ICON)), WHITE)
 	bar(u, p[.Health_Bar], HEALTH_ICON, HEALTH_BAR, mine.health / sim.DEFAULT_HEALTH)
+	zoom_end(z)
 
+	z = zoom_around(u, spread(u, AMMO_ICON), by)
 	picture(u, p[.Ammo], aligned(u, anchored(u, AMMO_ICON, AMMO_ICON)), WHITE)
 	if share, shown := mine.ammo_bar.?; shown do bar(u, p[.Reload_Bar], AMMO_ICON, AMMO_BAR, share)
 	picture(u, p[.Fire_Bar_Frame], aligned(u, anchored(u, AMMO_ICON, FIRE_FRAME)), WHITE)
 	bar(u, p[.Fire_Bar], AMMO_ICON, FIRE_BAR, mine.fire_bar, from_left = false)
-
-	if jets, has_jets := mine.jets.?; has_jets {
-		picture(u, p[.Jet], aligned(u, anchored(u, JET_ICON, JET_ICON)), WHITE)
-		bar(u, p[.Jet_Bar], JET_ICON, JET_BAR, jets)
-	}
-
 	// the grenades on the belt, one each
 	nade := p[.Nade]
 	for j in 1 ..= mine.grenades {
 		at := anchored(u, AMMO_ICON, NADES) + {nade.size.x * f32(j), 0}
 		picture(u, nade, aligned(u, at), WHITE)
+	}
+	zoom_end(z)
+
+	if jets, has_jets := mine.jets.?; has_jets {
+		z = zoom_around(u, spread(u, JET_ICON), by)
+		picture(u, p[.Jet], aligned(u, anchored(u, JET_ICON, JET_ICON)), WHITE)
+		bar(u, p[.Jet_Bar], JET_ICON, JET_BAR, jets)
+		zoom_end(z)
 	}
 }
 
@@ -68,7 +75,10 @@ draw_bars :: proc(u: ^ui.Ui, art: ^Art, mine: ^Mine) {
 // the leader's, and the limit of whoever I am watching (me, unless I follow a player).
 draw_bar_texts :: proc(u: ^ui.Ui, data: ^Hud_Data) {
 	mine := &data.mine
+	by := shrink_of(u, data)
 	if !mine.dead {
+		z := zoom_around(u, spread(u, AMMO_ICON), by)
+		defer zoom_end(z)
 		at := anchored(u, AMMO_ICON, ROUNDS)
 		rounds := fmt.tprintf("%d", mine.ammo)
 		write(u, rounds, {at.x - text_width(u, rounds, MENU_FONT), at.y}, MENU_FONT, ROUNDS_COLOR)
@@ -86,6 +96,8 @@ draw_bar_texts :: proc(u: ^ui.Ui, data: ^Hud_Data) {
 		if id == data.viewed do place = i + 1
 	}
 	at := [2]f32{STATUS.x * wide(u), STATUS.y}
+	z := zoom_around(u, at, by)
+	defer zoom_end(z)
 	if place > 0 do write(u, fmt.tprintf("%d/%d", place, len(ranks)), at, SMALL_FONT, PLACE_COLOR)
 	kills := data.players[data.viewed].kills
 	standing: string
@@ -102,6 +114,8 @@ draw_bar_texts :: proc(u: ^ui.Ui, data: ^Hud_Data) {
 
 // A box with each team's flag shown where it is away from its base.
 draw_team_box :: proc(u: ^ui.Ui, art: ^Art, data: ^Hud_Data) {
+	z := zoom_around(u, spread(u, TEAM_BOX), shrink_of(u, data))
+	defer zoom_end(z)
 	box(u, art, {TEAM_BOX.x * wide(u), TEAM_BOX.y, 57, 88}, FULL_BOX_ALPHA)
 	at := [2]f32{align(u, (TEAM_BOX.x + 4) * wide(u)), align(u, TEAM_BOX.y + 5)}
 	if !data.flags_home[.Alpha] do picture(u, art.pictures[.No_Flag], at, {255, 0, 0, 255})
@@ -112,6 +126,8 @@ draw_team_box :: proc(u: ^ui.Ui, art: ^Art, data: ^Hud_Data) {
 draw_team_scores :: proc(u: ^ui.Ui, data: ^Hud_Data) {
 	order := [2]res.Team{.Alpha, .Bravo}
 	if data.captures[.Bravo] > data.captures[.Alpha] do order = {.Bravo, .Alpha}
+	z := zoom_around(u, spread(u, TEAM_BOX), shrink_of(u, data))
+	defer zoom_end(z)
 	for team, i in order {
 		at := [2]f32{TEAM_BOX.x * wide(u) + 2, TEAM_BOX.y + 25 + 40 * f32(i)}
 		write(u, fmt.tprintf("%d", data.captures[team]), at, MENU_FONT, team_text_color(team))
@@ -134,6 +150,12 @@ team_text_color :: proc(team: res.Team) -> rl.Color {
 @(private = "file")
 anchored :: proc(u: ^ui.Ui, icon, place: [2]f32) -> [2]f32 {
 	return {icon.x * wide(u) + place.x - icon.x, place.y}
+}
+
+// Where an icon or a box is across the view: what its group is drawn about, unscaled.
+@(private = "file")
+spread :: proc(u: ^ui.Ui, anchor: [2]f32) -> [2]f32 {
+	return anchored(u, anchor, anchor)
 }
 
 @(private = "file")

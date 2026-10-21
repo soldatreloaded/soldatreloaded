@@ -99,52 +99,131 @@ hud_draw :: proc(u: ^ui.Ui, hud: ^Hud, data: ^Hud_Data, minimap: ^draw.Minimap) 
 	aiming := !demoing || (data.follow == nil && !data.free_camera)
 	defer rl.EndBlendMode()
 
+	// Scale_Interface off, each part drawn as big as in a 640 by 480 window, about the
+	// point its place is kept by (zoom.odin): a corner, an edge's middle, an icon, the
+	// cursor; what is over a soldier, each about its own. The end screen and a demo's bar,
+	// this game's own, grow with the window still.
+	by := shrink_of(u, data)
+	menus.by = by
+	middle := u.width / 2
+	z: Zoom
+
 	draw_world_texts(u, data) // of the world, under the rest
+	z = zoom_around(u, {middle, BIG_MESSAGE_BASELINE}, by)
 	draw_big_message(u, feed)
+	zoom_end(z)
 	draw_screen_texts(u, data)
-	if show_bars do draw_bars(u, art, mine)
+	if show_bars do draw_bars(u, art, mine, by)
 	if playing {
-		if !menus_any_open(menus) && !mine.dead && !data.ended && !mute_board && aiming do draw_crosshair(u, art, data) // gone as the round ends, as the original's; the scoreboard shows the pointer instead, to click its mute signs
+		if !menus_any_open(menus) && !mine.dead && !data.ended && !mute_board && aiming { // gone as the round ends, as the original's; the scoreboard shows the pointer instead, to click its mute signs
+			z = zoom_around(u, data.cursor, by)
+			draw_crosshair(u, art, data)
+			zoom_end(z)
+		}
 		draw_my_arrow(u, art, data)
 	}
+	z = zoom_around(u, kill_feed_anchor(u, data), by)
 	draw_kill_icons(u, art, feed, data.kill_log, kill_feed_top(data), hud.scoreboard)
-	if data.minimap do draw_minimap(u, art, minimap, data)
+	zoom_end(z)
+	if data.minimap {
+		z = zoom_around(u, MINIMAP_AT, by)
+		draw_minimap(u, art, minimap, data)
+		zoom_end(z)
+	}
 	summary := data.ended && players(data) > 1 // the end screen replaces the plain scoreboard
 	board_bottom: f32
-	if hud.scoreboard && !summary do board_bottom = draw_scoreboard_box(u, art, data)
+	if hud.scoreboard && !summary {
+		z = zoom_around(u, board_anchor(u), by)
+		board_bottom = draw_scoreboard_box(u, art, data)
+		zoom_end(z)
+	}
 	draw_menu_boxes(u, art, menus, data)
+	z = zoom_around(u, {45 * wide(u), 400}, by) // the vote's, and its box's
 	draw_vote_box(u, art, data)
+	zoom_end(z)
 	draw_team_box(u, art, data)
 
 	if me.active do draw_bar_texts(u, data)
 	draw_team_scores(u, data)
 	if summary do draw_round_summary(u, art, data)
+	z = zoom_around(u, board_anchor(u), by) // the pause's word, the stats and the scoreboard's, where the scoreboard is
 	if data.paused do draw_paused(u)
 	if hud.stats && !summary do draw_stats(u, art, feed, data, hud.scoreboard)
 	if hud.scoreboard && !summary do draw_scoreboard(u, data, board_bottom)
+	zoom_end(z)
+	z = zoom_around(u, {}, by)
 	draw_console(u, feed, hud.scoreboard || hud.stats || team || (typing && .Weapons in menus.open), typing, data.prompt.scroll)
-	if playing do draw_respawn(u, art, mine)
+	zoom_end(z)
+	if playing {
+		z = zoom_around(u, {180 * wide(u), 0}, by)
+		draw_respawn(u, art, mine)
+		zoom_end(z)
+	}
+	z = zoom_around(u, {45 * wide(u), 400}, by)
 	draw_vote(u, data)
-	if data.radio.open && !escape do draw_radio(u, art, data, hud.scoreboard || hud.stats)
-	if data.emotes.open && !escape do draw_emote_wheel(u, art, data)
+	zoom_end(z)
+	if data.radio.open && !escape {
+		z = zoom_around(u, {5, 250}, by)
+		draw_radio(u, art, data, hud.scoreboard || hud.stats)
+		zoom_end(z)
+	}
+	if data.emotes.open && !escape {
+		z = zoom_around(u, {middle, ui.VIEW_HEIGHT / 2}, by)
+		draw_emote_wheel(u, art, data)
+		zoom_end(z)
+	}
+	z = zoom_around(u, {5, PROMPT_BASELINE}, by)
 	draw_prompt(u, data)
+	zoom_end(z)
+	z = zoom_around(u, kill_feed_anchor(u, data), by)
 	draw_kill_feed(u, art, feed, data.kill_log, kill_feed_top(data), hud.scoreboard, typing)
+	zoom_end(z)
 	if me.active {
 		draw_said(u, data)
 		if data.player_names do draw_names(u, data)
 	}
-	if !mine.dead && !team && !escape && aiming do draw_under_cursor(u, data)
+	if !mine.dead && !team && !escape && aiming {
+		z = zoom_around(u, data.cursor, by)
+		draw_under_cursor(u, data)
+		zoom_end(z)
+	}
+	z = zoom_around(u, {middle, 430}, by)
 	draw_watching(u, data)
-	if data.clock && !hud.scoreboard && !hud.stats do draw_time_left(u, data, minimap)
+	zoom_end(z)
+	if data.clock && !hud.scoreboard && !hud.stats {
+		z = zoom_around(u, {middle, 0}, by)
+		draw_time_left(u, data, minimap)
+		zoom_end(z)
+	}
+	z = zoom_around(u, {u.width, 0}, by) // the readouts and the clocks, along the top right
 	draw_readouts(u, data)
 	draw_clocks(u, data)
+	zoom_end(z)
+	z = zoom_around(u, {middle, 431}, by)
 	draw_shot(u, feed, data.seconds)
+	zoom_end(z)
 
 	draw_menus(u, art, menus, data, hud.scoreboard || hud.stats)
 	draw_demo_bar(u, hud, data) // a demo's player bar, under the pointer
-	if menus_any_open(menus) || mine.dead || mute_board do draw_pointer(u, art, data) // the scoreboard's mute signs are clicked
-	else if demo_bar_shown(hud) do pointer_draw(u, art, data.mouse, data.pointer.color, data.pointer.scale) // the bar's, at the mouse
+	if menus_any_open(menus) || mine.dead || mute_board { // the scoreboard's mute signs are clicked
+		z = zoom_around(u, data.cursor, by)
+		draw_pointer(u, art, data)
+		zoom_end(z)
+	} else if demo_bar_shown(hud) do pointer_draw(u, art, data.mouse, data.pointer.color, data.pointer.scale) // the bar's, at the mouse
 	if mute_board && !summary && !menus_any_open(menus) do scoreboard_mute_input(hud, u, data)
+}
+
+// What the kill feed is drawn about, unscaled: the side it keeps to, at its top.
+@(private = "file")
+kill_feed_anchor :: proc(u: ^ui.Ui, data: ^Hud_Data) -> [2]f32 {
+	x := f32(5) if data.kill_log == .Top_Left else 600 * wide(u)
+	return {x, kill_feed_top(data)}
+}
+
+// What the scoreboard, the stats and the pause's word are drawn about, unscaled: the top's
+// middle, where they are centred.
+board_anchor :: proc(u: ^ui.Ui) -> [2]f32 {
+	return {u.width / 2, 0}
 }
 
 // How many are in the game.

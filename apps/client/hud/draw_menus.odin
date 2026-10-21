@@ -57,8 +57,14 @@ WINDOW_CAPTIONS := #partial [Menu][Window_Button]string {
 // The boxes behind the team and weapons menus, and the weapons' icons: drawn before the
 // HUD's texts, as the original's are.
 draw_menu_boxes :: proc(u: ^ui.Ui, art: ^Art, menus: ^Menus, data: ^Hud_Data) {
-	if .Team in menus.open do box(u, art, menu_box(menus, .Team))
+	if .Team in menus.open {
+		z := menu_zoom_begin(u, menus, .Team)
+		box(u, art, menu_box(menus, .Team))
+		zoom_end(z)
+	}
 	if .Weapons not_in menus.open do return
+	z := menu_zoom_begin(u, menus, .Weapons)
+	defer zoom_end(z)
 	under := menu_box(menus, .Weapons)
 	box(u, art, under)
 	box(u, art, {under.x, under.y + under.height, under.width, 80}) // the secondaries
@@ -78,6 +84,8 @@ draw_menus :: proc(u: ^ui.Ui, art: ^Art, menus: ^Menus, data: ^Hud_Data, dim: bo
 	hovered :: proc(menu, hot_menu: Menu, i, hot: int) -> bool {return menu == hot_menu && i == hot}
 
 	if .Weapons in menus.open {
+		z := menu_zoom_begin(u, menus, .Weapons)
+		defer zoom_end(z)
 		write(u, "Primary Weapon:", {65, 142}, SMALL_FONT, {234, 234, 234, 255})
 		write(u, "Secondary Weapon:", {65, 349}, SMALL_FONT, {214, 214, 214, 255}, vertical = .Baseline)
 		buttons := menu_buttons(menus, .Weapons)
@@ -99,6 +107,8 @@ draw_menus :: proc(u: ^ui.Ui, art: ^Art, menus: ^Menus, data: ^Hud_Data, dim: bo
 	}
 
 	if .Escape in menus.open {
+		z := menu_zoom_begin(u, menus, .Escape)
+		defer zoom_end(z)
 		r := menu_box(menus, .Escape)
 		box(u, art, r)
 		write(u, "ESC - return to game", {r.x + 20, r.y + r.height - 45}, SMALL_FONT, {250, 245, 255, 240})
@@ -114,6 +124,8 @@ draw_menus :: proc(u: ^ui.Ui, art: ^Art, menus: ^Menus, data: ^Hud_Data, dim: bo
 	}
 
 	if .Team in menus.open {
+		z := menu_zoom_begin(u, menus, .Team)
+		defer zoom_end(z)
 		alpha := 80 if dim else 255
 		write(u, "Select Team:", {55, 165}, MENU_FONT, with_alpha({234, 234, 234, 255}, alpha))
 		buttons := menu_buttons(menus, .Team)
@@ -142,6 +154,8 @@ draw_windows :: proc(u: ^ui.Ui, art: ^Art, menus: ^Menus, data: ^Hud_Data) {
 	hot_menu, hot, _ := menus_hovered(menus)
 	for window in ([2]Menu{.Kick, .Map}) {
 		if window not_in menus.open do continue
+		z := menu_zoom_begin(u, menus, window)
+		defer zoom_end(z)
 		box(u, art, WINDOW_BOX)
 		buttons := menu_buttons(menus, window)
 		first := sa.get(buttons, 0).rect

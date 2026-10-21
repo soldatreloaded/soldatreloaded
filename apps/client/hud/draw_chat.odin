@@ -48,10 +48,13 @@ draw_prompt :: proc(u: ^ui.Ui, data: ^Hud_Data) {
 // What each player said, over their head, and the dots while they type: over a corpse's
 // head too, as the original's, but not over a spectator, who has no head on the field.
 draw_said :: proc(u: ^ui.Ui, data: ^Hud_Data) {
+	by := shrink_of(u, data)
 	for &player in data.players {
 		typing := player.typing && data.typing != .Off
 		if !player.active || player.team == .Spectator || (!typing && player.said_ticks <= 0) do continue
 		at := in_view(data, player.top)
+		z := zoom_around(u, at, by) // unscaled, as big as in a 640 by 480 window over the head (zoom.odin)
+		defer zoom_end(z)
 		dy: f32 = -25
 		if typing { // the dots stepping one to three, after "Typing" if asked (interface.typing), at interface.typing_size
 			full := "Typing..." if data.typing == .Typing else "..."
