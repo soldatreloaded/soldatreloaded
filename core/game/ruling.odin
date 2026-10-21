@@ -4,7 +4,8 @@ import res "../resources"
 import "../utils"
 
 // A decision, and the only way health, lives and possession change. The server's
-// referee makes them during a step; a client applies the same ones when they arrive.
+// referee makes them during a step; a client applies the same ones when they arrive
+// (word.odin's rule_heard), all but the placing of things, which its snapshots carry.
 
 Ruling :: union {
 	Damage,

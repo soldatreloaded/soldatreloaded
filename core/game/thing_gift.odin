@@ -20,6 +20,14 @@ thing_pick_up :: proc(world: ^World, resources: ^Resources, pickup: Pickup) {
 	sa.push_back(&world.gifts, pickup)
 }
 
+// The same heard from the server on a machine without authority: a gun gone from the
+// ground, a kit left where it lies for the snapshot to bring up again elsewhere (it
+// alone knows where), and what it gives kept for the end of the turn as ever.
+thing_pick_up_heard :: proc(world: ^World, pickup: Pickup) {
+	if pickup.kind == .Weapon do dropped_gun_take(world, pickup)
+	sa.push_back(&world.gifts, pickup)
+}
+
 // At the end of the things' turn: what they gave, in the order it was taken.
 soldiers_receive :: proc(world: ^World, resources: ^Resources) {
 	for gift in sa.slice(&world.gifts) {
