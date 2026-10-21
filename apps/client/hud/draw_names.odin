@@ -38,6 +38,41 @@ draw_names :: proc(u: ^ui.Ui, data: ^Hud_Data) {
 	}
 }
 
+// Spectating, a bar of each living player's health over its helmet (data.health_bars):
+// red to yellow to green as it fills, on a dark ground.
+HEALTH_BAR_SIZE :: [2]f32{24, 3}
+HEALTH_BAR_RISE :: 14 // its bottom over the helmet, in units: under what is said over the head
+@(private = "file") HEALTH_BAR_GROUND :: rl.Color{0, 0, 0, 150}
+
+draw_health_bars :: proc(u: ^ui.Ui, data: ^Hud_Data) {
+	if data.players[data.me].team != .Spectator do return
+	by := shrink_of(u, data)
+	for &player in data.players {
+		if !player.active || player.team == .Spectator || player.dead do continue
+		ground, filled := health_bar_rects(data, &player)
+		z := zoom_around(u, {ground.x + ground.width / 2, ground.y + ground.height}, by) // unscaled, as the names
+		fill(u, ground, HEALTH_BAR_GROUND)
+		if filled.width > 0 do fill(u, filled, health_bar_color(player.health))
+		zoom_end(z)
+	}
+}
+
+// The bar's ground, a unit round it, and its filled share, from the left, in the view.
+health_bar_rects :: proc(data: ^Hud_Data, player: ^Player) -> (ground, filled: rl.Rectangle) {
+	at := in_view(data, player.top) - {0, HEALTH_BAR_RISE} // the bar's bottom middle
+	size := HEALTH_BAR_SIZE
+	filled = {at.x - size.x / 2, at.y - size.y, size.x * clamp(player.health, 0, 1), size.y}
+	ground = {at.x - size.x / 2 - 1, at.y - size.y - 1, size.x + 2, size.y + 2}
+	return
+}
+
+// Red when it is nearly gone, yellow at half, green full.
+health_bar_color :: proc(health: f32) -> rl.Color {
+	h := clamp(health, 0, 1)
+	if h < 0.5 do return {255, u8(255 * h * 2), 0, 255}
+	return {u8(255 * (1 - h) * 2), 255, 0, 255}
+}
+
 // The winners' names under their gosteks on the end screen's stage (data.stage): each
 // centred under the feet, in the names' lettering and colour, as a name by a player.
 draw_stage_names :: proc(u: ^ui.Ui, data: ^Hud_Data) {

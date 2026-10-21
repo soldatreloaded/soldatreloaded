@@ -189,6 +189,7 @@ Interface_Settings :: struct {
 	stats_color:        utils.Rgba `jsoncomment:"the frame rate's and the line's numbers' colour, RRGGBB"`,
 	player_names:       bool `jsoncomment:"teammates' names at the screen's edge when out of view (everyone's, spectating)"`,
 	team_names:         bool `jsoncomment:"teammates' names by them always, not only at the screen's edge when out of view (with player_names)"`,
+	spectator_health:   bool `jsoncomment:"spectating, a bar of each living player's health over their head"`,
 	name_color:         utils.Rgba `jsoncomment:"the colour of teammates' names, RRGGBB"`,
 	carrier_color:      utils.Rgba `jsoncomment:"the colour of a teammate's name while they carry the flag, RRGGBB"`,
 	scoreboard_mute:    bool `jsoncomment:"the mute sign by each name and team on the scoreboard, clicked to mute them"`,
@@ -427,6 +428,7 @@ DEFAULT_CLIENT_CONFIG := Client_Config {
 		stats_color     = {239, 170, 200, 255},
 		show_ping       = true,
 		player_names    = true,
+		spectator_health = true,
 		name_color      = {0x99, 0xDF, 0x99, 0xFF}, // as the HUD drew them
 		carrier_color   = {0xDC, 0xDC, 0x33, 0xFF},
 		scoreboard_mute = true,

@@ -187,6 +187,7 @@ hud_draw :: proc(u: ^ui.Ui, hud: ^Hud, data: ^Hud_Data, minimap: ^draw.Minimap) 
 	}
 	if me.active && !data.ended {
 		draw_said(u, data)
+		if data.health_bars do draw_health_bars(u, data)
 		if data.player_names do draw_names(u, data)
 	}
 	if !mine.dead && !team && !escape && aiming && !data.ended {
