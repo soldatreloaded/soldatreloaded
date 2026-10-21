@@ -7,18 +7,16 @@ import "core:thread"
 import res "../../../core/resources"
 
 // The Mods page's slow work, on a thread of its own so the game draws on while it runs:
-// looking for the Soldat 1 install where it is usually put (Steam's libraries on every
-// drive, Wine's), looking through one for what mods can be made of, making one of them a
-// mod, and unpacking a mod's zip (converting it, a Soldat 1 mod's). One at a time,
-// started, then taken once it is done, as a Folder_Pick is.
+// importing a folder of the player's Soldat 1 (an install, every mod made of it at once,
+// or a mod or an interface of it alone: res.soldat_import), and unpacking a mod's zip
+// (converting it, a Soldat 1 mod's). One at a time, started, then taken once it is done,
+// as a Folder_Pick is.
 //
 // The job wears a Classic of its own (res.mod_make), never the game's, which the Mods
 // page may wear anew while it runs. What it gives back is the context allocator's, the
 // taker's to keep or free.
 Soldat_Job_Kind :: enum {
-	Find,   // the installs where Soldat is usually put
-	Scan,   // what in `root` mods can be made of
-	Import, // `source` of `root` made a mod
+	Import, // the folder at `root`, of Soldat 1, imported into mods/
 	Unpack, // the zip at `root` (a mod's, or a Soldat 1 mod's) unpacked into mods/
 }
 
@@ -27,27 +25,20 @@ Soldat_Job :: struct {
 	kind:     Soldat_Job_Kind,
 	done:     bool, // atomic: the job is over, and what came of it may be read
 	started:  f64,  // when, by rl.GetTime: how long it has been, said while it runs
-	// what it was given, its own copies
-	root:     string,
-	source:   res.Soldat_Source,
+	root:     string, // what it was given, its own copy
+	progress: res.Import_Progress, // Import's, read as it runs
 	// what came of it
-	installs: []string,             // Find's
-	sources:  []res.Soldat_Source,  // Scan's
-	name:     string,               // Import's and Unpack's: the mod made, or meant to be
-	problem:  string,               // and why it wasn't; "" if it was
+	imported: res.Soldat_Imported, // Import's
+	name:     string,              // Unpack's: the mod made, or meant to be
+	problem:  string,              // and why it wasn't; "" if it was
 }
 
-// The job's name, and its own copies of `root` and `source`, for `kind`. Nothing if one is
-// running already.
-soldat_job_start :: proc(job: ^Soldat_Job, kind: Soldat_Job_Kind, started: f64, root := "", source := res.Soldat_Source{}) {
+// The job, its own copy of `root`, for `kind`. Nothing if one is running already.
+soldat_job_start :: proc(job: ^Soldat_Job, kind: Soldat_Job_Kind, started: f64, root: string) {
 	if job.thread != nil do return
-	// copied before the last job's results are freed, which they may be of
-	given := source
-	given.name, given.dir = strings.clone(source.name), strings.clone(source.dir)
-	given_root := strings.clone(root)
+	given := strings.clone(root) // copied before the last job's results are freed, which it may be of
 	soldat_job_forget(job)
-	job.kind, job.started = kind, started
-	job.root, job.source = given_root, given
+	job.kind, job.started, job.root = kind, started, given
 	sync.atomic_store(&job.done, false)
 	job.thread = thread.create_and_start_with_data(job, soldat_job_run)
 }
@@ -73,11 +64,7 @@ soldat_job_forget :: proc(job: ^Soldat_Job) {
 		job.thread = nil
 	}
 	delete(job.root)
-	delete(job.source.name)
-	delete(job.source.dir)
-	for s in job.installs do delete(s)
-	delete(job.installs)
-	res.soldat_sources_destroy(job.sources)
+	res.soldat_imported_destroy(&job.imported)
 	delete(job.name)
 	delete(job.problem)
 	job^ = {}
@@ -88,31 +75,13 @@ soldat_job_run :: proc(data: rawptr) {
 	job := (^Soldat_Job)(data)
 	defer free_all(context.temp_allocator) // this thread's own
 	switch job.kind {
-	case .Find:
-		job.installs = res.soldat_installs()
 	case .Unpack:
 		name, problem := res.mod_unpack(job.root, res.MODS_DIR, allocator = context.temp_allocator)
 		job.name, job.problem = strings.clone(name), strings.clone(problem) // out of this thread's temp allocator
-	case .Scan, .Import:
+	case .Import:
 		own := res.mod_make(res.MODS_DIR)
 		defer res.mod_destroy(&own)
-		classic := res.mod_classic(own)
-		if job.kind == .Scan {
-			job.sources = res.soldat_sources(job.root, classic)
-			break
-		}
-		name, problem: string
-		switch job.source.kind {
-		case .Own:
-			name = OWN_NAME
-			problem = res.mod_import({job.root}, res.MODS_DIR, name, classic, OWN_TITLE).problem
-		case .Mod:
-			name = res.mod_name_from(job.source.name)
-			problem = res.mod_import({job.root, job.source.dir}, res.MODS_DIR, name, classic).problem
-		case .Interface:
-			name, problem = res.interface_install(job.root, job.source.dir, job.source.name, res.MODS_DIR, classic)
-		}
-		job.name, job.problem = strings.clone(name), strings.clone(problem) // out of this thread's temp allocator
+		job.imported = res.soldat_import(job.root, res.MODS_DIR, res.mod_classic(own), &job.progress)
 	}
 	sync.atomic_store(&job.done, true)
 }

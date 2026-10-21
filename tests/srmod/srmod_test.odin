@@ -242,6 +242,11 @@ unpacked :: proc(t: ^testing.T) {
 	zip(loose, {{"readme.txt", "hi"}})
 	_, not_mod := res.mod_unpack(loose, mods, allocator = context.temp_allocator)
 	testing.expect(t, strings.contains(not_mod, "mod.json"), "a zip of no mod refused")
+	// a .srmod is ours: one laid out as a Soldat 1 mod isn't converted, as a .zip of it is
+	soldat := utils.temp_path(dir, "Soldat.srmod")
+	zip(soldat, {{"gostek-gfx/klata.png", "chest"}, {"sfx/shot.wav", "bang"}})
+	_, unconverted := res.mod_unpack(soldat, mods, allocator = context.temp_allocator)
+	testing.expect(t, strings.contains(unconverted, "mod.json") && !os.exists(utils.temp_path(mods, "Soldat")), "a .srmod without a mod.json refused, not converted")
 	escaping := utils.temp_path(dir, "escaping.zip")
 	zip(escaping, {{"mod.json", info("Escape", "")}, {"../outside.txt", "oops"}})
 	_, unsafe := res.mod_unpack(escaping, mods, allocator = context.temp_allocator)

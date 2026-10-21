@@ -12,6 +12,7 @@ import "core:path/filepath"
 import "core:slice"
 import "core:strconv"
 import "core:strings"
+import "core:sync"
 
 import stbi "vendor:stb/image"
 
@@ -117,6 +118,7 @@ soldat_is_install :: proc(dir: string) -> bool {
 // before, whole.
 Import_Options :: struct {
 	whole:         bool,        // every file of the first folder goes in, laid out as a Soldat 1 mod: a mod of before
+	base:          bool,        // the install's own folders go in whole, 1.7.1's art as it came too, each file the game reads, Classic's or not: the ground Soldat 1 wore a mod over
 	default_scale: f32,         // pixels to a unit where a mod.ini says none: Soldat 1's 1 (0), our mods of before Classic's 4.5
 	about:         Srmod_About, // what its mod.json says of it beside its name and title
 	description:   string,      // its description; "" for where it was made from
@@ -230,35 +232,52 @@ soldat_sources_destroy :: proc(sources: []Soldat_Source, allocator := context.al
 // see-through made alpha, its pixels as they were and its mod.json saying the scale
 // Soldat 1 drew it at (import_file); and the soldier's and the weapons' pivots, from their mod.inis'
 // [GOSTEK], where they differ from Classic's. With `options.whole`, the first folder is a
-// mod of its own, all of it going in (a mod of before, converted: mods_tidy).
+// mod of its own, all of it going in (a mod of before, converted: mods_tidy). With
+// `options.base`, the install's own folders go in whole, as Soldat 1 drew them under a
+// mod, each file the game reads and every pivot, Classic's or not: so a mod's art sits
+// among 1.7.1's, not Classic's redrawn, and stays so whatever becomes of Classic.
+//
+// An image of a folder over another replaces the one beneath, whichever of a .png or a
+// .bmp either is, as Soldat 1 looks for it in the mod first and the base game only then
+// (GR:393); within a folder a .png wins. Each keeps the scale of the mod.ini of the folder it
+// came from, as Soldat 1 sizes it (GetImageScale): the base game's at its DefaultScale, 4.5,
+// a mod's at its own, or 1 without one.
 mod_import :: proc(dirs: []string, mods_dir, name: string, classic: Mod, title := "", options := Import_Options{}) -> (result: Import_Result) {
 	if problem := mod_name_problem(mods_dir, name); problem != "" do return {problem = problem}
 	if !srmod_name_ok(name) do return {problem = "A mod's name is letters, digits, - and _, 32 at most."}
 	if len(dirs) == 0 do return {problem = "Pick what to make the mod from."}
 	default_scale := options.default_scale if options.default_scale > 0 else 1
 	stock := stock_load()
-	merged := make(map[string]Packed, 256, context.temp_allocator)
+	merged := make(map[string]Layered, 256, context.temp_allocator)
 	anchors := make(map[string]f32, context.temp_allocator)
 	for dir, i in dirs {
 		whole := options.whole && i == 0
 		if !soldat_is_install(dir) && !(whole && old_layout(dir)) do return {problem = "That isn't a Soldat folder: there is no gostek-gfx, weapons-gfx or the like in it."}
 		own := i == 0 && !whole // the install itself
-		files, _ := scan(dirs[0], dir, classic, &stock, own, default_scale)
-		for f in files do merged[strings.to_lower(f.name, context.temp_allocator)] = f
-		// its mod.ini's pivots, unless it is 1.7.1's own as it came: those are no player's
+		base := own && options.base
+		files, _ := scan(dirs[0], dir, classic, &stock, own, default_scale, base = base)
+		for f in files {
+			key := layered_key(f.name)
+			png := strings.equal_fold(filepath.ext(f.name), ".png")
+			if under, had := merged[key]; had && under.layer == i && under.png && !png do continue
+			merged[key] = {f, i, png}
+		}
+		// its mod.ini's pivots, unless it is 1.7.1's own as it came: those are no player's,
+		// but for the base game's whole
 		root := dir if own else folder_root(dir)
-		if !utils.file_exists(utils.temp_path(root, MOD_CONFIG_FILE)) || is_stock(&stock, utils.temp_path(root, MOD_CONFIG_FILE), MOD_CONFIG_FILE, install_path(dirs[0], root)) do continue
+		if !utils.file_exists(utils.temp_path(root, MOD_CONFIG_FILE)) do continue
+		if !base && is_stock(&stock, utils.temp_path(root, MOD_CONFIG_FILE), MOD_CONFIG_FILE, install_path(dirs[0], root)) do continue
 		config := soldat_config(root, default_scale)
 		for key, value in config.anchors do anchors[key] = value
 	}
 
 	packed := make([dynamic]Packed, 0, len(merged), context.temp_allocator)
-	for _, f in merged do append(&packed, f)
+	for _, l in merged do append(&packed, l.file)
 	entries: map[string][]byte
 	scales := make(map[string]f32, context.temp_allocator)
 	entries, result.changed = entries_of(packed[:], MOD_PARTS, &scales)
 
-	// the pivots that differ from Classic's
+	// the pivots that differ from Classic's; with the base under, every one it says
 	for part in ([]Part{.Soldier, .Weapons}) {
 		theirs := srmod_pivots(&classic.worn.classic, part) if classic.worn != nil else nil
 		pivots := make(map[string][2]f32, context.temp_allocator)
@@ -276,7 +295,7 @@ mod_import :: proc(dirs: []string, mods_dir, name: string, classic: Mod, title :
 			if !had do continue // an image this game hasn't (the flamer, the bow): Classic pins all it draws
 			x := anchors[strings.concatenate({id, "_centerx"}, context.temp_allocator)] or_else old.x
 			y := anchors[strings.concatenate({id, "_centery"}, context.temp_allocator)] or_else old.y
-			if abs(old.x - x) < 0.0001 && abs(old.y - y) < 0.0001 do continue
+			if !options.base && abs(old.x - x) < 0.0001 && abs(old.y - y) < 0.0001 do continue
 			pivots[id] = {x, y}
 		}
 		if len(pivots) == 0 do continue
@@ -303,12 +322,32 @@ Packed :: struct {
 	scale: f32,
 }
 
-// What of the folder `dir` goes in a mod (mod_import), each with the scale its mod.ini
-// gives it: a mod of mods/, every file of the game's folders; `own`, an install's own, each
-// that is neither 1.7.1's as it came nor Classic's, its game's folders alone looked
-// through. With the temp allocator.
+// A file of the folders a mod is made of, and which of them it is from (mod_import).
 @(private = "file")
-scan :: proc(install, dir: string, classic: Mod, stock: ^map[string]Stock_File, own: bool, default_scale: f32 = 1) -> (files: []Packed, ok: bool) {
+Layered :: struct {
+	file:  Packed,
+	layer: int,
+	png:   bool,
+}
+
+// Which file a Soldat 1 path stands for, whatever its folder: in lower case, an image's
+// without its extension, as Soldat 1 finds a .png or a .bmp by the one name.
+@(private = "file")
+layered_key :: proc(name: string) -> string {
+	key := strings.to_lower(name, context.temp_allocator)
+	switch filepath.ext(key) {
+	case ".png", ".bmp", ".jpg", ".jpeg", ".gif": return key[:len(key) - len(filepath.ext(key))]
+	}
+	return key
+}
+
+// What of the folder `dir` goes in a mod (mod_import), each with the scale its mod.ini
+// gives it: a mod of mods/, every file of the game's folders; `own`, an install's own, its
+// game's folders alone looked through: each that is neither 1.7.1's as it came nor
+// Classic's; or with `base`, each the game reads, whatever it is, the base game whole as
+// Soldat 1 drew it, kept apart from Classic, which may change. With the temp allocator.
+@(private = "file")
+scan :: proc(install, dir: string, classic: Mod, stock: ^map[string]Stock_File, own: bool, default_scale: f32 = 1, base := false) -> (files: []Packed, ok: bool) {
 	root := dir if own else folder_root(dir)
 	at := install_path(install, root) // where its files are in the install, as the stock list has them
 	config := soldat_config(root, default_scale)
@@ -326,18 +365,19 @@ scan :: proc(install, dir: string, classic: Mod, stock: ^map[string]Stock_File, 
 		path := utils.temp_path(root, file)
 		// a mod of mods/ is the player's whole: all of it goes in. The install's own
 		// folders are 1.7.1's, but for what the player put over them
-		if !own || keep(stock, classic, path, file, at, listings) do append(&packed, Packed{file, path, soldat_scale(&config, file)})
+		if !own || keep(stock, classic, path, file, at, listings, base) do append(&packed, Packed{file, path, soldat_scale(&config, file)})
 	}
 	return packed[:], true
 
-	// Whether the file goes in: not 1.7.1's own, and not Classic's. What it reads and
-	// decodes is let go of as it is weighed, so a mod of many files takes no more.
-	keep :: proc(stock: ^map[string]Stock_File, classic: Mod, path, file, at: string, listings: ^utils.Dir_Listings) -> bool {
+	// Whether the file goes in: not 1.7.1's own, and not Classic's; or with `base`, any the
+	// game reads. What it reads and decodes is let go of as it is weighed, so a mod of many
+	// files takes no more.
+	keep :: proc(stock: ^map[string]Stock_File, classic: Mod, path, file, at: string, listings: ^utils.Dir_Listings, base: bool) -> bool {
 		mark := runtime.default_temp_allocator_temp_begin()
 		defer runtime.default_temp_allocator_temp_end(mark)
-		if is_stock(stock, path, file, at) do return false
+		if !base && is_stock(stock, path, file, at) do return false
 		data := utils.read_file(path, context.temp_allocator) or_return
-		return differs(classic, data, file, listings)
+		return differs(classic, data, file, listings, present = base)
 	}
 }
 
@@ -553,10 +593,11 @@ last_mod :: proc(root: string) -> string {
 }
 
 // Whether the file `file` (its bytes `mine`) is one of Classic's, and isn't the same: an
-// image whose pixels differ, else bytes that do. A file Classic hasn't isn't one: the
-// game never asks for it. Images of other sizes differ without being decoded.
+// image whose pixels differ, else bytes that do; with `present`, one of Classic's at all.
+// A file Classic hasn't isn't one: the game never asks for it. Images of other sizes differ
+// without being decoded. The words differ by their lines, whatever is asked.
 @(private = "file")
-differs :: proc(classic: Mod, mine: []byte, file: string, listings: ^utils.Dir_Listings = nil) -> bool {
+differs :: proc(classic: Mod, mine: []byte, file: string, listings: ^utils.Dir_Listings = nil, present := false) -> bool {
 	slash := strings.last_index_byte(file, '/')
 	dir, name := file[:max(slash, 0)], file[slash + 1:]
 	extension := strings.to_lower(filepath.ext(name), context.temp_allocator)
@@ -575,7 +616,7 @@ differs :: proc(classic: Mod, mine: []byte, file: string, listings: ^utils.Dir_L
 	case:
 		theirs, found = mod_file(classic, file)
 	}
-	if !found do return false
+	if !found || present do return found
 	classics := mod_read(theirs, context.temp_allocator) or_return
 	if slice.equal(mine, classics) do return false
 	if image {
@@ -751,13 +792,16 @@ entries_of :: proc(files: []Packed, parts: Parts, scales: ^map[string]f32) -> (e
 // The custom interface `title` of `from` (a custom-interfaces/ of the install at `root`,
 // or of one of its mods) made the .srmod of its name (mod_name_from) in `mods_dir`, its
 // hud and its icons; and under them the player's own changes to the install's HUD and
-// icons that it hasn't of its own. Its name; or why it couldn't be made.
-interface_install :: proc(root, from, title, mods_dir: string, classic: Mod) -> (name, problem: string) {
+// icons that it hasn't of its own, or with `base` the install's whole, 1.7.1's as it came
+// too, as Soldat 1 draws an interface over its interface-gfx. Its name; or why it couldn't
+// be made.
+interface_install :: proc(root, from, title, mods_dir: string, classic: Mod, base := false) -> (name, problem: string) {
 	name = mod_name_from(title)
 	if name == "" do return "", "That interface's name can't be a mod's."
 	if mod_exists(mods_dir, name) do return name, "There is a mod by that name already."
 	stock := stock_load()
-	own, _ := scan(root, root, classic, &stock, own = true)
+	own: []Packed
+	if root != "" do own, _ = scan(root, root, classic, &stock, own = true, base = base) // "": an interface of no install
 	scales := make(map[string]f32, context.temp_allocator)
 	entries, _ := entries_of(own, {.Hud, .Icons}, &scales)
 	if !interface_entries(from, title, &entries, &scales) do return name, "That interface has no setup.sif to read."
@@ -765,4 +809,136 @@ interface_install :: proc(root, from, title, mods_dir: string, classic: Mod) -> 
 		return name, "The mod couldn't be written into mods/: is the disk full?"
 	}
 	return name, ""
+}
+
+// ---------------------------------------------------------------------------------
+// Importing a folder the player picks
+
+// The mod of an install's own folders, 1.7.1's art and the player's over it: its name, and
+// its title.
+SOLDAT_OWN_NAME :: "My_S1_Mod"
+SOLDAT_OWN_TITLE :: "My S1 Mod"
+
+// What a folder picked to import from Soldat 1 is.
+Soldat_Pick :: enum {
+	Nothing,   // nothing of Soldat's
+	Install,   // a Soldat 1 install
+	Mod,       // a mod, of an install's mods/ or alone
+	Interface, // a custom interface, its setup.sif in it
+}
+
+// What the folder `picked` is, and the install it is of: an install itself; a mod or an
+// interface of an install's mods/ or custom-interfaces/; "" for one alone. An install is
+// told from a mod by what is beside its art: its mods/ or its soldat.ini, which no mod has.
+soldat_pick :: proc(picked: string) -> (kind: Soldat_Pick, install: string) {
+	dir := strings.trim_right(picked, "/\\")
+	if dir == "" || !os.is_dir(dir) do return
+	if install_marked(dir) && soldat_is_install(dir) do return .Install, dir
+	parent := filepath.dir(dir)
+	above := filepath.dir(parent)
+	in_install := install_marked(above) && soldat_is_install(above)
+	if has_file(dir, INTERFACE_SETUP_FILE) {
+		return .Interface, above if in_install && strings.equal_fold(filepath.base(parent), "custom-interfaces") else ""
+	}
+	if !soldat_is_install(dir) do return
+	return .Mod, above if in_install && strings.equal_fold(filepath.base(parent), "mods") else ""
+
+	install_marked :: proc(dir: string) -> bool {
+		return os.is_dir(utils.temp_path(dir, "mods")) || has_file(dir, "soldat.ini")
+	}
+	has_file :: proc(dir, name: string) -> bool {
+		entries, _ := os.read_all_directory_by_path(dir, context.temp_allocator)
+		for entry in entries do if entry.type != .Directory && strings.equal_fold(entry.name, name) do return true
+		return false
+	}
+}
+
+// How far an import of many mods is (soldat_import), read from another thread as it runs.
+Import_Progress :: struct {
+	done:  int, // atomic
+	total: int, // atomic
+}
+
+// What importing a folder came to.
+Soldat_Imported :: struct {
+	kind:    Soldat_Pick,
+	install: string,   // the install whose own folders went under them; "" if none was found
+	made:    []string, // the mods made, by name, in order
+	skipped: []string, // those imported before, a mod by their name there already, by title
+	failed:  []string, // what couldn't be made, and why, a line each
+}
+
+// The folder `picked` imported into `mods_dir` (soldat_pick). An install: each thing in it a
+// mod can be made of (soldat_sources) made one: its own folders whole, 1.7.1's art as it
+// came and the player's over it, as My S1 Mod; each mod of its mods/, and each custom
+// interface, with its own folders under it (mod_import's and interface_install's `base`).
+// A mod or an interface alone the same, over the install it is in, else the first found
+// where Soldat is usually put (soldat_installs), else over Classic alone. Those imported
+// before, a mod by their name in `mods_dir`, are passed over. `progress`, if given, says
+// how far it is as it goes. With `allocator`; free with soldat_imported_destroy.
+soldat_import :: proc(picked, mods_dir: string, classic: Mod, progress: ^Import_Progress = nil, allocator := context.allocator) -> (r: Soldat_Imported) {
+	kind, install := soldat_pick(picked)
+	r.kind = kind
+	if kind == .Nothing do return
+	sources: []Soldat_Source
+	#partial switch kind {
+	case .Install:
+		sources = soldat_sources(install, classic, context.temp_allocator)
+	case .Mod, .Interface:
+		folder := strings.trim_right(picked, "/\\")
+		sources = make([]Soldat_Source, 1, context.temp_allocator)
+		sources[0] = {kind = .Mod, name = filepath.base(folder), dir = folder}
+		if kind == .Interface do sources[0] = {kind = .Interface, name = filepath.base(folder), dir = filepath.dir(folder)}
+	}
+	if install == "" {
+		if found := soldat_installs(context.temp_allocator); len(found) > 0 do install = found[0]
+	}
+	r.install = strings.clone(install, allocator)
+	if progress != nil do sync.atomic_store(&progress.total, len(sources))
+
+	made := make([dynamic]string, allocator)
+	skipped := make([dynamic]string, allocator)
+	failed := make([dynamic]string, allocator)
+	for s in sources {
+		// what each import reads let go of before the next: an install's whole, each time
+		mark := runtime.default_temp_allocator_temp_begin()
+		defer runtime.default_temp_allocator_temp_end(mark)
+		defer if progress != nil do sync.atomic_add(&progress.done, 1)
+		title := SOLDAT_OWN_TITLE if s.kind == .Own else s.name
+		name := SOLDAT_OWN_NAME if s.kind == .Own else mod_name_from(s.name, "_s1" if s.kind == .Mod else "_interface")
+		// a mod of Soldat 1's named as Classic (its mods/classic, the art of before 1.7) told
+		// apart from ours
+		if s.kind == .Mod && strings.equal_fold(s.name, MOD_CLASSIC) do title = fmt.tprintf("%s (Soldat 1)", s.name)
+		if name == "" {
+			append(&failed, fmt.aprintf("%s: its name can't be a mod's", title, allocator = allocator))
+			continue
+		}
+		if mod_exists(mods_dir, name) {
+			append(&skipped, strings.clone(title, allocator))
+			continue
+		}
+		problem: string
+		switch s.kind {
+		case .Own:
+			problem = mod_import({install}, mods_dir, name, classic, title, {base = true}).problem
+		case .Mod:
+			if install != "" do problem = mod_import({install, s.dir}, mods_dir, name, classic, title, {base = true}).problem
+			else do problem = mod_import({s.dir}, mods_dir, name, classic, title, {whole = true}).problem
+		case .Interface:
+			_, problem = interface_install(install, s.dir, s.name, mods_dir, classic, base = install != "")
+		}
+		if problem != "" do append(&failed, fmt.aprintf("%s: %s", title, problem, allocator = allocator))
+		else do append(&made, strings.clone(name, allocator))
+	}
+	r.made, r.skipped, r.failed = made[:], skipped[:], failed[:]
+	return
+}
+
+soldat_imported_destroy :: proc(r: ^Soldat_Imported, allocator := context.allocator) {
+	delete(r.install, allocator)
+	for list in ([][]string{r.made, r.skipped, r.failed}) {
+		for s in list do delete(s, allocator)
+		delete(list, allocator)
+	}
+	r^ = {}
 }

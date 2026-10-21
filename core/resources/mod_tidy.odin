@@ -25,13 +25,14 @@ MODS_OLD_DIR :: ".old" // in mods/: what a mod was made from, kept
 @(private = "file") CONVERTING_DIR :: ".converting" // in mods/: a mod of before being made one, out of sight
 
 // The mod zipped at `path` (a .srmod or a .zip, its mod.json at its root or a folder or
-// two down) unpacked into `mods_dir`, the folder of its name (its mod.json's). A zip of a
-// mod of before, or of a Soldat 1 mod, without a mod.json, is converted (old_convert),
-// named `name`, else for its file. A mod of that name already there is a problem, but
-// with `replace` (the catalogue's update), which takes its place once the new one is
-// whole. Its name, with `allocator`; or why not.
+// two down) unpacked into `mods_dir`, the folder of its name (its mod.json's), as it is.
+// Any other zip without a mod.json, of a mod of before or of a Soldat 1 mod, is converted
+// (old_convert), named `name`, else for its file; a .srmod is ours, and never is. A mod of
+// that name already there is a problem, but with `replace` (the catalogue's update), which
+// takes its place once the new one is whole. Its name, with `allocator`; or why not.
 mod_unpack :: proc(path, mods_dir: string, name := "", replace := false, allocator := context.allocator) -> (unpacked: string, problem: string) {
 	a, found := archive_open_at(path, SRMOD_INFO_FILE)
+	if !found && strings.equal_fold(filepath.ext(path), SRMOD_EXTENSION) do return "", "It isn't a .srmod: there is no mod.json in it."
 	if !found do return old_unpack(path, mods_dir, name, replace, allocator)
 	layer := Mod_Layer{archive = a}
 	defer layer_close(&layer)

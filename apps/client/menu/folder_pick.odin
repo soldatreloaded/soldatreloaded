@@ -15,9 +15,10 @@ Folder_Pick :: struct {
 	path:   string, // the folder or file picked; "" if none was
 }
 
-// The files a mod comes in, as the file dialog offers them.
+// The file a mod comes in, as Import .srmod's dialog offers it: our own, zipped. (A .zip
+// or a .smod dropped on the window is still taken: mods_tidy's converting.)
 @(rodata)
-MOD_FILE_PATTERNS := [?]string{"*.zip", "*.srmod", "*.smod"}
+MOD_FILE_PATTERNS := [?]string{"*.srmod"}
 @(rodata)
 TEXT_FILE_PATTERNS := [?]string{"*.txt"}
 

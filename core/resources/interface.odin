@@ -455,7 +455,7 @@ interface_entries :: proc(from, title: string, entries: ^map[string][]byte, scal
 
 // A mod's name made of `title`: what a name can't have (srmod_name_ok) made `_`, at most
 // SRMOD_NAME_MAX; Classic's name with _interface after it; "" if nothing is left.
-mod_name_from :: proc(title: string) -> string {
+mod_name_from :: proc(title: string, clash := "_interface") -> string {
 	b := strings.builder_make(context.temp_allocator)
 	for c in transmute([]u8)strings.trim_space(title) {
 		switch c {
@@ -467,6 +467,6 @@ mod_name_from :: proc(title: string) -> string {
 		if strings.builder_len(b) == SRMOD_NAME_MAX do break
 	}
 	name := strings.to_string(b)
-	if strings.equal_fold(name, MOD_CLASSIC) do name = strings.concatenate({name, "_interface"}, context.temp_allocator) // Classic's own name, which no other may have
+	if strings.equal_fold(name, MOD_CLASSIC) do name = strings.concatenate({name, clash}, context.temp_allocator) // Classic's own name, which no other may have
 	return name if srmod_name_ok(name) else ""
 }

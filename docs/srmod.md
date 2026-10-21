@@ -89,8 +89,9 @@ and a `mod.json` of no part, to fill.
 `mod.json` at its root or a folder or two down: what is handed over, and what the
 catalogue serves. The game unpacks it into `mods/<name>/` (`mod_unpack`) as it comes in:
 picked on the Mods page, dropped on the window, installed from the catalogue, or found in
-`mods/` as the game starts (`mods_tidy`), which puts the zip aside in `mods/.old/`. A zip
-without a `mod.json`, of a mod laid out as a Soldat 1 mod's, is converted (below).
+`mods/` as the game starts (`mods_tidy`), which puts the zip aside in `mods/.old/`. A
+`.zip` or `.smod` without a `mod.json`, of a mod laid out as a Soldat 1 mod's, is
+converted (below); a `.srmod` without one is refused.
 
 ## The parts
 
@@ -227,7 +228,7 @@ The client config's `graphics.parts`, a mod by part; a part not named is Classic
 "parts": {"soldier": "NoNameMod", "weapons": "NoNameMod", "sounds": "RemasteredSounds", "hud": "micro1", "text": "Deutsch"}
 ```
 
-The Mods page's **Installed Mods** lists Classic and each mod; beside the one picked, its
+The Mods page's **Configure Mods** lists Classic and each mod; beside the one picked, its
 parts, each worn from it with a switch (and so from whichever wore it no longer), **Wear all
 of it** and **Wear none of it**; its art's scale, the whole mod's and part by part; what its
 `mod.json` says of it, changed and saved; and **Edit HUD**, **Edit words** and its folder.
@@ -245,42 +246,52 @@ file the game draws, plays or says. It can't be removed, changed, or chosen agai
 
 ## Bringing mods in
 
-On the Mods page's **Add Mods**:
+On the Mods page's **Install Mods**, beside the catalogue, three buttons:
 
-- **From a file**: a `.zip` or `.srmod` picked in the system's dialog, or dropped on the
-  game's window, unpacked into its folder (The folder, above); a zip of a Soldat 1 mod,
-  without a `mod.json`, converted as a mod of before is (below).
-- **A new mod**: a name, and an empty mod made, its folder opened to fill.
-- **From your Soldat 1**, making mods like any other.
+- **Create**: an empty mod, `My_Mod` (then `My_Mod_2`...), its folder opened to fill, picked
+  on Configure Mods to give it a title.
+- **Import .srmod**: a `.srmod` picked in the system's dialog, which offers nothing else,
+  unzipped into its folder as it is (The folder, above); one without a `mod.json` is
+  refused, never converted. A `.srmod`, `.zip` or `.smod` dropped on the game's window, on
+  either tab, is taken too; a `.zip` or `.smod` without a `mod.json` converted as a mod of
+  before is (below). A Soldat 1 mod comes in by Import S1 Mod, not zipped.
+- **Import S1 Mod**: a folder of the player's Soldat 1 picked in the system's folder dialog
+  (Windows' own; zenity, kdialog or osascript elsewhere), imported on a thread, its
+  progress said beside the buttons (`soldat_import`).
 
-The Soldat 1 install is found where it is usually put: `C:\Soldat`, Program Files, Steam's
-libraries (its registry, `libraryfolders.vdf`, any `steamapps/common` folder named for
-Soldat), and on Linux Wine's, Steam's, Flatpak's and Snap's: a folder there is an install
-when the game's art folders (`gostek-gfx/`, `sfx/` and the like) are in it. Failing that,
-**Browse...** brings up the system's folder dialog (Windows' own; zenity, kdialog or
-osascript elsewhere), and the folder picked is taken as it is, unchecked; if there is
-nothing in it to make a mod of, the tab says so and offers **Browse...** again.
+The folder picked is told apart by what is in it and above it (`soldat_pick`):
 
-Then the tab offers each thing in the install a mod can be made of, an **Import** each
-(**Imported** once a mod by its name is):
+- **The install**: the game's art folders (`gostek-gfx/`, `sfx/` and the like) beside a
+  `mods/` or a `soldat.ini`, which no mod has. Everything in it is imported at once, a mod
+  each, those imported before (a mod by their name there already) passed over:
+  - **My S1 Mod**: the install's own folders whole, 1.7.1's art as it shipped and the
+    player's changes over it, so Soldat 1's look can be worn here, part by part.
+  - **Each mod** of `mods/<name>/` but those 1.7.1 ships with (`data/soldat-1.7.1.txt`,
+    each file's size and CRC). Each is named for its folder (Soldat 1's own `classic`, the
+    art of before 1.7, made `classic_s1`).
+  - **Each custom interface**, the install's and its mods', but the ten 1.7.1 ships with
+    as they came, `Default`, and any without a `setup.sif`.
+- **A mod of its `mods/`**, or **an interface of its `custom-interfaces/`**: that alone,
+  over the install it is in.
+- **A mod alone**, its folders but no install about it: over the install found where
+  Soldat is usually put (`C:\Soldat`, Program Files, Steam's libraries, and on Linux
+  Wine's, Steam's, Flatpak's and Snap's), else over Classic, said so.
 
-- **Your changes**: art, sounds and words copied over the install's own `gostek-gfx/`,
-  `sfx/`, `txt/default.txt` and the rest, if any. Each file is weighed against 1.7.1 as it
-  shipped (`data/soldat-1.7.1.txt`, each file's size and CRC) and against Classic; what
-  differs is the player's. Made **My S1 Mod**; each mod and interface below is named for its
-  folder.
-- **Mods**: each folder of `mods/<name>/` but those 1.7.1 ships with. A mod there is the
-  player's whole: all of it goes in, weighed against nothing. Under it go the player's
-  changes, as Soldat wore a mod over its own folders.
-- **Custom interfaces**: each of the install's, and its mods', but the ten 1.7.1 ships
-  with as they came, `Default`, and any without a `setup.sif`. Under it go the player's
-  changes to the HUD's art and icons.
+Under each mod goes the install's own folders whole, as Soldat 1 wore a mod over them, and
+under each interface the install's HUD art and icons: a mod's art is shown among 1.7.1's,
+not among Classic's redrawn. Whole means every file the game reads and every pivot, even
+those that are Classic's as they are: Classic is ours, and changes, and a mod made from
+Soldat 1 looks as it did there whatever becomes of it. Only what the game never reads is
+left out. There is no choice about it. Then:
 
-There is no choice about the changes underneath: a mod made from Soldat 1 looks as it did
-there. Then:
+- Layered as Soldat 1 finds a file: the mod's first, then the install's (GR:393). A mod's
+  `klata.bmp` replaces the install's `klata.png`, whichever the extension; within a folder
+  a `.png` wins.
 
-- Each image's Soldat 1 scale, as Soldat 1 works it out: its `mod.ini`'s, by its path,
-  then its folder, then `DefaultScale`, else 1 (soldat1-mods.md); the edges' 1. Its pixels
+- Each image's Soldat 1 scale, as Soldat 1 works it out, from the `mod.ini` of the folder
+  it came from: by its path, then its folder, then `DefaultScale`, else 1 (soldat1-mods.md);
+  the edges' 1. So the install's art keeps its 4.5 (its cursor its 10), a mod's its own
+  `mod.ini`'s, and a mod of before 1.7 without one its 1, side by side in one mod. Its pixels
   are kept as they were, and the mod's `mod.json` says the scales, as few as say them all
   (the most of them the mod's, and each folder's or file's that differs: `scales_compact`).
 - `.bmp` to `.png`, its colour key to alpha (green; black for the 15 images keyed so).

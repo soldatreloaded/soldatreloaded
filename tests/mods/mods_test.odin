@@ -235,6 +235,127 @@ soldat_sources :: proc(t: ^testing.T) {
 	testing.expect(t, string(shot) == "loud shotgun" && chest, "the mod's own over its own folders', and theirs under it")
 }
 
+// A mod of an install's mods/ made over the install's own folders whole (base), as Soldat 1
+// wears it: the mod's image replaces the install's of its name, a .bmp over a .png, as
+// Soldat 1 looks in the mod first; each at the scale of the mod.ini of the folder it came
+// from, the install's DefaultScale or the mod's 1 without one; what the mod hasn't, the
+// install's, even what is Classic's as it is, so that it stays Soldat 1's whatever becomes
+// of Classic; and not what the game never reads.
+@(test)
+over_the_base :: proc(t: ^testing.T) {
+	dir := scratch(t, "over_the_base")
+	defer os.remove_all(dir)
+	soldat := utils.temp_path(dir, "Soldat")
+	mods_dir := utils.temp_path(dir, "mods")
+	write_classic(mods_dir, {{"soldier/klata.png", picture(1)}, {"soldier/morda.png", picture(2)}, {"soldier/biodro.png", picture(7)}, {"soldier/pivots.json", `{"Head": [0, 0.5]}`}, {"sounds/spas12-fire.wav", "classic shotgun"}})
+	classic := res.mod_make(mods_dir)
+	defer res.mod_destroy(&classic)
+
+	write(utils.temp_path(soldat, "mod.ini"), "[SCALE]\nDefaultScale=4.5\n[GOSTEK]\nHead_CenterX=0\nHead_CenterY=0.5\n")
+	write(utils.temp_path(soldat, "gostek-gfx", "klata.png"), picture(3, 27, 18))
+	write(utils.temp_path(soldat, "gostek-gfx", "morda.png"), picture(4, 27, 18))
+	write(utils.temp_path(soldat, "gostek-gfx", "biodro.png"), picture(7)) // Classic's belt, as it is
+	write(utils.temp_path(soldat, "gostek-gfx", "unread.png"), picture(8)) // none the game asks for
+	write(utils.temp_path(soldat, "sfx", "spas12-fire.wav"), "soldat shotgun")
+	old := utils.temp_path(soldat, "mods", "Old")
+	write(utils.temp_path(old, "gostek-gfx", "klata.bmp"), as_bitmap(t, picture(5))) // a mod from before 1.7, no mod.ini
+	scaled := utils.temp_path(soldat, "mods", "Sharp")
+	write(utils.temp_path(scaled, "mod.ini"), "[SCALE]\nDefaultScale=2\n")
+	write(utils.temp_path(scaled, "gostek-gfx", "klata.png"), picture(6, 12, 8))
+
+	result := res.mod_import({soldat, old}, mods_dir, "Old", classic, options = {base = true})
+	testing.expect_value(t, result.problem, "")
+	sharp := res.mod_import({soldat, scaled}, mods_dir, "Sharp", classic, options = {base = true})
+	testing.expect_value(t, sharp.problem, "")
+
+	choice: [res.Part]string
+	choice[.Soldier], choice[.Sounds] = "Old", "Old"
+	worn := res.mod_make(mods_dir, choice)
+	defer res.mod_destroy(&worn)
+	chest, found := res.mod_image(worn, "gostek-gfx", "klata.png")
+	testing.expect(t, found && width_of(chest) == 6 && chest.scale == 1, "the mod's .bmp over the install's .png, at 1")
+	head, _ := res.mod_image(worn, "gostek-gfx", "morda.png")
+	testing.expect(t, width_of(head) == 27 && head.scale == 4.5, "the install's head under it, not Classic's, at its DefaultScale")
+	shot, _ := res.sound_file(worn, "spas12-fire.wav")
+	testing.expect_value(t, read(shot), "soldat shotgun")
+	made := utils.temp_path(mods_dir, "Old", "soldier")
+	testing.expect(t, utils.file_exists(utils.temp_path(made, "biodro.png")), "the install's belt, though Classic's is the same")
+	testing.expect(t, !utils.file_exists(utils.temp_path(made, "unread.png")), "not what the game never reads")
+	pivots, _ := utils.read_file(utils.temp_path(made, "pivots.json"), context.temp_allocator)
+	testing.expect(t, strings.contains(string(pivots), `"head"`), "its pivots, though Classic's are the same")
+
+	choice[.Soldier] = "Sharp"
+	worn_sharp := res.mod_make(mods_dir, choice)
+	defer res.mod_destroy(&worn_sharp)
+	sharp_chest, _ := res.mod_image(worn_sharp, "gostek-gfx", "klata.png")
+	sharp_head, _ := res.mod_image(worn_sharp, "gostek-gfx", "morda.png")
+	testing.expect(t, width_of(sharp_chest) == 12 && sharp_chest.scale == 2, "a mod's mod.ini sizes its own art")
+	testing.expect_value(t, sharp_head.scale, 4.5) // and not the install's under it
+
+	width_of :: proc(file: res.Mod_File) -> int {
+		data, _ := res.mod_read(file, context.temp_allocator)
+		image, _ := res.texture_decode(data, nil, context.temp_allocator)
+		return image.width
+	}
+}
+
+// A folder picked to import from Soldat 1, told apart: an install (art beside its mods/),
+// a mod of its mods/, an interface of its custom-interfaces/, a mod alone, and none.
+@(test)
+soldat_picked :: proc(t: ^testing.T) {
+	dir := scratch(t, "soldat_picked")
+	defer os.remove_all(dir)
+	soldat := utils.temp_path(dir, "Soldat")
+	write(utils.temp_path(soldat, "gostek-gfx", "klata.png"), picture(1))
+	write(utils.temp_path(soldat, "mods", "Old", "gostek-gfx", "klata.bmp"), "art")
+	write(utils.temp_path(soldat, "custom-interfaces", "Mine", "setup.SIF"), "layout")
+	write(utils.temp_path(dir, "Downloads", "Loose", "sfx", "shot.wav"), "loud")
+	write(utils.temp_path(dir, "Notes", "readme.txt"), "not Soldat's")
+
+	same :: proc(a, b: string) -> bool {
+		x, _ := strings.replace_all(a, "\\", "/", context.temp_allocator)
+		y, _ := strings.replace_all(b, "\\", "/", context.temp_allocator)
+		return strings.equal_fold(strings.trim_right(x, "/"), strings.trim_right(y, "/"))
+	}
+	kind, install := res.soldat_pick(soldat)
+	testing.expect(t, kind == .Install && same(install, soldat), "the install")
+	kind, install = res.soldat_pick(utils.temp_path(soldat, "mods", "Old"))
+	testing.expect(t, kind == .Mod && same(install, soldat), "a mod of its mods/, the install under it")
+	kind, install = res.soldat_pick(utils.temp_path(soldat, "custom-interfaces", "Mine"))
+	testing.expect(t, kind == .Interface && same(install, soldat), "an interface of its custom-interfaces/")
+	kind, install = res.soldat_pick(utils.temp_path(dir, "Downloads", "Loose"))
+	testing.expect(t, kind == .Mod && install == "", "a mod alone")
+	kind, _ = res.soldat_pick(utils.temp_path(dir, "Notes"))
+	testing.expect_value(t, kind, res.Soldat_Pick.Nothing)
+}
+
+// An install imported whole: My S1 Mod of its own folders, and a mod each of its mods/,
+// counted as it goes; imported again, each passed over, being there.
+@(test)
+soldat_imported :: proc(t: ^testing.T) {
+	dir := scratch(t, "soldat_imported")
+	defer os.remove_all(dir)
+	soldat := utils.temp_path(dir, "Soldat")
+	mods_dir := utils.temp_path(dir, "mods")
+	write_classic(mods_dir, {{"soldier/klata.png", picture(1)}, {"sounds/spas12-fire.wav", "classic shotgun"}})
+	classic := res.mod_make(mods_dir)
+	defer res.mod_destroy(&classic)
+	write(utils.temp_path(soldat, "gostek-gfx", "klata.png"), picture(3, 27, 18))
+	write(utils.temp_path(soldat, "mods", "Loud", "sfx", "spas12-fire.wav"), "loud shotgun")
+
+	progress: res.Import_Progress
+	first := res.soldat_import(soldat, mods_dir, classic, &progress)
+	defer res.soldat_imported_destroy(&first)
+	testing.expect_value(t, first.kind, res.Soldat_Pick.Install)
+	testing.expect(t, slice.equal(first.made, []string{res.SOLDAT_OWN_NAME, "Loud"}) && len(first.failed) == 0, "My S1 Mod, and the mod")
+	testing.expect(t, progress.done == 2 && progress.total == 2, "counted as it went")
+	testing.expect(t, utils.file_exists(utils.temp_path(mods_dir, "Loud", "soldier", "klata.png")), "the install's own art under the mod")
+
+	again := res.soldat_import(soldat, mods_dir, classic)
+	defer res.soldat_imported_destroy(&again)
+	testing.expect(t, len(again.made) == 0 && len(again.skipped) == 2, "each there already, passed over")
+}
+
 // A .png of `w` by `h`: a block of colour `shade` in the middle, see-through about it.
 picture :: proc(shade: u8, w := 6, h := 4) -> string {
 	pixels := make([]utils.Rgba, w * h, context.temp_allocator)
