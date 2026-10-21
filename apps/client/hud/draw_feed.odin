@@ -3,6 +3,7 @@ package hud
 import sa "core:container/small_array"
 import "core:fmt"
 import "core:math"
+import "core:strings"
 
 import rl "vendor:raylib"
 
@@ -100,8 +101,27 @@ draw_console :: proc(u: ^ui.Ui, feed: ^Feed, dim, typing: bool, scroll: int) {
 	}
 	for &line, i in lines {
 		text := utils.short_string_text(&line.text)
-		font := SMALLEST_FONT if text_width(u, text, SMALL_FONT) > u.width - 10 else SMALL_FONT
-		write(u, text, {5, 1 + f32(i) * console_row(u)}, font, with_alpha(line.color, 60 if dim else 255))
+		font := SMALLEST_FONT if text_width(u, unmarked(text), SMALL_FONT) > u.width - 10 else SMALL_FONT
+		alpha := 60 if dim else 255
+		write_marked(u, text, {5, 1 + f32(i) * console_row(u)}, font, with_alpha(line.color, alpha), with_alpha(feed.var_color, alpha))
+	}
+}
+
+// `text` at `pos` in `color`, but what a taunt filled in (between VAR_OPEN and VAR_CLOSE)
+// in `marked`, the marks themselves left out.
+@(private = "file")
+write_marked :: proc(u: ^ui.Ui, text: string, pos: [2]f32, font: Lettering, color, marked: rl.Color) {
+	x, rest, in_var := pos.x, text, false
+	for rest != "" {
+		i := strings.index_any(rest, VAR_MARKS)
+		part := rest if i < 0 else rest[:i]
+		if part != "" {
+			write(u, part, {x, pos.y}, font, marked if in_var else color)
+			x += text_width(u, part, font)
+		}
+		if i < 0 do break
+		in_var = rest[i] == VAR_OPEN
+		rest = rest[i + 1:]
 	}
 }
 

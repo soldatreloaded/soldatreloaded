@@ -41,6 +41,14 @@ edit_stop :: proc(k: ^Kit) {
 	k.edit.select_all = false // the field gone, its selection with it
 }
 
+// `str` typed into the field over `key` as though from the keyboard, if it has the
+// keyboard; false if it hasn't.
+edit_append :: proc(k: ^Kit, key: rawptr, str: string) -> bool {
+	if k.edit.key != key do return false
+	edit_insert(k, str)
+	return true
+}
+
 edit_text :: proc(k: ^Kit) -> string {
 	return string(k.edit.buffer[:k.edit.length])
 }

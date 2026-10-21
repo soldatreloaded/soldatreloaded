@@ -92,6 +92,8 @@ Match :: struct {
 	radio:      Radio,
 	emote_wheel: Emote_Wheel,
 	speech:     [sim.MAX_PLAYERS]Speech, // what each said last, over their head
+	killer:     Name_Text, // who killed me last, and whom I killed last: a taunt's {killer} and {victim}
+	victim:     Name_Text,
 	scoreboard_muted: [sim.MAX_PLAYERS]bool, // muted from the scoreboard, by slot: this session, the player there now (cleared as they leave)
 	vote:       Vote_Seen,
 	watch:      Watch,
@@ -443,7 +445,9 @@ shown :: proc(match: ^Match, config: ^res.Client_Config, sounds: ^sound.Sound) {
 		// my own sounds are the point of view's, so a demo hears the watched player's
 		sound.sound_tick(sounds, game, point_of_view(match), watched(match), match.camera.pos, &match.sparks)
 	}
+	match.hud.feed.var_color = rl.Color(config.interface.taunt_var_color)
 	hud.feed_tick(&match.hud.feed, game, &names, point_of_view(match))
+	taunt_kills_seen(match, &names)
 	if ended, is_ended := game.round.phase.(sim.Ended); is_ended && ended.countdown == sim.ROUND_END_TICKS && match.mode == .Offline {
 		hud_round_ended(match) // online the server says so (Map_Change)
 	}

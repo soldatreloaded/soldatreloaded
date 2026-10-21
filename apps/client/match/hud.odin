@@ -444,7 +444,7 @@ flag_team :: proc(kind: sim.Thing_Kind) -> res.Team {
 
 // The time of day in `zone`, as the original's scoreboard has it ('h:nn:ss ampm'): the
 // hour without its 0, and AM or PM. For this frame.
-@(private = "file")
+@(private = "package")
 time_of_day :: proc(zone: ^datetime.TZ_Region) -> string {
 	at, ok := time.time_to_datetime(time.now())
 	if !ok do return ""

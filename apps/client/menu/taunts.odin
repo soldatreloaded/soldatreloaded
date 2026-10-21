@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:strings"
 
 import res "../../../core/resources"
+import "../hud"
 import "../ui"
 
 // The taunt editor: the modifier every taunt key is held with (Alt, Ctrl or Shift), then
@@ -19,6 +20,7 @@ Taunt_Editor :: struct {
 	radio:    int,    // Radio's call, 1 to 9, 0 for none picked yet
 	emote:    int,    // Emote's, its place in EMOTES
 	text:     string, // the words being edited
+	vars:     bool,   // the list of the variables the words can carry, shown
 }
 
 TAUNT_TEXT_MAX :: 255
@@ -58,6 +60,7 @@ page_taunts :: proc(menu: ^Menu) {
 		combo := fmt.tprintf("%s + %s", TAUNT_MODIFIER_NAMES[editor.modifier], strings.to_upper(TAUNT_SLOT_KEYS[editor.slot], context.temp_allocator))
 		ui.section(k, combo)
 		taunt_line(menu)
+		taunt_vars(menu)
 		if r := ui.row(k, ui.ROW_H, true); r.shown {
 			bw := ui.button_w(k, "Remove")
 			if ui.button_at(k, ui.ctrl_x(r) + ui.ctrl_w(r) - bw, ui.ctrl_y(r), bw, ui.CTRL_H, "Remove", false, false) do taunt_clear(menu)
@@ -192,6 +195,57 @@ taunt_line :: proc(menu: ^Menu) {
 
 	if k.erase do taunt_clear(menu) // Delete unbinds the key
 	else if changed do taunt_apply(menu)
+}
+
+// The variables the words can carry (hud.TAUNT_VARS), as one line naming a few until
+// it's opened; open, each with what it fills in, two to a row where there's room. A
+// click on one puts it in the words.
+@(private = "file")
+taunt_vars :: proc(menu: ^Menu) {
+	k := &menu.kit
+	u := k.ui
+	editor := &menu.taunts
+	if r := ui.row(k, ui.ROW_H, false); r.shown {
+		caption := "Hide" if editor.vars else "Variables"
+		bw := ui.button_w(k, caption)
+		if ui.button_at(k, r.x + r.w - 10 - bw, ui.ctrl_y(r), bw, ui.CTRL_H, caption, false, false) do editor.vars = !editor.vars
+		hint := "Click one to add it. {{name}} says it in capitals." if editor.vars else "Words can carry {time_left}, {score}, {killer} and more, filled in as the key says them."
+		ui.text_fit(k, ui.BODY, hint, r.x + 10, r.y + r.h / 2, r.w - bw - 30, ui.MUTED)
+	}
+	if !editor.vars do return
+	VAR_H :: 22
+	r0 := ui.row(k, 0, false)
+	columns := 2 if r0.w >= 460 else 1
+	cell_w := (r0.w - 20) / f32(columns)
+	name_w: f32 = 0
+	for v in hud.TAUNT_VARS do name_w = max(name_w, ui.width_of(u, ui.BOLD, strings.concatenate({"{", v.name, "}"}, context.temp_allocator)))
+	for i := 0; i < len(hud.TAUNT_VARS); i += columns {
+		r := ui.row(k, VAR_H, false)
+		if !r.shown do continue
+		for c in 0 ..< columns {
+			if i + c >= len(hud.TAUNT_VARS) do break
+			v := hud.TAUNT_VARS[i + c]
+			x := r.x + 10 + f32(c) * cell_w
+			token := strings.concatenate({"{", v.name, "}"}, context.temp_allocator)
+			if ui.over(k, x, r.y, cell_w - 6, VAR_H) do ui.rrect(u, x, r.y + 1, cell_w - 6, VAR_H - 2, ui.RADIUS, ui.HOVER)
+			if ui.take(k, -1, x, r.y, cell_w - 6, VAR_H) do taunt_var_add(menu, token)
+			cy := r.y + VAR_H / 2
+			ui.text_fit(k, ui.BOLD, token, x + 6, cy, name_w, ui.ACCENT)
+			ui.text_fit(k, ui.BODY, v.about, x + 6 + name_w + 10, cy, cell_w - name_w - 28, ui.MUTED)
+		}
+	}
+	ui.gap(k, 4)
+}
+
+// `token` added to the end of the words: into the box while it is typed in, else bound
+// at once.
+@(private = "file")
+taunt_var_add :: proc(menu: ^Menu, token: string) {
+	editor := &menu.taunts
+	if ui.edit_append(&menu.kit, &editor.text, token) do return
+	if len(editor.text) + len(token) > TAUNT_TEXT_MAX do return
+	set_text(&editor.text, strings.concatenate({editor.text, token}, context.temp_allocator))
+	taunt_apply(menu)
 }
 
 // The 36 keys, the number row then the qwerty rows: a bound key tinted, the picked one

@@ -92,7 +92,7 @@ command_run :: proc(match: ^Match, line: string) {
 		prompt_open(match, .Command)
 	case "say", "say_team":
 		if rest == "" do usage(match, "%s <text>", word)
-		else do say(match, word == "say_team", true, unquoted(rest)) // a key's: a taunt, a radio call
+		else do say(match, word == "say_team", true, taunt_fill(match, unquoted(rest))) // a key's: a taunt, a radio call, its variables filled in
 	case "votemap", "votekick":
 		if rest == "" do usage(match, "%s <%s>", word, "map" if word == "votemap" else "player")
 		else do say(match, false, false, fmt.tprintf("/%s %s", word, rest))

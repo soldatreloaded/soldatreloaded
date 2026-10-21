@@ -183,6 +183,7 @@ Interface_Settings :: struct {
 	name_color:         utils.Rgba `jsoncomment:"the colour of teammates' names, RRGGBB"`,
 	carrier_color:      utils.Rgba `jsoncomment:"the colour of a teammate's name while they carry the flag, RRGGBB"`,
 	scoreboard_mute:    bool `jsoncomment:"the mute sign by each name and team on the scoreboard, clicked to mute them"`,
+	taunt_var_color:    utils.Rgba `jsoncomment:"the colour a taunt's variables ({time_left} and the rest) show in, in the console, RRGGBB"`,
 	kill_color_mine:   Maybe(utils.Rgba) `jsoncomment:"the kill log colour for your own kills and deaths, RRGGBB; empty keeps the team's colour"`,
 	kill_color_team:    Maybe(utils.Rgba) `jsoncomment:"the kill log colour for your teammates, RRGGBB; empty keeps the team's colour"`,
 	kill_color_enemy:   Maybe(utils.Rgba) `jsoncomment:"the kill log colour for the enemy, RRGGBB; empty keeps the team's colour"`,
@@ -412,6 +413,7 @@ DEFAULT_CLIENT_CONFIG := Client_Config {
 		name_color      = {0x99, 0xDF, 0x99, 0xFF}, // as the HUD drew them
 		carrier_color   = {0xDC, 0xDC, 0x33, 0xFF},
 		scoreboard_mute = true,
+		taunt_var_color = {0x8F, 0xE3, 0xFF, 0xFF},
 		typing         = .Dots,
 		typing_size     = 100,
 		kill_log_length = 15,

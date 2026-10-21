@@ -264,9 +264,10 @@ chat_heard :: proc(match: ^Match, slot: sim.Soldier_Id, team, taunt: bool, text:
 		hud.console_add(feed, color, fmt.tprintf("%s[%s] ", prefix, who))
 		hud.console_add(feed, color, fmt.tprintf(" %s", text))
 	}
-	spaces := strings.count(text, " ")
-	delay := len(text) * CHAR_DELAY if spaces == 0 else spaces * SPACE_CHAR_DELAY
-	match.speech[slot] = {text = utils.short_string(hud.LINE_TEXT, text), ticks = i32(min(delay, MAX_CHAT_DELAY))}
+	said := hud.unmarked(text) // over the head a taunt's variables aren't coloured
+	spaces := strings.count(said, " ")
+	delay := len(said) * CHAR_DELAY if spaces == 0 else spaces * SPACE_CHAR_DELAY
+	match.speech[slot] = {text = utils.short_string(hud.LINE_TEXT, said), ticks = i32(min(delay, MAX_CHAT_DELAY))}
 }
 
 // A line from the server: a player's, or its own, in the colour the original gives what
@@ -338,7 +339,7 @@ radio_call :: proc(match: ^Match, call, place: int, words: string) {
 	if !radio_allowed(match) do return
 	match.radio = {cooldown = match.radio.cooldown}
 	if words != "" {
-		say(match, true, true, fmt.tprintf("*%d%d%s", call, place, words))
+		say(match, true, true, fmt.tprintf("*%d%d%s", call, place, taunt_fill(match, words)))
 		return
 	}
 	radio_choose(match, call)

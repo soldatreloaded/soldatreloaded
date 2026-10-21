@@ -28,7 +28,10 @@ chat :: proc(sv: ^Server, slot: game.Soldier_Id, e: ^net.Event) {
 	m.name = player.name // carried with the line, so the receiver names it even before its soldier arrives whole
 	m.kind = .Server
 	m.color = {}
-	text := utils.short_string_text(&m.text)
+	// what the line says, without the marks round a taunt's filled-in variables (which
+	// go on to the clients, for their consoles to colour): for the scripts, the commands
+	// and the log
+	text := unmarked(utils.short_string_text(&m.text))
 	// an emote is no chat: a key does it as often as the player likes (the client keeps it
 	// to one in EMOTE_COOLDOWN), and only the line's own flood check counts it
 	if !is_emote(text) do player.chat_warnings += 1
@@ -59,6 +62,18 @@ chat :: proc(sv: ^Server, slot: game.Soldier_Id, e: ^net.Event) {
 	for &other, i in sv.players {
 		if other.joined && sv.game.world.soldiers[i].team == team do net.net_send(other.peer, .Chat, bytes)
 	}
+}
+
+// `text` without the client's marks round a taunt's variables (\x01 and \x02). For this
+// frame.
+@(private = "file")
+unmarked :: proc(text: string) -> string {
+	if strings.index_any(text, "\x01\x02") < 0 do return text
+	b := strings.builder_make(context.temp_allocator)
+	for i in 0 ..< len(text) {
+		if text[i] != '\x01' && text[i] != '\x02' do strings.write_byte(&b, text[i])
+	}
+	return strings.to_string(b)
 }
 
 // Whether the line is an emote's command: /victory and the rest (game.TAUNT_NAMES).
