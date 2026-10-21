@@ -105,8 +105,8 @@ draw_scoreboard_box :: proc(u: ^ui.Ui, art: ^Art, data: ^Hud_Data) -> f32 {
 		if player.flags > 0 do picture(u, art.pictures[.Flag], {align(u, 337 + x), align(u, row - 1)}, mark)
 		if player.bot do picture(u, art.pictures[.Bot], {align(u, 534 + x), align(u, row)}, mark)
 		// the mute sign, faint until it is muted, so every row shows it can be clicked to
-		// mute; never on my own row, which can't be muted
-		if id != data.me do picture(u, art.pictures[.Mute], {align(u, 246 + x), align(u, row - 1)}, {255, 255, 255, u8(STATUS_ALPHA) if player.muted else MUTE_HINT_ALPHA})
+		// mute; never on my own row, which can't be muted. None at all with the setting off
+		if data.scoreboard_mute && id != data.me do picture(u, art.pictures[.Mute], mute_sign_at(u, x, row), {255, 255, 255, u8(STATUS_ALPHA) if player.muted else MUTE_HINT_ALPHA})
 		// the line's quality, red to green: the original's by its ConnectionQuality, here by the
 		// ping, whole up to 50 ms and gone by 350
 		quality := clamp(100 - (player.ping - 50) / 3, 0, 100)
@@ -115,13 +115,21 @@ draw_scoreboard_box :: proc(u: ^ui.Ui, art: ^Art, data: ^Hud_Data) -> f32 {
 	}
 	// each team's caption shows the sign too, faint until the team is muted: its caption is
 	// clicked to mute the whole team
-	for g in groups {
-		picture(u, art.pictures[.Mute], {align(u, 246 + x), align(u, g.top - 1)}, {255, 255, 255, u8(STATUS_ALPHA) if data.team_muted[g.team] else MUTE_HINT_ALPHA})
+	if data.scoreboard_mute {
+		for g in groups {
+			picture(u, art.pictures[.Mute], mute_sign_at(u, x, g.top), {255, 255, 255, u8(STATUS_ALPHA) if data.team_muted[g.team] else MUTE_HINT_ALPHA})
+		}
 	}
 	return bottom
 }
 
-MUTE_HINT_ALPHA :: 55 // the mute sign while not muted: faint, to show a row or caption can be clicked to mute
+MUTE_HINT_ALPHA :: 55 // the mute sign while not muted: faint, to show it can be clicked to mute
+
+// Where a row's mute sign sits, the row's text at `top`: drawn there, and clicked there.
+@(private = "file")
+mute_sign_at :: proc(u: ^ui.Ui, x, top: f32) -> [2]f32 {
+	return {align(u, 246 + x), align(u, top - 1)}
+}
 
 @(private = "file") HEADING_COLOR :: rl.Color{255, 255, 230, 255}
 @(private = "file") HOST_COLOR :: rl.Color{233, 180, 12, 255}
@@ -256,19 +264,19 @@ Mute_Team :: struct {
 	team: res.Team,
 }
 
-// A left-click on the open scoreboard, as a mute request on the Hud: whatever is under
-// the pointer (scoreboard_at).
+// A left-click on the open scoreboard, as a mute request on the Hud: whichever mute sign
+// is under the pointer (scoreboard_at).
 @(private = "package")
 scoreboard_mute_input :: proc(hud: ^Hud, u: ^ui.Ui, data: ^Hud_Data) {
 	if !rl.IsMouseButtonPressed(.LEFT) do return
-	if target, ok := scoreboard_at(u, data); ok do hud.mute = target
+	if target, ok := scoreboard_at(u, data, hud.art.pictures[.Mute].size); ok do hud.mute = target
 }
 
-// What is under the pointer on the scoreboard: a team by its caption, or a player by
-// their row (never my own); none if the pointer is off the rows. The rows are placed as
-// draw_scoreboard places them. Shared by the mute hint and the click.
+// Which mute sign is under the pointer on the scoreboard: a team's by its caption, or a
+// player's by their row (never my own); none if the pointer is off the signs. The signs
+// are placed as draw_scoreboard_box places them, `sign` big.
 @(private = "file")
-scoreboard_at :: proc(u: ^ui.Ui, data: ^Hud_Data) -> (Mute_Target, bool) {
+scoreboard_at :: proc(u: ^ui.Ui, data: ^Hud_Data, sign: [2]f32) -> (Mute_Target, bool) {
 	at := data.cursor
 	x := board_x(u)
 	ranked := rank_players(data)
@@ -278,7 +286,7 @@ scoreboard_at :: proc(u: ^ui.Ui, data: ^Hud_Data) -> (Mute_Target, bool) {
 
 	// the team captions, each on its own line
 	for g in groups {
-		if row_hit(at, x, g.top) do return Mute_Team{g.team}, true
+		if sign_hit(at, mute_sign_at(u, x, g.top), sign) do return Mute_Team{g.team}, true
 	}
 	// the player rows
 	placed: [len(res.Team)]int
@@ -288,14 +296,15 @@ scoreboard_at :: proc(u: ^ui.Ui, data: ^Hud_Data) -> (Mute_Target, bool) {
 		row := groups[gi].top + 20 + f32(placed[gi] * PLAYER_ROW)
 		placed[gi] += 1
 		if id == data.me do continue // my own line is not muted
-		if row_hit(at, x, row) do return Mute_Player{id}, true
+		if sign_hit(at, mute_sign_at(u, x, row), sign) do return Mute_Player{id}, true
 	}
 	return nil, false
 }
 
-// Whether `at` is on a scoreboard row whose text sits at `top`: the row's full width,
-// PLAYER_ROW tall, from a little above the text.
+// Whether `at` is on a mute sign with its top-left at `pos`, `size` big, give or take a
+// couple of points so a small sign is easy to hit.
 @(private = "file")
-row_hit :: proc(at: [2]f32, x, top: f32) -> bool {
-	return at.x >= x + 35 && at.x <= x + 600 && at.y >= top - 2 && at.y <= top - 2 + PLAYER_ROW
+sign_hit :: proc(at, pos, size: [2]f32) -> bool {
+	PAD :: 2
+	return at.x >= pos.x - PAD && at.x <= pos.x + size.x + PAD && at.y >= pos.y - PAD && at.y <= pos.y + size.y + PAD
 }

@@ -68,6 +68,7 @@ Hud_Data :: struct {
 	team_names:   bool, // teammates' names by them always, not only out of view
 	name_color:   rl.Color, // teammates' names
 	carrier_color: rl.Color, // a teammate carrying the flag
+	scoreboard_mute: bool, // the scoreboard's mute signs, clicked to mute
 	team_muted:   [res.Team]bool, // each team muted by a kind mute, for the scoreboard's sign
 	typing:       res.Typing_Style, // over a player typing
 	typing_size:  f32, // the indicator's size, 1 the small font's own
