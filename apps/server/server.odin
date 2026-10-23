@@ -207,6 +207,7 @@ settings_from :: proc(config: ^res.Server_Config, weapons: res.Weapon_Table) -> 
 	s.respawn_max_wave = max(config.server.respawn_max_wave * game.TICK_RATE, s.respawn_min_wave)
 	s.max_grenades = clamp(config.server.max_grenades, 0, 5)
 	s.guns_off = res.guns_off(config.guns)
+	if !config.server.shuriken do s.guns_off += {.Shuriken}
 	s.weapons = weapons
 	return s
 }

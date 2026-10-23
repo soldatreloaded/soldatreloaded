@@ -27,6 +27,7 @@ DRAW_SOUNDS := #partial [res.Weapon]string {
 	.USSOCOM  = "changespin.wav",
 	.Knife    = "knife.wav",
 	.Chainsaw = "chainsaw-d.wav",
+	.Shuriken = "knife.wav",
 }
 
 // Hard ground's steps, then soft ground's (the map's `steps`), four of each.

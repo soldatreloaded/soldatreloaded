@@ -35,6 +35,7 @@ Weapon :: enum {
 	Knife,
 	Chainsaw,
 	LAW,
+	Shuriken,
 	Frag_Grenade,
 	Thrown_Knife,
 }
@@ -83,6 +84,7 @@ WEAPON_INI_SECTIONS := [Weapon]string {
 	.Knife         = "Combat Knife",
 	.Chainsaw      = "Chainsaw",
 	.LAW           = "M72 LAW",
+	.Shuriken      = "Shuriken",
 	.Frag_Grenade  = "Grenade",
 	.Thrown_Knife  = "",
 }
@@ -131,6 +133,7 @@ GATHER_WEAPONS :: Weapon_Table {
 	.Knife         = {2310,   6,   1,   3,     6,     0,      0,   0,      0,     0.12,    0,      1.15,  1,     0.98},
 	.Chainsaw      = {50,     2,   200, 110,   8,     0,      0,   0,      0,     0.0028,  0,      1.15,  1,     0.9},
 	.LAW           = {2150,   6,   1,   260,   23,    11,     0,   0,      0,     0.028,   0.5,    1.15,  1,     0.9},
+	.Shuriken      = {6.0,    6,   2,   120,   13.33, 0,      0,   0,      0,     0.01,    0,      1,     1,     1},
 	.Frag_Grenade  = {1505,   80,  1,   20,    5,     0,      0,   0,      0,     0,       1,      0.63,  0.63,  1},
 	.Thrown_Knife  = {},
 }

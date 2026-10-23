@@ -90,6 +90,7 @@ settings_from :: proc(offline: res.Offline_Settings) -> sim.Game_Settings {
 	s.respawn_min_wave = s.respawn_time
 	s.respawn_max_wave = s.respawn_time + wave
 	s.max_grenades = clamp(offline.max_grenades, 0, 5)
+	if !offline.shuriken do s.guns_off += {.Shuriken}
 	return s
 }
 

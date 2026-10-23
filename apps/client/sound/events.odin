@@ -29,6 +29,7 @@ FIRE_SOUNDS := #partial [res.Weapon]string {
 	.Minigun         = "minigun-fire.wav",
 	.USSOCOM         = "colt1911-fire.wav",
 	.LAW             = "law.wav",
+	.Shuriken        = "knife.wav",
 	.Frag_Grenade    = "grenade-throw.wav",
 }
 

@@ -19,6 +19,7 @@ Ruling :: union {
 	Flag_Capture,
 	Pickup,
 	Thing_Respawn,
+	Shuriken_Pickup,
 }
 
 // A wound, as the rules have it: what comes off the health.
@@ -118,6 +119,12 @@ Thing_Respawn :: struct {
 	thing: Thing_Id,
 }
 
+// A shuriken stuck in a wall a soldier walked up to, taken up again.
+Shuriken_Pickup :: struct {
+	soldier: Soldier_Id,
+	bullet:  Bullet_Id,
+}
+
 apply_ruling :: proc(world: ^World, resources: ^Resources, ruling: Ruling) {
 	switch r in ruling {
 	case Damage:        soldier_hurt(world, r)
@@ -133,5 +140,6 @@ apply_ruling :: proc(world: ^World, resources: ^Resources, ruling: Ruling) {
 	case Flag_Capture:  flag_capture(world, resources, r)
 	case Pickup:        thing_pick_up(world, resources, r)
 	case Thing_Respawn: thing_respawn(world, resources, r.thing)
+	case Shuriken_Pickup: shuriken_pick_up(world, resources, r)
 	}
 }

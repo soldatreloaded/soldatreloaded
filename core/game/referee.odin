@@ -39,6 +39,11 @@ judge :: proc(world: ^World, resources: ^Resources, authority: ^Authority, out: 
 		}
 	}
 	out.judged = len(events)
+
+	// a stuck shuriken a soldier walked up to is taken up again
+	for &bullet, i in world.bullets {
+		if bullet.active && bullet.style == .Shuriken && bullet.stuck do judge_shuriken_pickup(world, resources, Bullet_Id(i), authority, out)
+	}
 }
 
 // The server's tick on every soldier, whoever moves it: the dead respawned when their

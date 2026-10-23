@@ -27,6 +27,7 @@ Bullet_Shape :: enum {
 	Frag_Grenade,
 	Knife,
 	Knife_Left,
+	Shuriken,
 }
 
 @(private = "file", rodata)
@@ -52,6 +53,7 @@ SHAPE_FILES := [Bullet_Shape]string {
 	.Frag_Grenade = "frag-grenade",
 	.Knife        = "knife",
 	.Knife_Left   = "knife2",
+	.Shuriken     = "shuriken",
 }
 
 bullets_load :: proc(source: Source) -> (art: Bullet_Art) {
@@ -123,6 +125,12 @@ draw_bullet :: proc(art: ^Bullet_Art, bullet: ^sim.Bullet, alpha: f32, grenade_c
 		} else {
 			draw_sprite(art.shapes[.Knife_Left], at, {4, 1}, {1, 1}, turn, WHITE)
 		}
+	case .Shuriken:
+		s := art.shapes[.Shuriken]
+		if !bullet.stuck && !bullet.lost_momentum && trails && timeout < sim.SHURIKEN_AIR_TIME - 2 {
+			draw_streak(streak, pos, {speed / 3, 1}, heading, {255, 255, 255, 110})
+		}
+		draw_sprite(s, pos, s.size * 0.5, {1, 1}, 0 if bullet.stuck else spin, WHITE)
 	case .Punch, .Knife: // a blow has nothing to show
 	case .Plain:
 		draw_round(own, bullet, pos, timeout, trails)
