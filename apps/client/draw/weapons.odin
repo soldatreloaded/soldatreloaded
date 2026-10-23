@@ -45,6 +45,7 @@ WEAPON_ART := #partial [res.Weapon]Weapon_Art {
 	.Chainsaw      = {id = "Chainsaw", file = "chainsaw", in_hands = {0.25, 0.5}, on_back = {0.25, 0.5}, flash = "chainsaw-fire", flash_center = {-0.2, 0.5}},
 	.LAW           = {id = "Law", file = "law", in_hands = {0.1, 0.6}, on_back = {0.3, 0.45}, flash = "law-fire", flash_center = {-0.2, 0.8}},
 	.Knife         = {id = "Knife", file = "knife", in_hands = {-0.1, 0.6}, forearm = true, unslung = true},
+	.Shuriken      = {id = "Shuriken", file = "shuriken", in_hands = {0.5, 0.5}, unslung = true},
 }
 
 // Where a weapon is pinned, as the mod.ini of the mod its image is from has it, else as

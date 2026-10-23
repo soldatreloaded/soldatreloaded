@@ -10,7 +10,7 @@ import "../utils"
 // sent over and over, unreliably, a lost one replaced by the next; news goes once, in
 // order. The two streams' messages are stream.odin's.
 
-VERSION :: 16 // of the wire: a client of another can't join
+VERSION :: 17 // of the wire: a client of another can't join
 DEFAULT_PORT :: 23073
 
 Name :: utils.Short_String(24)     // a player's
@@ -291,7 +291,7 @@ msg_map_reply :: proc(b: ^Buffer, m: ^Msg_Map_Reply) {
 }
 
 // The weapons' numbers the server's game plays by, every weapon's, in a message of its
-// own (17 weapons of 14 numbers fit a datagram). A client plays by them. Sent by its
+// own (18 weapons of 14 numbers fit a datagram). A client plays by them. Sent by its
 // fields (fields.odin), so a number added to res.Weapon_Stats goes with the rest.
 Msg_Weapons :: struct {
 	weapons: res.Weapon_Table,

@@ -216,6 +216,7 @@ bullet_collide :: proc(world: ^World, resources: ^Resources, id: Bullet_Id, auth
 		bullet.velocity, bullet.pos, bullet.old_pos = saved_velocity, saved_pos, saved_old
 		bullet.ricochet_count -= 1
 	}
+	if bullet.stuck do return // a shuriken embedded in the wall meets nothing else this tick
 
 	collider, hit_collider := collider_collide(world, resources, id, nearest, authority, out)
 	if !bullet.active {
@@ -230,6 +231,8 @@ bullet_collide :: proc(world: ^World, resources: ^Resources, id: Bullet_Id, auth
 	}
 
 	thing_collide(world, resources, bullet, nearest, out)
+
+	shuriken_collide(world, id, out)
 }
 
 // A thrown knife stopped where it is: the things lay it down there, at their turn.
@@ -376,6 +379,16 @@ map_collide :: proc(world: ^World, resources: ^Resources, id: Bullet_Id, at: uti
 				knife_land(world, bullet)
 				wall_hit(id, bullet, pos, bullet.velocity, out)
 				bullet_end(world, id, out, pos)
+			case .Shuriken:
+				incoming := bullet.velocity
+				normal, distance, _ := res.closest_edge(polygon, pos)
+				dir := utils.normalize(normal)
+				// the normals point into the polygon: back out to just off its face
+				bullet.pos = pos - dir * (distance + 3.0)
+				bullet.stuck = true
+				bullet.stuck_normal = -dir
+				bullet.velocity = {}
+				wall_hit(id, bullet, pos, incoming, out)
 			}
 			return result
 		}
@@ -410,6 +423,14 @@ collider_collide :: proc(
 			if bullet.style == .Thrown_Knife do knife_land(world, bullet)
 			emit(out, Collider_Hit{bullet = id, pos = p, velocity = bullet.velocity})
 			bullet_end(world, id, out, p)
+		case .Shuriken:
+			incoming := bullet.velocity
+			normal := utils.normalize(p - collider.pos)
+			bullet.pos = p + normal * 3.0
+			bullet.stuck = true
+			bullet.stuck_normal = normal
+			bullet.velocity = {}
+			emit(out, Collider_Hit{bullet = id, pos = p, velocity = incoming})
 		case .Frag_Grenade:
 			// not stopped by cover it was thrown from right next to
 			if bullet.timeout < GRENADE_TIMEOUT - 2 {
@@ -436,10 +457,11 @@ Candidates :: struct {
 
 // Who the bullet may hit, nearest first (TargetableSprite, FilterSpritesByDistance). The
 // corpses are among them, once their bodies have started (a soldier just killed has
-// none until the corpses' next turn).
+// none until the corpses' next turn). `timeout` is the bullet's own life, so its owner
+// is left alone for its first ticks whatever that life is (a shuriken's is short).
 @(private = "file")
-candidates :: proc(world: ^World, authority: ^Authority, bullet: ^Bullet) -> (c: Candidates) {
-	owner_vulnerable_after: i32 = GRENADE_TIMEOUT - 50 if bullet.style == .Frag_Grenade else BULLET_TIMEOUT - 20
+candidates :: proc(world: ^World, authority: ^Authority, bullet: ^Bullet, timeout: i32) -> (c: Candidates) {
+	owner_vulnerable_after: i32 = GRENADE_TIMEOUT - 50 if bullet.style == .Frag_Grenade else timeout - 20
 
 	distances: [MAX_PLAYERS]f32
 	for i in 0 ..< MAX_PLAYERS {
@@ -525,7 +547,7 @@ body_collide :: proc(
 	owner := &world.soldiers[bullet.owner]
 	melee := bullet.style == .Punch || bullet.style == .Knife
 	radius := PART_RADIUS + 1.0 if bullet.style == .Frag_Grenade else PART_RADIUS
-	c := candidates(world, authority, bullet)
+	c := candidates(world, authority, bullet, resources.weapons[bullet.weapon].timeout)
 
 	for n in 0 ..< c.count {
 		ti := c.ids[n]
@@ -653,6 +675,19 @@ body_collide :: proc(
 			shot_end_tell(authority, bullet, point, nil, target_id, out)
 			bullet_end(world, id, out, point)
 			return
+		case .Shuriken:
+			// A shuriken stops in the first soldier it meets, dealing its damage; through a
+			// corpse it flies on.
+			friendly := owner.team != .None && owner.team == live.team && target_id != bullet.owner
+			emit(out, Blood{target = target_id, pos = point, velocity = bullet.velocity, bloodless = friendly})
+			wound(resources, bullet, target_id, utils.length(bullet.velocity) * bullet.damage * modifier, &joints, label, point, push, false, out)
+			if corpse {
+				bullet.last_hit = target_id
+				return
+			}
+			shot_end_tell(authority, bullet, point, nil, target_id, out)
+			bullet_end(world, id, out, point)
+			return
 		}
 	}
 	return
@@ -697,6 +732,125 @@ thing_collide :: proc(world: ^World, resources: ^Resources, bullet: ^Bullet, nea
 		if bullet.style == .Plain || bullet.style == .Shotgun {
 			emit(out, Thing_Hit{thing = thing.kind, pos = point, velocity = bullet.velocity, part = u8(part)})
 		}
+		return
+	}
+}
+
+// ---------------------------------------------------------------------------------
+// The shurikens
+
+SHURIKEN_DEFLECT_RADIUS :: f32(10) // a shuriken's reach, as it turns fire aside
+
+// A shuriken in flight turns a bullet or grenade aside as a polygon would; one stuck in
+// a wall turns nothing aside. Each bullet's path is judged against every flying
+// shuriken's own path, both from the state before either flies; every machine steps the
+// bullets in the same order, so they all agree. The shuriken itself is never deflected.
+@(private = "file")
+shuriken_collide :: proc(world: ^World, id: Bullet_Id, out: ^Tick_Output) {
+	bullet := &world.bullets[id]
+	if !bullet.active do return
+	#partial switch bullet.style {
+	case .Plain, .Shotgun, .M79, .LAW, .Frag_Grenade:
+	case:
+		return
+	}
+
+	path := bullet.pos + bullet.velocity
+	for &other, i in world.bullets {
+		if !other.active || other.style != .Shuriken || other.stuck || Bullet_Id(i) == id do continue
+		// where the shuriken flies this tick
+		from := other.pos
+		to := other.pos + other.velocity
+		if segments_distance(bullet.pos, path, from, to) > SHURIKEN_DEFLECT_RADIUS do continue
+
+		normal := utils.normalize(bullet.pos - other.pos)
+		if normal == (utils.Vec2{}) {
+			normal = utils.normalize(bullet.velocity)
+			if normal == (utils.Vec2{}) do normal = {1, 0}
+		}
+		point := bullet.pos
+		#partial switch bullet.style {
+		case .Plain, .Shotgun, .M79, .LAW:
+			speed := utils.length(bullet.velocity)
+			reflect := normal * -speed
+			bullet.velocity = bullet.velocity * RICOCHET_KEEP + reflect * RICOCHET_TURN
+			bullet.last_ricochet = point
+			emit(out, Ricochet{bullet = id, pos = point, velocity = bullet.velocity})
+		case .Frag_Grenade:
+			if utils.length(bullet.velocity) > 1.5 do emit(out, Grenade_Bounce{bullet = id, pos = point})
+			dot := bullet.velocity.x * normal.x + bullet.velocity.y * normal.y
+			bullet.velocity = (bullet.velocity - normal * (2.0 * dot)) * GRENADE_SURFACE_COEFFICIENT
+			bullet.last_ricochet = point
+		}
+		return
+	}
+}
+
+// The closest approach of the segments a0-a1 and b0-b1, in f32 so every machine agrees.
+@(private = "file")
+segments_distance :: proc(a0, a1, b0, b1: utils.Vec2) -> f32 {
+	d1 := a1 - a0
+	d2 := b1 - b0
+	r := a0 - b0
+	a := d1.x * d1.x + d1.y * d1.y
+	e := d2.x * d2.x + d2.y * d2.y
+	f := d2.x * r.x + d2.y * r.y
+	s, t: f32 = 0, 0
+	eps := f32(1e-6)
+	if a <= eps && e <= eps do return utils.length(a0 - b0)
+	if a <= eps {
+		t = clamp(f / e, 0, 1)
+	} else {
+		c := d1.x * r.x + d1.y * r.y
+		if e <= eps {
+			s = clamp(-c / a, 0, 1)
+		} else {
+			b := d1.x * d2.x + d1.y * d2.y
+			denom := a * e - b * b
+			if denom != 0 do s = clamp((b * f - c * e) / denom, 0, 1)
+			t = (b * s + f) / e
+			if t < 0 {
+				t = 0
+				s = clamp(-c / a, 0, 1)
+			} else if t > 1 {
+				t = 1
+				s = clamp((b - c) / a, 0, 1)
+			}
+		}
+	}
+	closest := (a0 + d1 * s) - (b0 + d2 * t)
+	return utils.length(closest)
+}
+
+SHURIKEN_PICKUP_RADIUS :: f32(16) // a soldier this near a stuck shuriken takes it up
+
+// A stuck shuriken a soldier walked up to is taken up again, as a dropped gun is: gone
+// from the wall, a charge back on a shuriken in hand, or a shuriken taken into the hands.
+shuriken_pick_up :: proc(world: ^World, resources: ^Resources, pickup: Shuriken_Pickup) {
+	bullet := &world.bullets[pickup.bullet]
+	if !bullet.active do return
+	bullet.active = false
+	soldier := &world.soldiers[pickup.soldier]
+	if soldier.arsenal.primary.weapon == .Shuriken {
+		full := resources.weapons[.Shuriken].stats.ammo
+		soldier.arsenal.primary.ammo = min(soldier.arsenal.primary.ammo + 1, full)
+	} else {
+		soldier.arsenal.primary = weapon_state(resources, .Shuriken)
+		soldier.arsenal.primary.ammo = 1
+	}
+}
+
+// The nearest living soldier within reach, empty-handed or topping up a shuriken in hand,
+// takes a stuck shuriken, on the server's word.
+judge_shuriken_pickup :: proc(world: ^World, resources: ^Resources, id: Bullet_Id, authority: ^Authority, out: ^Tick_Output) {
+	if authority == nil do return
+	bullet := &world.bullets[id]
+	for &soldier, i in world.soldiers {
+		if !soldier.active || soldier.vitals.dead || soldier.team == .Spectator do continue
+		if utils.length(soldier.body.pos - bullet.pos) > SHURIKEN_PICKUP_RADIUS do continue
+		if soldier.arsenal.primary.weapon != .Punch && soldier.arsenal.primary.weapon != .Shuriken do continue
+		if soldier.arsenal.primary.weapon == .Shuriken && soldier.arsenal.primary.ammo >= resources.weapons[.Shuriken].stats.ammo do continue
+		rule(world, resources, Shuriken_Pickup{soldier = Soldier_Id(i), bullet = id}, out)
 		return
 	}
 }

@@ -560,6 +560,7 @@ GUN_BODIES := #partial [res.Weapon]Gun_Body {
 	.Knife         = {1.8, 0.994, 1.15},
 	.Chainsaw      = {2.8, 0.994, 1.15},
 	.LAW           = {2.8, 0.994, 1.15},
+	.Shuriken      = {1.0, 0.994, 1.15},
 }
 
 thing_skeleton :: proc(resources: ^Resources, thing: ^Thing) -> ^res.Skeleton {

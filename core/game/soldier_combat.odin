@@ -84,7 +84,7 @@ combat_control :: proc(world: ^World, resources: ^Resources, id: Soldier_Id, out
 
 	// the rifle butt, standing next to someone standing
 	if soldier.controls.stance == .Stand && fire_held && soldier.vitals.cease_fire < 0 &&
-	   weapon.weapon != .Punch && weapon.weapon != .Knife && weapon.weapon != .Chainsaw {
+	   weapon.weapon != .Punch && weapon.weapon != .Knife && weapon.weapon != .Chainsaw && weapon.weapon != .Shuriken {
 		for &other, i in world.soldiers {
 			if Soldier_Id(i) == id || !other.active || other.vitals.dead || other.controls.stance != .Stand || other.team == .Spectator do continue
 			if utils.length(soldier.body.pos - other.body.pos) < MELEE_DISTANCE do res.animation_switch(animations, body, .Melee)
@@ -109,15 +109,15 @@ combat_control :: proc(world: ^World, resources: ^Resources, id: Soldier_Id, out
 	if !rolling(body) && .Change in buttons do res.animation_switch(animations, body, .Change)
 
 	// throwing the gun away
-	if soldier.arsenal.dont_drop && (!drop_held || weapon.weapon == .Knife) do soldier.arsenal.dont_drop = false
+	if soldier.arsenal.dont_drop && (!drop_held || weapon.weapon == .Knife || weapon.weapon == .Shuriken) do soldier.arsenal.dont_drop = false
 	if drop_held && .Throw not_in buttons && !soldier.arsenal.dont_drop && !rolling(body) &&
 	   (body.id != .Change || body.frame > 25) && weapon.weapon != .Punch {
 		res.animation_switch(animations, body, .Throw_Weapon)
-		if weapon.weapon == .Knife do body.speed = 2
+		if weapon.weapon == .Knife || weapon.weapon == .Shuriken do body.speed = 2
 	}
 
 	// reloading by hand
-	if (weapon.weapon == .Chainsaw || (!rolling(body) && body.id != .Change)) && .Reload in buttons && weapon.ammo != info.stats.ammo {
+	if (weapon.weapon == .Chainsaw || (!rolling(body) && body.id != .Change)) && .Reload in buttons && weapon.ammo != info.stats.ammo && weapon.weapon != .Shuriken {
 		if weapon.weapon == .Spas12 {
 			if weapon.ammo < info.stats.ammo {
 				if weapon.fire_count == 0 {
@@ -154,9 +154,9 @@ combat_control :: proc(world: ^World, resources: ^Resources, id: Soldier_Id, out
 		res.animation_switch(animations, body, .Stand)
 	}
 
-	// the gun leaves the hand at frame 19 of the throw; the knife flies from frame 16, or
-	// as soon as the key is let go of
-	if weapon.weapon != .Knife && body.id == .Throw_Weapon && body.frame == 19 && weapon.weapon != .Punch {
+	// the gun leaves the hand at frame 19 of the throw; the knife and the shuriken fly
+	// from frame 16, or as soon as the key is let go of
+	if weapon.weapon != .Knife && weapon.weapon != .Shuriken && body.id == .Throw_Weapon && body.frame == 19 && weapon.weapon != .Punch {
 		if weapon_droppable(weapon.weapon) {
 			// laid down from the hand at the things' turn
 			joints := soldier_pose(animations, soldier, soldier.body.pos)
@@ -171,6 +171,10 @@ combat_control :: proc(world: ^World, resources: ^Resources, id: Soldier_Id, out
 	if weapon.weapon == .Knife && body.id == .Throw_Weapon && (!drop_held || body.frame == 16) {
 		throw_knife(world, resources, id, out)
 		info = &resources.weapons[.Punch]
+	}
+	if weapon.weapon == .Shuriken && body.id == .Throw_Weapon && (!drop_held || body.frame == 16) {
+		throw_shuriken(world, resources, id, out)
+		info = &resources.weapons[weapon.weapon]
 	}
 
 	// the punch or the stab
@@ -295,6 +299,7 @@ trigger :: proc(world: ^World, resources: ^Resources, id: Soldier_Id, out: ^Tick
 		res.animation_switch(resources.animations, body, .Punch)
 		return
 	}
+	if weapon.weapon == .Shuriken do return // a shuriken is thrown by the throw key, never fired
 	if weapon.fire_count != 0 || weapon.ammo <= 0 do return
 
 	if stats.start_up_time > 0 && weapon.startup_count > 0 {
@@ -544,6 +549,25 @@ throw_knife :: proc(world: ^World, resources: ^Resources, id: Soldier_Id, out: ^
 	soldier_shoot(world, resources, id, .Thrown_Knife, joints[15], velocity, knife.damage, out)
 
 	soldier.arsenal.primary = weapon_state(resources, .Punch)
+	res.animation_switch(resources.animations, &soldier.pose.body, .Stand)
+}
+
+// The shuriken leaves the hand at full speed, straight at the aim, one of its charges
+// spent; with none left, the fists take its place. A held drop key throws nothing more
+// until it is let go of.
+@(private = "file")
+throw_shuriken :: proc(world: ^World, resources: ^Resources, id: Soldier_Id, out: ^Tick_Output) {
+	soldier := &world.soldiers[id]
+	shuriken := &resources.weapons[.Shuriken].stats
+	joints := soldier_pose(resources.animations, soldier, soldier.body.pos)
+
+	soldier.arsenal.dont_drop = true
+	velocity := utils.normalize(soldier.controls.aim - joints[14]) * shuriken.speed
+	soldier_shoot(world, resources, id, .Shuriken, joints[15], velocity, shuriken.damage, out)
+
+	weapon := &soldier.arsenal.primary
+	weapon.ammo -= 1
+	if weapon.ammo <= 0 do soldier.arsenal.primary = weapon_state(resources, .Punch)
 	res.animation_switch(resources.animations, &soldier.pose.body, .Stand)
 }
 

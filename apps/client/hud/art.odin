@@ -86,6 +86,7 @@ GUN_FILES := [res.Weapon]string {
 	.Knife         = "guns/knife.png",
 	.Chainsaw      = "guns/chainsaw.png",
 	.LAW           = "guns/law.png",
+	.Shuriken      = "guns/shuriken.png",
 	.Frag_Grenade  = "nade.png",
 	.Thrown_Knife  = "guns/knife.png",
 }

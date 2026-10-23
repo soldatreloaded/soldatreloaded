@@ -108,7 +108,7 @@ Window_Button :: enum {
 ESCAPE_SIZE :: [2]f32{300, 200}
 WINDOW_BOX :: rl.Rectangle{125, 355, 370, 90}
 PRIMARIES :: 10 // the weapons menu's first buttons; the secondaries follow
-SECONDARIES :: 4
+SECONDARIES :: 5
 
 // A button where it is, and whether it is offered.
 Button :: struct {

@@ -80,11 +80,11 @@ bullet_sounds :: proc(s: ^Sound, game: ^sim.Game, followed: Maybe(sim.Soldier_Id
 			s.whizzed[i] = false
 			continue
 		}
-		if bullet.timeout == game.resources.weapons[bullet.weapon].timeout - 25 && bullet.style != .Shotgun {
+		if bullet.timeout == game.resources.weapons[bullet.weapon].timeout - 25 && bullet.style != .Shotgun && bullet.style != .Shuriken {
 			play_at(s, "bulletby.wav", bullet.pos)
 		}
 		listener, following := followed.?
-		if s.whizzed[i] || !following || bullet.owner == listener || bullet.style == .Punch do continue
+		if s.whizzed[i] || !following || bullet.owner == listener || bullet.style == .Punch || bullet.style == .Shuriken do continue
 		d := bullet.pos - s.listener
 		if d.x > -200 && d.x < 200 && d.y > -350 && d.y < 100 {
 			play_at(s, pick(s, WHIZZES[:]), bullet.pos)

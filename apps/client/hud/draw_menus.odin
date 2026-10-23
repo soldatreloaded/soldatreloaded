@@ -67,9 +67,9 @@ draw_menu_boxes :: proc(u: ^ui.Ui, art: ^Art, menus: ^Menus, data: ^Hud_Data) {
 	defer zoom_end(z)
 	under := menu_box(menus, .Weapons)
 	box(u, art, under)
-	box(u, art, {under.x, under.y + under.height, under.width, 80}) // the secondaries
+	box(u, art, {under.x, under.y + under.height, under.width, 98}) // the secondaries, room for the shuriken
 	x := align(u, 55)
-	for weapon in res.Weapon.Desert_Eagles ..= res.Weapon.LAW {
+	for weapon in res.Weapon.Desert_Eagles ..= res.Weapon.Shuriken {
 		icon := art.guns[weapon]
 		k := f32(weapon)
 		y := 157 + 18 * (k - 1 if k <= PRIMARIES else k) + max(0, 18 - icon.size.y) / 2

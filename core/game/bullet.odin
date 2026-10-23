@@ -25,6 +25,9 @@ Bullet :: struct {
 	forces:         utils.Vec2,
 	fired_from:     utils.Vec2, // the damage falls off from here
 	last_ricochet:  utils.Vec2, // so one surface deflects it once
+	stuck:          bool,       // a shuriken embedded in a polygon: it stays and deflects fire
+	stuck_normal:   utils.Vec2, // the polygon's normal where it stuck, for the deflection
+	lost_momentum:  bool,       // a shuriken whose air time is spent: it falls instead of flying on
 	timeout:        i32,
 	damage:         f32,
 	last_hit:       Maybe(Soldier_Id), // so a piercing bullet hits a soldier once
@@ -168,22 +171,29 @@ bullet_update :: proc(world: ^World, resources: ^Resources, id: Bullet_Id, autho
 		return
 	}
 
-	bullet_collide(world, resources, id, authority, out)
+	// a shuriken embedded in a polygon meets nothing further: it only counts down.
+	if !bullet.stuck do bullet_collide(world, resources, id, authority, out)
 	if !bullet.active do return
 
 	bullet.timeout -= 1
 	if bullet.timeout == 0 {
-		#partial switch bullet.style {
-		case .Frag_Grenade, .M79, .LAW:
-			explode(world, resources, id, .Frag, nil, -1, authority, out) // the M79 too: a spent round goes off as a frag
+		// a shuriken has no timeout: its air time spent, it loses its momentum and falls
+		if bullet.style == .Shuriken && !bullet.stuck && !bullet.lost_momentum {
+			bullet.lost_momentum = true
+			bullet.velocity = {}
+		} else if bullet.style != .Shuriken {
+			#partial switch bullet.style {
+			case .Frag_Grenade, .M79, .LAW:
+				explode(world, resources, id, .Frag, nil, -1, authority, out) // the M79 too: a spent round goes off as a frag
+			}
+			bullet_end(world, id, out)
+			return
 		}
-		bullet_end(world, id, out)
-		return
 	}
 
 	// the damage falls off with the distance flown
 	weapon := bullet.weapon
-	if bullet.timeout % 6 == 0 && weapon != .Barrett && weapon != .M79 && weapon != .Knife && weapon != .LAW {
+	if bullet.timeout % 6 == 0 && weapon != .Barrett && weapon != .M79 && weapon != .Knife && weapon != .LAW && weapon != .Shuriken {
 		distance := utils.length(bullet.fired_from - bullet.pos)
 		if (bullet.degrade_count == 0 && distance > 500) || (bullet.degrade_count == 1 && distance > 900) {
 			bullet.damage *= 0.5
@@ -192,8 +202,15 @@ bullet_update :: proc(world: ^World, resources: ^Resources, id: Bullet_Id, autho
 	}
 }
 
-// Euler on the bullet, after every bullet's tick (Parts.pas).
+// Euler on the bullet, after every bullet's tick (Parts.pas). A shuriken flies and falls
+// as any bullet does, decelerating all the while; one stuck in a polygon stays where it is.
 bullet_fly :: proc(bullet: ^Bullet, gravity: f32) {
+	if bullet.stuck {
+		bullet.old_pos = bullet.pos
+		bullet.velocity = {}
+		bullet.forces = {}
+		return
+	}
 	bullet.forces.y += gravity * BULLET_GRAVITY
 	previous := bullet.pos
 	bullet.velocity += bullet.forces

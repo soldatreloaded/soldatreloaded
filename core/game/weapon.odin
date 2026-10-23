@@ -28,12 +28,14 @@ Bullet_Style :: enum u8 {
 	Knife,
 	LAW,
 	Thrown_Knife,
+	Shuriken,
 }
 
 // How long a bullet of each style flies before it is gone, in ticks.
 BULLET_TIMEOUT :: 60 * 7
 GRENADE_TIMEOUT :: 60 * 3
 MELEE_TIMEOUT :: 1
+SHURIKEN_AIR_TIME :: 15 // how long a shuriken flies before its momentum is spent: a quarter second
 
 // A weapon in a soldier's hands.
 Weapon_State :: struct {
@@ -78,6 +80,7 @@ weapons_finish :: proc(weapons: ^[res.Weapon]Weapon_Info) {
 		#partial switch info.bullet_style {
 		case .Frag_Grenade:  info.timeout = GRENADE_TIMEOUT
 		case .Punch, .Knife: info.timeout = MELEE_TIMEOUT
+		case .Shuriken:      info.timeout = SHURIKEN_AIR_TIME
 		case:                info.timeout = BULLET_TIMEOUT
 		}
 	}
@@ -97,9 +100,9 @@ weapon_is_primary :: proc(weapon: res.Weapon) -> bool {
 	return weapon >= .Desert_Eagles && weapon <= .Minigun
 }
 
-// And of its second: the USSOCOM, the knife, the chainsaw, the LAW.
+// And of its second: the USSOCOM, the knife, the chainsaw, the LAW, the shuriken.
 weapon_is_secondary :: proc(weapon: res.Weapon) -> bool {
-	return weapon >= .USSOCOM && weapon <= .LAW
+	return weapon >= .USSOCOM && weapon <= .Shuriken
 }
 
 // A loadout as a host allows it, with the guns `off` taken away: a choice that isn't one,
@@ -113,7 +116,7 @@ loadout_allowed :: proc(chosen: Loadout, off: res.Weapon_Set = {}) -> Loadout {
 	}
 	secondary := chosen.secondary
 	if !weapon_is_secondary(secondary) || secondary in off {
-		secondary = .Knife if .Knife not_in off else first_on(.USSOCOM, .LAW, off)
+		secondary = .Knife if .Knife not_in off else first_on(.USSOCOM, .Shuriken, off)
 	}
 	return {primary, secondary}
 }
@@ -172,6 +175,7 @@ WEAPON_BASES := [res.Weapon]Weapon_Base {
 	.Knife         = {"Combat Knife", false, false, .Knife},
 	.Chainsaw      = {"Chainsaw", false, false, .Knife},
 	.LAW           = {"LAW", true, false, .LAW},
+	.Shuriken      = {"Shuriken", false, false, .Shuriken},
 	.Frag_Grenade  = {"Frag Grenade", false, false, .Frag_Grenade},
 	.Thrown_Knife  = {"Combat Knife", false, false, .Thrown_Knife},
 }
@@ -195,6 +199,7 @@ SOLDAT_WEAPONS :: res.Weapon_Table {
 	.Knife          = {2150.0, 6,   1,   3,     6.0,  0,      0,   0.0,    0.0,   0.12,    0.0,    1.15, 1.0,  0.9},
 	.Chainsaw       = {50.0,   2,   200, 110,   8.0,  0,      0,   0.0,    0.0,   0.0028,  0.0,    1.15, 1.0,  0.9},
 	.LAW            = {1550.0, 6,   1,   300,   23.0, 13,     0,   0.0,    0.0,   0.028,   0.5,    1.15, 1.0,  0.9},
+	.Shuriken       = {6.0,    6,   2,   120,   13.33, 0,      0,   0.0,    0.0,   0.01,    0.0,    1.0,  1.0,  1.0},
 	.Punch          = {330.0,  6,   1,   3,     5.0,  0,      0,   0.0,    0.0,   0.0,     0.0,    1.15, 1.0,  0.9},
 	.Frag_Grenade   = {1500.0, 80,  1,   20,    5.0,  0,      0,   0.0,    0.0,   0.0,     1.0,    0.63, 0.63, 1.0},
 	.Thrown_Knife   = {},

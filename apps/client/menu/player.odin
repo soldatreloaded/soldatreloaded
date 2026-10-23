@@ -23,7 +23,7 @@ EYEWEAR_NAMES := [?]string{"None", "Sunglasses"}
 @(rodata)
 CHAIN_NAMES := [?]string{"None", "Dog tags", "Gold chain"}
 @(rodata)
-SECONDARY_NAMES := [?]string{"USSOCOM", "Combat Knife", "Chainsaw", "LAW"}
+SECONDARY_NAMES := [?]string{"USSOCOM", "Combat Knife", "Chainsaw", "LAW", "Shuriken"}
 
 // The rat and the furry wear only dreadlocks, punk, Mr. T, mullet and wolfcut, and no
 // headgear; the kang wears only army.

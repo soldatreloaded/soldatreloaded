@@ -801,12 +801,12 @@ loadouts_allowed :: proc(t: ^testing.T) {
 	testing.expect_value(t, game.loadout_allowed({.Desert_Eagles, .Knife}, {.Desert_Eagles, .Knife}), game.Loadout{.MP5, .USSOCOM})
 	testing.expect_value(t, game.loadout_allowed({.Punch, .Chainsaw}, {.Chainsaw}), game.Loadout{.Punch, .Knife})
 	primaries := res.Weapon_Set{.Desert_Eagles, .MP5, .AK74, .Steyr_AUG, .Spas12, .Ruger77, .M79, .Barrett, .Minimi, .Minigun}
-	every := primaries + {.USSOCOM, .Knife, .Chainsaw, .LAW}
+	every := primaries + {.USSOCOM, .Knife, .Chainsaw, .LAW, .Shuriken}
 	testing.expect_value(t, game.loadout_allowed({.Minigun, .Knife}, primaries), game.Loadout{.Punch, .Knife})
 	testing.expect_value(t, game.loadout_allowed({.Minigun, .Knife}, every), game.Loadout{.Punch, .Punch})
 	testing.expect_value(t, res.guns_off(res.ALL_GUNS), res.Weapon_Set{})
 	none: res.Gun_Settings
-	testing.expect_value(t, res.guns_off(none), every)
+	testing.expect_value(t, res.guns_off(none), primaries + {.USSOCOM, .Knife, .Chainsaw, .LAW})
 }
 
 // A server of no guns: its Map says which are off, and a bot (whose profile has a
@@ -820,6 +820,7 @@ no_guns :: proc(t: ^testing.T) {
 	config := res.DEFAULT_SERVER_CONFIG
 	config.server.port = PORT
 	config.guns = {}
+	config.server.shuriken = false
 	if !testing.expect(t, server.server_init(sv, {config = &config, data_dir = game.DATA_DIR, first_map = "ctf_Ash"})) do return
 	defer server.server_destroy(sv)
 
@@ -829,7 +830,7 @@ no_guns :: proc(t: ^testing.T) {
 	defer client_close(c)
 	mapped := pump_until(sv, {c}, proc(cs: []^Test_Client) -> bool { return cs[0].mapped })
 	if !testing.expect(t, mapped, "the client is told the map") do return
-	testing.expect_value(t, c.map_msg.guns_off, res.guns_off({}))
+	testing.expect_value(t, c.map_msg.guns_off, res.guns_off({}) + {.Shuriken})
 
 	slot, added := server.server_add_bot(sv, .Alpha)
 	if !testing.expect(t, added, "a bot") do return
