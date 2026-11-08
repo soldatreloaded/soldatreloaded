@@ -114,7 +114,7 @@ runs:
         for p in "${programs[@]}"; do
           case "$platform" in
             linux) deps=$(ldd "$stage/$p") ;;
-            macos) deps=$(otool -L "$stage/$p") ;;
+            macos) deps=$(otool -L "$stage/$p" | grep -Ev "^[[:space:]]*/usr/lib/|^[[:space:]]*/System/") ;; # less the system's own, curl and zlib among them, which every Mac has
             *) deps=$(llvm-objdump -p "$stage/$p" | grep 'DLL Name') ;;
           esac
           echo "$p:"; echo "$deps"

@@ -1,0 +1,41 @@
+name: package-check
+
+# One platform's package made as a release would make it, by hand from the Actions tab
+# (or `gh workflow run package-check.yml -f os=macos-latest`), and kept as an artifact for
+# a look: a way to try the package action without a release's tag.
+
+on:
+  workflow_dispatch:
+    inputs:
+      os:
+        description: the runner (windows-latest, ubuntu-latest, macos-latest, ubuntu-24.04-arm)
+        required: true
+        default: macos-latest
+      app:
+        description: client or server
+        required: true
+        default: client
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ${{ inputs.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/package
+        with:
+          app: ${{ inputs.app }}
+          version: 0.0.0-check
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.app }}-${{ inputs.os }}-check
+          path: |
+            build/dist/*.zip
+            build/dist/manifest.*.json
+          if-no-files-found: error
