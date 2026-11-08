@@ -1,7 +1,9 @@
 name: ci
 
 # Every push to main and every pull request: the programs build and the tests pass, on
-# Windows and Linux. A release runs this first (release.yml).
+# Windows and Linux; on macOS the game and the launcher build, and the tests are run but
+# not yet held to, no one here having a Mac to see to them. A release runs this first
+# (release.yml).
 
 on:
   push:
@@ -15,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest]
+        os: [windows-latest, ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -28,7 +30,8 @@ jobs:
         run: |
           mkdir -p build/ci
           ext=""; if [ "$RUNNER_OS" = Windows ]; then ext=.exe; fi
-          for app in client server launcher; do
+          apps="client server launcher"; if [ "$RUNNER_OS" = macOS ]; then apps="client launcher"; fi # the server is not built for macOS
+          for app in $apps; do
             # the game's and the launcher's Windows resources too, as a release builds them
             res=""; if [ "$RUNNER_OS" = Windows ] && [ -f apps/resources/$app.rc ]; then res=-resource:apps/resources/$app.rc; fi
             odin build apps/$app -vet $ODIN_FLAGS $res -out:build/ci/$app$ext
@@ -36,9 +39,10 @@ jobs:
 
       # tests/compare is left out: it needs the C game and a C toolchain (docs/porting.md).
       - name: test
+        continue-on-error: ${{ runner.os == 'macOS' }} # macOS's tests are watched, not yet held to
         run: |
           for suite in air-animation bots configs launcher lists lobby mods network poahair script; do
             odin test tests/$suite $ODIN_FLAGS
           done
-          odin test tests/server -define:ODIN_TEST_THREADS=1 $ODIN_FLAGS # real sockets, one at a time
+          if [ "$RUNNER_OS" != macOS ]; then odin test tests/server -define:ODIN_TEST_THREADS=1 $ODIN_FLAGS; fi # real sockets, one at a time; the server is not built for macOS
           odin test tests/client -define:ODIN_TEST_THREADS=1 $ODIN_FLAGS

@@ -10,8 +10,10 @@ import "core:path/filepath"
 // xdg-open and the browsers read them; for this user alone.
 
 // This game made the handler, as it starts. False if it couldn't be, which only means
-// links don't open it.
+// links don't open it. On macOS none is made: a URL scheme there is an app bundle's to
+// declare, and the game is a plain program.
 link_register :: proc() -> bool {
+	when ODIN_OS == .Darwin do return false
 	exe, err := os.get_executable_path(context.temp_allocator)
 	if err != nil do return false
 	data, data_err := os.user_data_dir(context.temp_allocator)

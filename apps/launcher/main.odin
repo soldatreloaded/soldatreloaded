@@ -42,6 +42,9 @@ DAMAGED_SHOWN :: 10 // the missing or changed files named; the rest are counted
 when ODIN_OS == .Windows {
 	PLATFORM :: "windows"
 	GAME :: "soldatreloaded.exe"
+} else when ODIN_OS == .Darwin {
+	PLATFORM :: "macos"
+	GAME :: "soldatreloaded"
 } else {
 	PLATFORM :: "linux"
 	GAME :: "soldatreloaded"

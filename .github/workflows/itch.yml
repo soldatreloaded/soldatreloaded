@@ -1,8 +1,8 @@
 name: itch
 
-# A release's game on itch.io, for Windows and Linux, which the itch app installs and
+# A release's game on itch.io, for Windows, Linux and macOS, which the itch app installs and
 # keeps updated (docs/git.md): each platform's zip from the GitHub release, unpacked and
-# pushed by butler to its channel (windows, linux) as the release's version. Without the
+# pushed by butler to its channel (windows, linux, mac) as the release's version. Without the
 # launcher and its manifest: itch is the updater there, and the launcher's would fight
 # it. The game is started by .itch.toml, from the install's root, as the launcher starts
 # it.
@@ -51,7 +51,7 @@ jobs:
           TAG: ${{ inputs.tag }}
         run: |
           gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir dist \
-            --pattern soldatreloaded-windows.zip --pattern soldatreloaded-linux.zip
+            --pattern soldatreloaded-windows.zip --pattern soldatreloaded-linux.zip --pattern soldatreloaded-macos.zip
 
       - name: butler
         run: |
@@ -67,10 +67,11 @@ jobs:
         run: |
           set -euo pipefail
           butler -V
-          for platform in windows linux; do
+          for platform in windows linux macos; do
             case "$platform" in
-              windows) exe=.exe ;;
-              linux) exe= ;;
+              windows) exe=.exe; channel=windows ;;
+              linux) exe=; channel=linux ;;
+              macos) exe=; channel=mac ;;
             esac
             stage="itch-$platform"
             rm -rf "$stage" && mkdir -p "$stage"
@@ -78,7 +79,7 @@ jobs:
             install="$stage/Soldat Reloaded"
             rm -f "$install/soldatreloaded-launcher$exe" "$install/manifest.json"
             printf '[[actions]]\nname = "play"\npath = "soldatreloaded%s"\n' "$exe" > "$install/.itch.toml"
-            butler push "$install" "$ITCH_GAME:$platform" --userversion "${TAG#v}"
+            butler push "$install" "$ITCH_GAME:$channel" --userversion "${TAG#v}"
           done
 
       # What itch.io made of each channel's builds, a while after: processing, live, or

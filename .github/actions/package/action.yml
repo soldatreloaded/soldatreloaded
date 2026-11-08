@@ -9,7 +9,7 @@ description: >
 # players start and which keeps the install at the newest release (apps/launcher). Into
 # build/dist/:
 #
-#   soldatreloaded-<platform>/           the game's install, unpacked
+#   soldatreloaded-<platform>/           the game's install, unpacked (windows, linux, macos)
 #   soldatreloaded-<platform>.zip        what a player downloads
 #   manifest.<platform>.json             every file in it, by hash, for the launcher
 #   soldatreloaded-server.zip            the server, for Linux alone
@@ -18,6 +18,10 @@ description: >
 #
 # The game's install holds its manifest too, as manifest.json, so the launcher knows
 # what release it was last brought up to. The server has none: hosts update it by hand.
+#
+# The macOS game is universal: built once for arm64 and once for x86_64, the two put
+# together with lipo. It is a plain folder, not an app bundle, and is not signed:
+# macOS asks a player to allow it once (Privacy & Security, Open Anyway).
 
 inputs:
   app:
@@ -41,6 +45,7 @@ runs:
         case "$RUNNER_OS" in
           Windows) platform=windows; exe=.exe ;;
           Linux) platform=linux; exe= ;;
+          macOS) platform=macos; exe= ;;
           *) echo "::error::no packages for $RUNNER_OS"; exit 1 ;;
         esac
         case "$APP" in
@@ -80,9 +85,24 @@ runs:
           flags+=(-subsystem:windows -resource:apps/resources/client.rc)
           launcher_flags+=(-resource:apps/resources/launcher.rc)
         fi
-        odin build "apps/$APP" "${flags[@]}" -out:"$stage/$program"
+        # On macOS each program is built for both architectures and the two made one.
+        build() { # build <app> <flags...> -out:<path>
+          local app="$1"; shift
+          if [ "$platform" = macos ]; then
+            local out=""; local rest=()
+            for a in "$@"; do case "$a" in -out:*) out="${a#-out:}" ;; *) rest+=("$a") ;; esac; done
+            odin build "$app" "${rest[@]}" -target:darwin_arm64 -minimum-os-version:11.0 -out:"$out.arm64"
+            odin build "$app" "${rest[@]}" -target:darwin_amd64 -minimum-os-version:11.0 -out:"$out.x86_64"
+            lipo -create "$out.arm64" "$out.x86_64" -output "$out"
+            rm -f "$out.arm64" "$out.x86_64"
+            lipo -info "$out"
+          else
+            odin build "$app" "$@"
+          fi
+        }
+        build "apps/$APP" "${flags[@]}" -out:"$stage/$program"
         if [ "$APP" = client ]; then
-          odin build apps/launcher "${launcher_flags[@]}" -out:"$stage/soldatreloaded-launcher$exe"
+          build apps/launcher "${launcher_flags[@]}" -out:"$stage/soldatreloaded-launcher$exe"
           programs+=("soldatreloaded-launcher$exe")
         fi
         rm -f "$stage"/*.pdb "$stage"/*.exp "$stage"/*.lib
@@ -92,7 +112,11 @@ runs:
         # outside them, or the Visual C++ runtime (apps/client/crt_windows.odin), fails
         # the release.
         for p in "${programs[@]}"; do
-          if [ "$platform" = linux ]; then deps=$(ldd "$stage/$p"); else deps=$(llvm-objdump -p "$stage/$p" | grep 'DLL Name'); fi
+          case "$platform" in
+            linux) deps=$(ldd "$stage/$p") ;;
+            macos) deps=$(otool -L "$stage/$p") ;;
+            *) deps=$(llvm-objdump -p "$stage/$p" | grep 'DLL Name') ;;
+          esac| grep 'DLL Name'); fi
           echo "$p:"; echo "$deps"
           if grep -iE 'raylib|enet|curl|mbed|libz\.|lua|sqlite|vcruntime|msvcp' <<< "$deps"; then
             echo "::error::$p links a library a player would need installed"

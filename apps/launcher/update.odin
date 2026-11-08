@@ -122,8 +122,10 @@ install_file :: proc(path: string, data: []byte) -> bool {
 	if path == LAUNCHER do os.rename(LAUNCHER, LAUNCHER + ".old")
 
 	perm := os.Permissions_Read_All + {.Write_User}
-	if path == LAUNCHER || path == GAME do perm += os.Permissions_Execute_All // on Linux, programs are marked so
-	return os.write_entire_file(path, data, perm) == nil
+	if path == LAUNCHER || path == GAME do perm += os.Permissions_Execute_All // on Linux and macOS, programs are marked so
+	if os.write_entire_file(path, data, perm) != nil do return false
+	if path == LAUNCHER || path == GAME do unquarantine(path)
+	return true
 }
 
 remove_old_launcher :: proc() {

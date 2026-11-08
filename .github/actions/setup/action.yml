@@ -20,6 +20,11 @@ description: >
 # The step exports ODIN_FLAGS, which every build and test passes to Odin: the directory
 # the static libraries are in, searched before the system's. What stays the system's is
 # what every machine has: the C library, and on Linux X11 and OpenGL.
+#
+# On macOS the game alone is built, universal (arm64 and x86_64 in one program): Odin's
+# raylib and stb for macOS hold both, curl is the system's, and ENet is built here fat.
+# GNU coreutils and findutils are put first on the path, since the package action's
+# manifest is made with their find, stat and sha256sum.
 
 runs:
   using: composite
@@ -36,6 +41,19 @@ runs:
       if: runner.os == 'Linux'
       shell: bash
       run: bash "$(odin root)/vendor/stb/src/build_stb.sh" unix
+
+    - name: stb (macOS)
+      if: runner.os == 'macOS'
+      shell: bash
+      run: test -f "$(odin root)/vendor/stb/lib/darwin/stb_image.a" || bash "$(odin root)/vendor/stb/src/build_stb.sh" darwin
+
+    - name: gnu tools (macOS)
+      if: runner.os == 'macOS'
+      shell: bash
+      run: |
+        brew install -q coreutils findutils
+        echo "$(brew --prefix)/opt/coreutils/libexec/gnubin" >> "$GITHUB_PATH"
+        echo "$(brew --prefix)/opt/findutils/libexec/gnubin" >> "$GITHUB_PATH"
 
     # raylib at the version Odin's bindings are for (raylib.odin's VERSION), linked
     # against the same C runtime as the library it replaces (/MD).
@@ -116,7 +134,7 @@ runs:
       run: echo "ODIN_FLAGS=-extra-linker-flags:/LIBPATH:$(cygpath -w "$HOME/sqlite-lib")" >> "$GITHUB_ENV"
 
     - name: versions
-      if: runner.os == 'Linux'
+      if: runner.os == 'Linux' || runner.os == 'macOS'
       shell: bash
       run: |
         {
@@ -133,7 +151,7 @@ runs:
 
     - name: cache
       id: cache
-      if: runner.os == 'Linux'
+      if: runner.os == 'Linux' || runner.os == 'macOS'
       uses: actions/cache@v5
       with:
         path: ~/static-libs
@@ -201,8 +219,23 @@ runs:
           cp "lua-$LUA_VERSION/src/liblua.a" "$STATIC_LIBS/lib/liblua5.4.a"
         fi
 
+    # ENet alone on macOS, fat: the game's other libraries are Odin's or the system's.
+    - name: build enet (macOS)
+      if: runner.os == 'macOS' && steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p "$STATIC_LIBS/lib" && cd "$RUNNER_TEMP"
+        git clone -q --depth 1 --branch "$ENET_TAG" https://github.com/lsalzman/enet.git
+        test "$(git -C enet rev-parse HEAD)" = "$ENET_COMMIT"
+        cmake -S enet -B enet-build -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_SHARED_LIBS=OFF \
+          -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+        cmake --build enet-build -j
+        cp enet-build/libenet.a "$STATIC_LIBS/lib/"
+        lipo -info "$STATIC_LIBS/lib/libenet.a"
+
     - name: link the static libraries
-      if: runner.os == 'Linux'
+      if: runner.os == 'Linux' || runner.os == 'macOS'
       shell: bash
       run: |
         ls "$STATIC_LIBS/lib"/*.a

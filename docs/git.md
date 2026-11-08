@@ -86,9 +86,12 @@ The tag's message is the release's notes, so write it for players to read. Pushi
 tag runs `.github/workflows/release.yml`, each step only if the one before succeeded:
 
 1. **test**: `ci.yml`, the same as on every push to `main` and every pull request: the
-   programs build and the tests pass, on Windows and Linux.
-2. **package**: `.github/actions/package`, for the game on Windows and Linux and the
-   server on Linux.
+   programs build and the tests pass, on Windows and Linux; on macOS the game and the
+   launcher build, and the tests run but are not yet held to.
+2. **package**: `.github/actions/package`, for the game on Windows, Linux and macOS and
+   the server on Linux. The macOS game is universal (arm64 and x86_64 in one), a plain
+   folder, not an app bundle, and unsigned: macOS asks a player to allow it once, in
+   Privacy & Security (Open Anyway), there being no Apple developer account to sign with.
 3. **publish**: a GitHub release named after the tag, its notes the tag's message,
    with every package and manifest attached.
 4. **discord**: `discord-notify.yml` posts the release to the channel behind the
@@ -106,7 +109,7 @@ The game is on itch.io too, at https://soldatreloaded.itch.io/soldat-reloaded (t
 it updated in the launcher's place. `itch.yml` takes each platform's zip from the GitHub
 release, leaves out the launcher and its `manifest.json` (two updaters would fight), adds
 an `.itch.toml` that starts the game from the install's root, and pushes it with butler
-to the channel `windows` or `linux`, as the release's version. The server isn't on
+to the channel `windows`, `linux` or `mac`, as the release's version. The server isn't on
 itch.io.
 
 It needs an API key of the page's account (https://itch.io/user/settings/api-keys) as
@@ -135,7 +138,8 @@ no version, so the newest release's are always at the same addresses
 |---|---|
 | `soldatreloaded-windows.zip` | `soldatreloaded.exe`, `soldatreloaded-launcher.exe`, `data/`, `mods/classic/`, `manifest.json` |
 | `soldatreloaded-linux.zip` | `soldatreloaded`, `soldatreloaded-launcher`, `data/`, `mods/classic/`, `manifest.json` |
-| `manifest.windows.json`, `manifest.linux.json` | every file of the game's install on that platform (below) |
+| `soldatreloaded-macos.zip` | the same for macOS, the programs universal (arm64 and x86_64) |
+| `manifest.windows.json`, `manifest.linux.json`, `manifest.macos.json` | every file of the game's install on that platform (below) |
 | `soldatreloaded-server.zip` | `soldatreloaded-server`, `data/`, `server.config.mjson`, `weapons.ini`, for Linux |
 | `soldatreloaded-server-linux-arm64.zip` | the same, for arm64 Linux (a Raspberry Pi 4 or 5 on a 64-bit OS, an arm cloud machine) |
 
@@ -143,7 +147,7 @@ Each holds `license.md` and `version.txt` too. Players start the launcher, which
 the install up to the newest release and starts the game. The server draws nothing, so
 it carries no mods; nor any scripts, a host adding their own to `scripts/` (examples at
 [soldatreloaded-scripts](https://github.com/soldatreloaded/soldatreloaded-scripts)). The
-game is released for Windows and Linux; the server, for those who host, for Linux alone (x64
+game is released for Windows, Linux and macOS; the server, for those who host, for Linux alone (x64
 and arm64, the arm64 one built on GitHub's arm runner), and
 with no manifest: a host updates it by hand. A server runs on Windows built from the
 source, as it is developed.
