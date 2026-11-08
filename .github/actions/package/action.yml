@@ -58,7 +58,7 @@ runs:
         fi
         # arm64 has the server alone, under a name of its own; x64 keeps the plain one,
         # which the hosted servers' image fetches.
-        if [ "$RUNNER_ARCH" = ARM64 ]; then
+        if [ "$RUNNER_ARCH" = ARM64 ] && [ "$platform" = linux ]; then # macOS is arm64 too, and builds universal
           if [ "$APP" != server ] || [ "$platform" != linux ]; then
             echo "::error::arm64 has the server on Linux alone"; exit 1
           fi
@@ -116,7 +116,7 @@ runs:
             linux) deps=$(ldd "$stage/$p") ;;
             macos) deps=$(otool -L "$stage/$p") ;;
             *) deps=$(llvm-objdump -p "$stage/$p" | grep 'DLL Name') ;;
-          esac| grep 'DLL Name'); fi
+          esac
           echo "$p:"; echo "$deps"
           if grep -iE 'raylib|enet|curl|mbed|libz\.|lua|sqlite|vcruntime|msvcp' <<< "$deps"; then
             echo "::error::$p links a library a player would need installed"
