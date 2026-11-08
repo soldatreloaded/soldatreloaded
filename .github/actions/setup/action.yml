@@ -15,7 +15,10 @@ description: >
 # Windows' raylib is built here too, over Odin's: the one Odin ships is raylib's own
 # release, whose Visual Studio project asks for AVX2, and a game built on it dies at its
 # first frame on a CPU before 2013 (Ivy Bridge and older), an illegal instruction.
-# raylib's CMake asks for nothing beyond what every x64 CPU has.
+# raylib's CMake asks for nothing beyond what every x64 CPU has. And macOS' raylib: the
+# one Odin ships leaves the stb libraries it carries (image, truetype, rect_pack) public,
+# and the game links Odin's own copies of them, which the Mac linker won't have twice;
+# built here, fat, with stb's functions kept to raylib (STB_IMAGE_STATIC and the rest).
 #
 # The step exports ODIN_FLAGS, which every build and test passes to Odin: the directory
 # the static libraries are in, searched before the system's. What stays the system's is
@@ -58,7 +61,7 @@ runs:
     # raylib at the version Odin's bindings are for (raylib.odin's VERSION), linked
     # against the same C runtime as the library it replaces (/MD).
     - name: raylib version
-      if: runner.os == 'Windows'
+      if: runner.os == 'Windows' || runner.os == 'macOS'
       shell: bash
       run: |
         {
@@ -69,28 +72,39 @@ runs:
 
     - name: raylib cache
       id: raylib-cache
-      if: runner.os == 'Windows'
+      if: runner.os == 'Windows' || runner.os == 'macOS'
       uses: actions/cache@v5
       with:
         path: ~/raylib-lib
-        key: raylib-${{ runner.os }}-${{ env.RAYLIB_COMMIT }}
+        key: raylib-${{ runner.os }}-${{ env.RAYLIB_COMMIT }}-stbstatic
 
     - name: build raylib
-      if: runner.os == 'Windows' && steps.raylib-cache.outputs.cache-hit != 'true'
+      if: (runner.os == 'Windows' || runner.os == 'macOS') && steps.raylib-cache.outputs.cache-hit != 'true'
       shell: bash
       run: |
         set -euo pipefail
         mkdir -p "$RAYLIB_LIB" && cd "$RUNNER_TEMP"
         git clone -q --depth 1 --branch "$RAYLIB_TAG" https://github.com/raysan5/raylib.git
         test "$(git -C raylib rev-parse HEAD)" = "$RAYLIB_COMMIT"
-        cmake -S raylib -B raylib-build -A x64 -DBUILD_EXAMPLES=OFF -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL
-        cmake --build raylib-build --config Release --target raylib -j
-        cp raylib-build/raylib/Release/raylib.lib "$RAYLIB_LIB/"
+        if [ "$RUNNER_OS" = Windows ]; then
+          cmake -S raylib -B raylib-build -A x64 -DBUILD_EXAMPLES=OFF -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL
+          cmake --build raylib-build --config Release --target raylib -j
+          cp raylib-build/raylib/Release/raylib.lib "$RAYLIB_LIB/"
+        else
+          stb_static="-DSTB_IMAGE_STATIC -DSTB_IMAGE_WRITE_STATIC -DSTB_IMAGE_RESIZE_STATIC -DSTBTT_STATIC -DSTBRP_STATIC"
+          cmake -S raylib -B raylib-build -DBUILD_EXAMPLES=OFF -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 -DCMAKE_C_FLAGS="$stb_static"
+          cmake --build raylib-build --target raylib -j
+          cp raylib-build/raylib/libraylib.a "$RAYLIB_LIB/"
+          lipo -info "$RAYLIB_LIB/libraylib.a"
+        fi
 
     - name: link raylib
-      if: runner.os == 'Windows'
+      if: runner.os == 'Windows' || runner.os == 'macOS'
       shell: bash
-      run: cp "$RAYLIB_LIB/raylib.lib" "$(odin root)/vendor/raylib/windows/raylib.lib"
+      run: |
+        if [ "$RUNNER_OS" = Windows ]; then cp "$RAYLIB_LIB/raylib.lib" "$(odin root)/vendor/raylib/windows/raylib.lib"
+        else cp "$RAYLIB_LIB/libraylib.a" "$(odin root)/vendor/raylib/macos/libraylib.a"; fi
 
     # SQLite's amalgamation, one C file, at a pinned version checked against its hash.
     - name: sqlite version
