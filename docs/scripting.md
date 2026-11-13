@@ -70,7 +70,9 @@ in seconds, `scores` (`{alpha = n, bravo = n}`), `winner` (`"alpha"` or `"bravo"
 
 A player table has `slot`, `name`, `team` (`"none"`, `"alpha"`, `"bravo"`,
 `"charlie"`, `"delta"` or `"spectator"`), `kills`, `deaths`, `flags`, `ping`, `health`,
-`x` and `y` (where it is, in the map's units, as `server.spawns()` gives them), and `bot`,
+`x` and `y` (where it is, in the map's units, as `server.spawns()` gives them), `vx` and
+`vy` (its velocity, in map units a tick; `y` grows downward), `direction` (`1` facing
+right, `-1` left), `aim_x` and `aim_y` (the cursor, in the map: where it aims), and `bot`,
 `alive`, `spectator` and `admin` (may run the admin commands) as booleans; and a person's `ip` (`"1.2.3.4"`) and
 `hwid` (its machine's hardware ID, eleven hex digits), as the bans know them: a bot has
 neither, and a client that sent no hardware ID has no `hwid`. Slots count from 0 and are

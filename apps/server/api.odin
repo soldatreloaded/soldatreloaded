@@ -77,14 +77,14 @@ push_name :: proc(L: ^lua.State, sv: ^Server, slot: game.Soldier_Id) {
 	push_string(L, utils.short_string_text(&sv.players[slot].name))
 }
 
-// A player's table pushed: its slot, name, team, tally, ping, health, where it is, and
-// whether it is a bot, alive, watching and an admin; and a person's address and hardware
-// ID, which a bot hasn't.
+// A player's table pushed: its slot, name, team, tally, ping, health, where it is, how
+// fast it moves, which way it faces and where it aims, and whether it is a bot, alive,
+// watching and an admin; and a person's address and hardware ID, which a bot hasn't.
 @(private)
 push_player :: proc(L: ^lua.State, sv: ^Server, slot: game.Soldier_Id) {
 	soldier := &sv.game.world.soldiers[slot]
 	player := &sv.players[slot]
-	lua.createtable(L, 0, 16)
+	lua.createtable(L, 0, 21)
 	if player.peer != nil {
 		push_string(L, lists.address_text(net.peer_address(player.peer)))
 		lua.setfield(L, -2, "ip")
@@ -121,6 +121,16 @@ push_player :: proc(L: ^lua.State, sv: ^Server, slot: game.Soldier_Id) {
 	lua.setfield(L, -2, "x")
 	lua.pushnumber(L, lua.Number(soldier.body.pos.y))
 	lua.setfield(L, -2, "y")
+	lua.pushnumber(L, lua.Number(soldier.body.velocity.x))
+	lua.setfield(L, -2, "vx")
+	lua.pushnumber(L, lua.Number(soldier.body.velocity.y))
+	lua.setfield(L, -2, "vy")
+	lua.pushinteger(L, lua.Integer(soldier.body.direction))
+	lua.setfield(L, -2, "direction")
+	lua.pushnumber(L, lua.Number(soldier.controls.aim.x))
+	lua.setfield(L, -2, "aim_x")
+	lua.pushnumber(L, lua.Number(soldier.controls.aim.y))
+	lua.setfield(L, -2, "aim_y")
 }
 
 // Every player's table, in slot order.
